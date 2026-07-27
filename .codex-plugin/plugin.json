@@ -1,0 +1,25 @@
+{
+  "name": "knowledge-loom",
+  "version": "0.1.0",
+  "description": "Governed local Markdown knowledge vault workflows",
+  "author": {
+    "name": "Mike Xiao",
+    "url": "https://github.com/magickaichen"
+  },
+  "repository": "https://github.com/magickaichen/knowledge-loom",
+  "keywords": ["knowledge", "markdown", "vault", "context", "governance"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Knowledge Loom",
+    "shortDescription": "Govern local Markdown knowledge vaults.",
+    "longDescription": "Initialize, audit, use, and maintain bounded focus views in governed local Markdown knowledge vaults.",
+    "developerName": "Mike Xiao",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write", "Local files"],
+    "defaultPrompt": [
+      "Audit this knowledge vault without changing it.",
+      "Use the relevant vault context for this task.",
+      "Initialize a governed Markdown knowledge vault."
+    ]
+  }
+}

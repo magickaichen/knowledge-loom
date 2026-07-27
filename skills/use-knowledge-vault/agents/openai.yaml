@@ -1,0 +1,4 @@
+interface:
+  display_name: "Use Knowledge Vault"
+  short_description: "Use a governed Markdown vault safely"
+  default_prompt: "Use $use-knowledge-vault to apply relevant vault context and capture only authorized durable knowledge."

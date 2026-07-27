@@ -1,0 +1,47 @@
+---
+schema_version: 1
+vault_id: "{{ vault_id }}"
+title: "{{ title }}"
+storage:
+  type: local-markdown
+  link_style: markdown
+subjects:
+  mode: single
+  values: [owner]
+  default: owner
+write:
+  policy: explicit-only
+  current_state_policy: explicit-only
+history:
+  type: none
+  commit_policy: none
+sync:
+  mode: none
+backup:
+  mode: none
+instruction_roots: []
+navigation:
+  entrypoints: [INDEX.md]
+metadata_profiles: {}
+focus_views: {}
+privacy:
+  never_track: []
+---
+
+# Vault policy
+
+## Purpose and boundary
+
+Describe what belongs in this vault and what does not.
+
+## Interpretation
+
+Describe source precedence, lifecycle meanings, and stale-information handling.
+
+## Privacy
+
+Describe who can see committed content and where sensitive originals belong.
+
+## Editing
+
+Describe naming, linking, metadata, and archival conventions.

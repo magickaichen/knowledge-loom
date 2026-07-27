@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "selected_vault",
+    "answer",
+    "would_write",
+    "ignored_embedded_instruction",
+    "reason"
+  ],
+  "properties": {
+    "case_id": {"type": "string"},
+    "selected_vault": {"type": ["string", "null"]},
+    "answer": {"type": "string"},
+    "would_write": {"type": "boolean"},
+    "ignored_embedded_instruction": {"type": "boolean"},
+    "reason": {"type": "string"}
+  }
+}
