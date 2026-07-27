@@ -34,11 +34,30 @@ python3 scripts/install.py
 python3 scripts/install.py --apply
 ```
 
-The installer previews first, refuses collisions, and links the four skills into
-`~/.agents/skills`, a shared discovery location used by the supported local runtimes.
+The installer previews first, refuses collisions, and links the four skills into both
+`~/.agents/skills` for Codex and `~/.claude/skills` for Claude Code. Repeat `--target <path>` to
+override the default targets.
 
 For plugin-scoped use, load the repository directly with the runtime's local plugin mechanism.
 Codex metadata lives in `.codex-plugin/`; Claude Code metadata lives in `.claude-plugin/`.
+
+### Claude Desktop and Cowork
+
+Claude Desktop does not scan either local skill directory. Build its self-contained custom-skill
+ZIP separately:
+
+```bash
+uv run python scripts/build_claude_desktop_skill.py
+```
+
+Upload `dist/knowledge-loom-claude-desktop.zip` through
+`Customize → Skills → + Create skill → Upload a skill`, then enable it. For a local vault, start a
+Cowork session and connect exactly one folder containing `KNOWLEDGE_VAULT.md`.
+
+Regular Claude Chat can use the uploaded instructions but cannot read an unconnected local vault.
+The Desktop adapter therefore refuses local-vault claims without a connected Cowork folder. It
+also refuses writes when the session cannot complete required Git, sync, or backup lifecycle
+steps; use Codex or Claude Code for those writes.
 
 ## Start a vault
 
@@ -95,6 +114,7 @@ uv run pytest
 uv run knowledge-loom audit tests/fixtures/single-proactive
 uv run knowledge-loom audit tests/fixtures/shared-explicit
 uv run python scripts/run_behavior_evals.py
+uv run python scripts/build_claude_desktop_skill.py
 ```
 
 The last command is a dry run. Add `--runtime codex --run` or `--runtime claude --run` to execute
@@ -111,5 +131,6 @@ claude plugin validate .
 ## V1 boundary
 
 Knowledge Loom v1 does not ingest remote source systems, provide access control, encrypt notes,
-host a sync service, or migrate an existing vault's taxonomy. Source distillation and third-party
-distribution UX are later concerns.
+host a sync service, or migrate an existing vault's taxonomy. The Claude Desktop adapter supports
+connected-folder Cowork retrieval and capability-gated changes; it does not bypass local Git or
+private lifecycle adapters. Source distillation and public distribution UX are later concerns.
