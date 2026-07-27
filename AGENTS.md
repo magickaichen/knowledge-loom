@@ -30,9 +30,11 @@ Run these before committing:
 uv run pytest
 uv run knowledge-loom audit tests/fixtures/single-proactive
 uv run knowledge-loom audit tests/fixtures/shared-explicit
+uv run python scripts/build_claude_desktop_skill.py
 python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/use-knowledge-vault
 python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/init-knowledge-vault
 python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/audit-knowledge-vault
 python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/manage-current-focus
+python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py adapters/claude-desktop/knowledge-loom
 python3 /Users/mike.xiao/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 ```
