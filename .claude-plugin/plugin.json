@@ -1,0 +1,11 @@
+{
+  "name": "knowledge-loom",
+  "version": "0.1.0",
+  "description": "Governed local Markdown knowledge vault workflows",
+  "author": {
+    "name": "Mike Xiao",
+    "url": "https://github.com/magickaichen"
+  },
+  "repository": "https://github.com/magickaichen/knowledge-loom",
+  "keywords": ["knowledge", "markdown", "vault", "context", "governance"]
+}

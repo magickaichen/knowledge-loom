@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage Current Focus"
+  short_description: "Maintain one bounded and sourced focus view"
+  default_prompt: "Use $manage-current-focus to update the selected focus view without adding parallel work."
