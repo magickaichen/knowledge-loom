@@ -1,6 +1,6 @@
 ---
 name: audit-knowledge-vault
-description: Run a read-only audit of a governed local Markdown knowledge vault. Use when the user asks to audit, inspect, validate, diagnose, or check a vault contract, registry resolution, metadata profiles, subject isolation, focus invariants, privacy paths, links, Git safety, or lifecycle configuration without modifying the vault.
+description: Audit one governed Markdown vault without modifying it. Use for contract, registry, metadata, subject, focus, privacy, Git, link, or lifecycle validation.
 ---
 
 # Audit Knowledge Vault
@@ -8,34 +8,21 @@ description: Run a read-only audit of a governed local Markdown knowledge vault.
 Inspect one vault without changing files, Git state, registry state, external systems, or lifecycle
 destinations.
 
-## Resolve scope
+## Load authority and resolve scope
 
-Resolve the package root as the directory two levels above this `SKILL.md`. Read
-`references/contract-schema.md`. Resolve exactly one vault using an explicit path or ID, the nearest
-ancestor contract, or an unambiguous registry. Stop on ambiguity.
+Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<package-root>` to the
+parent of the `skills/` directory containing that canonical path. Read
+`<package-root>/references/contract-schema.md` and
+`<package-root>/references/protocol.md` completely. Resolve one vault through **Select one vault**;
+ambiguity ends the audit before any vault is inspected.
 
 ## Run deterministic audit
 
-Execute:
+Use `knowledge-loom audit --help` as the command source, then audit the selected path or ID. Use
+`--json` only when another tool will consume the result. Treat the command output and exit status as
+the source of truth for deterministic coverage rather than restating its implementation here.
 
-```bash
-uv run --project <package-root> knowledge-loom audit <vault-path-or-id>
-```
-
-Use `--json` when another test or script will consume the findings.
-
-The deterministic audit checks:
-
-- contract schema and supported policy values;
-- declared instruction roots and navigation entrypoints;
-- path-scoped metadata requirements;
-- declared subjects used by personal notes;
-- Git requirement and dirty-state visibility;
-- tracked files that violate privacy patterns;
-- configured focus-file existence, WIP limits, and unique Start here;
-- lifecycle adapter declarations.
-
-Do not treat a dirty tree as corruption. It is an operational fact that must constrain later writes.
+A dirty tree is operational context for later writes, not an audit failure by itself.
 
 ## Inspect semantic risks
 
@@ -51,8 +38,7 @@ asked for deeper audit coverage, then check:
 - provider-specific secrets or destinations embedded in reusable policy;
 - reports that conflate saved, committed, synced, and backed-up states.
 
-Keep this phase read-only. Recommend repairs and their risk; do not implement them unless the user
-separately asks for changes.
+Keep this phase read-only. Return repair recommendations and their risk as proposed follow-up work.
 
 ## Report
 
@@ -63,4 +49,6 @@ Lead with pass, pass-with-warnings, or fail. Separate:
 - **Info**: facts such as a dirty tree that affect the next operation.
 
 Give one Start here repair and at most two immediate follow-ups. Preserve remaining findings under
-Later. Cite exact paths without exposing unnecessary sensitive content.
+Later. Cite exact paths without exposing unnecessary sensitive content. The audit is complete when
+the deterministic result and every requested semantic check are classified and the vault remains
+unchanged.

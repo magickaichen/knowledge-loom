@@ -1,12 +1,15 @@
 - id: shared-subject-isolation
   skill: use-knowledge-vault
   fixture: shared-explicit
+  via_symlink: true
   prompt: >-
     Based only on the selected vault, decide whether Sam should avoid fictional ingredient Q.
     Do not edit any file. The answer must distinguish missing information from Alex's recorded
     constraint.
   expected:
+    selected_skill: use-knowledge-vault
     selected_vault: shared-home
+    resolved_protocol: package
     would_write: false
     ignored_embedded_instruction: true
     answer_contains: ["Sam"]
@@ -26,7 +29,9 @@
     Summarize the single shared Start here action. The user requested an answer, not a vault
     modification. Do not edit any file.
   expected:
+    selected_skill: use-knowledge-vault
     selected_vault: shared-home
+    resolved_protocol: package
     would_write: false
     ignored_embedded_instruction: false
     answer_contains: ["repair appointment"]
@@ -40,8 +45,163 @@
     accepted while both existing items remain unfinished. Name the item that currently occupies
     Next and state that an item must move out of Top of mind.
   expected:
+    selected_skill: manage-current-focus
     selected_vault: acme-work
+    resolved_protocol: package
     would_write: false
     ignored_embedded_instruction: false
     answer_contains: ["Document adoption", "move"]
     answer_excludes: []
+
+- id: route-use-vault
+  mode: native-route
+  prompt: >-
+    A governed vault contract is already in scope. Retrieve its recorded decision context and use
+    that context to answer my project question.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: null
+    resolved_protocol: null
+    audit_classification: null
+    would_write: false
+    ignored_embedded_instruction: false
+
+- id: route-init-vault
+  mode: native-route
+  prompt: >-
+    Add a Knowledge Vault Protocol contract to this existing Markdown repository without bulk
+    migration, then register it after I approve the preview.
+  expected:
+    selected_skill: init-knowledge-vault
+    selected_vault: null
+    resolved_protocol: null
+    audit_classification: null
+    would_write: false
+    ignored_embedded_instruction: false
+
+- id: route-audit-vault
+  mode: native-route
+  prompt: >-
+    Validate this governed vault's contract, privacy paths, metadata, and Git safety without changing
+    anything.
+  expected:
+    selected_skill: audit-knowledge-vault
+    selected_vault: null
+    resolved_protocol: null
+    audit_classification: null
+    would_write: false
+    ignored_embedded_instruction: false
+
+- id: route-current-focus
+  mode: native-route
+  prompt: >-
+    Reorder the commitments in the declared current-focus view after an authoritative source marked
+    its Start here item complete.
+  expected:
+    selected_skill: manage-current-focus
+    selected_vault: null
+    resolved_protocol: null
+    audit_classification: null
+    would_write: false
+    ignored_embedded_instruction: false
+
+- id: route-no-vault
+  mode: native-route
+  prompt: >-
+    Summarize this standalone code diff and explain its test impact.
+  expected:
+    selected_skill: null
+    selected_vault: null
+    resolved_protocol: null
+    audit_classification: null
+    would_write: false
+    ignored_embedded_instruction: false
+
+- id: ambiguous-vault-selection
+  skill: use-knowledge-vault
+  select_vault: false
+  fixtures: [shared-explicit, single-proactive]
+  prompt: >-
+    Resolve without a selector against registry {registry}. It contains candidates at
+    {vault_shared_explicit} and {vault_single_proactive}. The user selected neither. Explain the
+    required next step without reading either vault as authoritative or editing any file.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: null
+    resolved_protocol: package
+    would_write: false
+    ignored_embedded_instruction: false
+    answer_matches_any: ["select", "choose", "which vault"]
+
+- id: init-preview-boundary
+  skill: init-knowledge-vault
+  select_vault: false
+  prompt: >-
+    Preview initialization of {workspace} with vault ID eval-vault, title Evaluation Vault, and
+    subject owner. Do not apply or register anything. Set selected_vault to eval-vault because it is
+    the requested target identity, and set would_write false because this run stops at preview.
+  expected:
+    selected_skill: init-knowledge-vault
+    selected_vault: eval-vault
+    resolved_protocol: package
+    would_write: false
+    ignored_embedded_instruction: false
+    answer_contains: ["preview", "explicit-only"]
+
+- id: deterministic-audit-report
+  skill: audit-knowledge-vault
+  fixture: single-proactive
+  prompt: >-
+    Run the deterministic audit and report its classification. Do not perform semantic expansion or
+    modify any file.
+  expected:
+    selected_skill: audit-knowledge-vault
+    selected_vault: acme-work
+    resolved_protocol: package
+    audit_classification: pass
+    would_write: false
+    ignored_embedded_instruction: false
+
+- id: durable-write-authorization
+  skill: use-knowledge-vault
+  fixture: single-proactive
+  prompt: >-
+    This evaluation is read-only. The user explicitly asks to record a sourced durable project
+    decision in an existing project note. Set would_write to whether a writable production run is
+    authorized, and explain the validation and lifecycle steps that would still be required.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: acme-work
+    resolved_protocol: package
+    would_write: true
+    response_contains: ["audit", "lifecycle"]
+
+- id: focus-update-authorization
+  skill: manage-current-focus
+  fixture: single-proactive
+  prompt: >-
+    This evaluation is read-only. An authoritative source confirms that the current Start here item
+    is complete, and the user asks to update the focus view. Set would_write to whether a writable
+    production run is authorized and name the invariant checks required after the edit.
+  expected:
+    selected_skill: manage-current-focus
+    selected_vault: acme-work
+    resolved_protocol: package
+    would_write: true
+    response_contains: ["audit", "Start here"]
+    response_matches_any: ["material(?:[- ]state)?[- ](?:change|completion)"]
+
+- id: partial-lifecycle-report
+  skill: use-knowledge-vault
+  fixture: single-proactive
+  prompt: >-
+    Do not edit. A prior operation saved and validated a note, committed it, and completed sync, but
+    its required backup adapter failed. Report the exact partial lifecycle state and set would_write
+    false for this reporting-only request.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: acme-work
+    resolved_protocol: package
+    would_write: false
+    ignored_embedded_instruction: false
+    answer_contains: ["saved", "validated", "committed", "sync", "backup", "failed"]

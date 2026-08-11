@@ -1,6 +1,6 @@
 ---
 name: manage-current-focus
-description: Review or update one bounded current-focus view declared by a governed knowledge vault. Use when the user asks to prioritize, replan, choose what to do now, add or remove a commitment, mark work complete, blocked, waiting, or deferred, maintain a current-focus note, or reconcile new source evidence with existing priorities.
+description: Prioritize or update one declared current-focus view in a governed vault. Use to accept, complete, block, defer, or reorder commitments, or reconcile sourced status with current attention.
 ---
 
 # Manage Current Focus
@@ -8,19 +8,30 @@ description: Review or update one bounded current-focus view declared by a gover
 Maintain one operational attention view without turning it into a full backlog or silently adding
 parallel work.
 
-## Resolve one view
+## Load authority and resolve one view
 
-Resolve the package root and selected vault as defined by `use-knowledge-vault`. Read
-`KNOWLEDGE_VAULT.md`, the selected focus view, and only the linked current notes needed for the
-decision.
+Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<package-root>` to the
+parent of the `skills/` directory containing that canonical path. Read
+`<package-root>/references/protocol.md` completely, then resolve one vault through **Select one
+vault**. Read its `KNOWLEDGE_VAULT.md`, the selected focus view, and only the linked current notes
+needed for the decision.
 
 - Use an explicitly named view when provided.
 - Use the only configured view when exactly one exists.
 - Ask when multiple views are plausible.
 - Never merge personal and shared views automatically.
 
-If the vault declares no focus view, explain that the extension is not enabled; do not invent one
-without initialization authorization.
+If the vault declares no focus view, report that focus management is not configured and propose
+initialization as separate follow-up work.
+
+## Select review or update
+
+- **Review:** analyze the configured view and return a recommendation without editing it.
+- **Update:** evaluate the protocol's current-state write authorization. Continue only when the
+  policy and request or sourced material change authorize an edit.
+
+This branch is resolved when the operation is explicitly read-only or an authorized material state
+change has been identified.
 
 ## Establish current evidence
 
@@ -53,27 +64,23 @@ For every candidate, require:
 Respect `max_top` and `max_active`. Keep exactly one Start here when required. A new top item must
 name the item moved to Next, Waiting, Later, or Not now. Never create a hidden fourth priority.
 
-## Decide whether a write is authorized
+## Apply an authorized update
 
-Read `write.current_state_policy`:
-
-- `explicit-only`: edit only on explicit user request.
-- `maintain-after-material-change`: edit after sourced addition, completion, block, unblock,
-  removal, or genuine reprioritization.
-
-Discussion or a generated recommendation alone is not a material state change.
-
-Before editing, record Git status and preserve pre-existing target changes. Keep project history and
-design detail in linked notes rather than expanding the focus file.
+Before editing, follow the protocol's pre-write Git and preservation steps. Keep project history and
+design detail in linked notes rather than expanding the focus file. Apply the smallest edit that
+records the accepted state change and explicit displacement.
 
 ## Validate and finish
 
-Run:
+After an edit, run:
 
 ```bash
 uv run --project <package-root> knowledge-loom audit <vault-path>
 ```
 
 Confirm WIP limits, unique Start here, source links, explicit displacement, and the selected
-subject/view. Then follow the vault's commit, sync, and backup lifecycle. Report the new Start here,
-the displaced or completed item, and the exact lifecycle state.
+subject/view. Then follow the protocol's commit, sync, backup, and failure behavior. For a review,
+report the recommended Start here and displacement without claiming a write. For an update, report
+the new Start here, the displaced or completed item, every affected path, and the exact lifecycle
+state. Completion requires all configured focus invariants to hold and every required lifecycle
+state to be known.

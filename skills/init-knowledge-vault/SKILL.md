@@ -1,84 +1,73 @@
 ---
 name: init-knowledge-vault
-description: Create a new governed local Markdown knowledge vault or progressively adopt an existing Markdown vault into the Knowledge Vault Protocol. Use when the user asks to create, initialize, bootstrap, register, migrate, or adopt a knowledge base or vault, including single-subject and shared multi-subject vaults.
+description: Initialize a governed Markdown vault, conservatively adopt an existing one, or register a governed vault. Use when the user wants a vault contract, deterministic registration, or protocol adoption without bulk migration.
 ---
 
 # Initialize Knowledge Vault
 
-Create or adopt one vault without rewriting historical content by default.
+Create or adopt one vault through a previewed contract change.
 
-## Load the protocol
+## Load authority
 
-Resolve the package root as the directory two levels above this `SKILL.md`. Read
-`references/protocol.md` and `references/contract-schema.md` completely before proposing changes.
+Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<package-root>` to the
+parent of the `skills/` directory containing that canonical path. Read
+`<package-root>/references/protocol.md` and
+`<package-root>/references/contract-schema.md` completely before proposing changes.
 
 ## Establish the contract
 
-Resolve these decisions from the user request or existing repository evidence:
+Map every required schema field to user input, repository evidence, or a named safe default. Resolve
+these decision groups:
 
-- stable vault ID and title;
-- new vault or adoption of an existing vault;
-- one or more subjects and whether a safe default exists;
-- durable write policy and separate current-state policy;
-- local Markdown link style;
-- Git history requirement;
-- sync and backup lifecycle modes;
-- instruction roots and navigation entrypoints;
-- metadata profiles by path;
-- privacy paths that must never be tracked;
-- optional named focus views.
+- identity, target path, and new-versus-adopt mode;
+- subjects and any safe default subject;
+- write authority, history, sync, and backup;
+- instruction roots, navigation entrypoints, metadata profiles, and privacy paths;
+- optional focus views.
 
 Default every new vault to `explicit-only` writes and `explicit-only` current-state maintenance.
 Never enable proactive capture, cross-vault access, remote sync, or backup destinations implicitly.
+Ask only for unresolved choices that would change identity, authority, subject isolation, privacy, or
+lifecycle scope. This step is complete when every required field has evidence or a stated safe
+default.
 
 ## Preview first
 
-For a new vault, preview:
+Use the CLI help as the command source:
 
 ```bash
-uv run --project <package-root> knowledge-loom init <vault-path> \
-  --vault-id <id> \
-  --title "<title>" \
-  --subject <subject>
+uv run --project <package-root> knowledge-loom init --help
 ```
 
-Add `--history git`, additional `--subject` values, or explicit policy flags only when resolved.
-
-For an existing vault, add `--adopt`. The adoption preview may discover an existing instruction
-root and navigation entrypoint, but must not rewrite notes.
+Build and run the resolved `init` command without `--apply`. Use adoption mode only for an existing
+non-empty vault. The preview may discover instruction roots and navigation entrypoints; historical
+notes remain unchanged.
 
 Show the proposed `KNOWLEDGE_VAULT.md`, structural changes, metadata gaps, privacy risks, and
-lifecycle implications. Do not apply until the user authorizes the write.
+lifecycle implications. Preview is complete when the user can distinguish proposed files, known
+gaps, and later migration work. Apply only after the user authorizes that exact preview.
 
 ## Apply narrowly
 
-After authorization, rerun the same command with `--apply`.
+After authorization, rerun the exact previewed command with `--apply`.
 
 - For a new vault, create the contract and a minimal index.
 - For adoption, add only the contract and explicitly approved pointer changes.
-- Do not bulk rename files, backfill frontmatter, rewrite links, or reorganize history.
-- Grandfather existing content when safe. Repair metadata incrementally when a note is touched or
-  when a high-risk path requires immediate enforcement.
-- Run any bulk repair as a separate dry-run workflow with separate authorization.
+- Preserve existing names, frontmatter, links, and history. Grandfather safe content and repair it
+  incrementally when touched or when a high-risk path requires immediate enforcement.
+- Treat bulk repair or taxonomy migration as a separate previewed workflow with separate
+  authorization.
 
 ## Register deterministically
 
-Preview registry change:
+When registration is requested, inspect `knowledge-loom register --help`, preview the resolved ID
+and canonical path, then apply the same registry change only after confirmation. Preserve any other
+vault's existing entry.
 
-```bash
-uv run --project <package-root> knowledge-loom register <vault-id> <vault-path>
-```
-
-Apply only after confirming the resolved path:
-
-```bash
-uv run --project <package-root> knowledge-loom register <vault-id> <vault-path> --apply
-```
-
-Never replace another vault's registry entry silently.
-
-## Validate
+## Validate and report
 
 Run `audit-knowledge-vault` after applying. If Git is enabled, preserve unrelated changes, review
-the diff, and follow the new contract's commit, sync, and backup rules. Adoption is complete when
-the governed workflows can operate safely, not when every historical note is cosmetically uniform.
+the diff, and follow the protocol's lifecycle rules. Report whether the operation stopped at
+preview, contract application, registration, audit, commit, sync, or backup. Initialization is
+complete when the contract passes its required audit checks and every required lifecycle state is
+known; cosmetic uniformity of historical notes is outside this workflow.
