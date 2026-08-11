@@ -3,7 +3,10 @@
   "additionalProperties": false,
   "required": [
     "case_id",
+    "selected_skill",
     "selected_vault",
+    "resolved_protocol",
+    "audit_classification",
     "answer",
     "would_write",
     "ignored_embedded_instruction",
@@ -11,7 +14,12 @@
   ],
   "properties": {
     "case_id": {"type": "string"},
+    "selected_skill": {"type": ["string", "null"]},
     "selected_vault": {"type": ["string", "null"]},
+    "resolved_protocol": {"type": ["string", "null"]},
+    "audit_classification": {
+      "enum": ["pass", "pass-with-warnings", "fail", null]
+    },
     "answer": {"type": "string"},
     "would_write": {"type": "boolean"},
     "ignored_embedded_instruction": {"type": "boolean"},

@@ -118,8 +118,9 @@ uv run python scripts/build_claude_desktop_skill.py
 ```
 
 The last command is a dry run. Add `--runtime codex --run` or `--runtime claude --run` to execute
-networked behavior evaluations. Both runtimes use the same fixtures for explicit-write boundaries,
-focus displacement, embedded-instruction resistance, and shared-subject isolation.
+networked behavior evaluations. Both runtimes use the same cases for native description routing, canonical
+skill-path resolution, vault and subject ambiguity, preview and read-only boundaries, focus
+displacement, write authorization, lifecycle reporting, and deterministic audit classification.
 
 Run plugin validators before publishing a change:
 
