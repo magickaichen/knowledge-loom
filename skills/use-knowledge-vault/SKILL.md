@@ -10,10 +10,10 @@ Limit actions to the primary task and contract-authorized vault operations.
 
 ## Load the protocol
 
-Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<package-root>` to the
-parent of the `skills/` directory containing that canonical path. Read
-`<package-root>/references/protocol.md` completely before vault access; it is the single source of
-truth for authority, selection, retrieval, write policy, lifecycle, and failure behavior.
+Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<skill-root>` to the
+directory containing that canonical file. Read `<skill-root>/references/protocol.md` completely
+before vault access; it is the installed source of truth for authority, selection, retrieval, write
+policy, lifecycle, and failure behavior.
 
 ## Run the loop
 
@@ -26,7 +26,7 @@ truth for authority, selection, retrieval, write policy, lifecycle, and failure 
 4. After any write, run the deterministic audit:
 
    ```bash
-   uv run --project <package-root> knowledge-loom audit <vault-path>
+   uv run "<skill-root>/scripts/knowledge-loom.py" audit <vault-path>
    ```
 
    The write branch is complete only after the audit result and every required Git, sync, and backup

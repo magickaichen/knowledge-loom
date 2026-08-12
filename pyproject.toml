@@ -16,7 +16,7 @@ knowledge-loom = "knowledge_loom.cli:main"
 
 [dependency-groups]
 dev = [
-  "pytest>=8.3,<9",
+  "pytest>=9.0.3,<10",
 ]
 
 [tool.pytest.ini_options]

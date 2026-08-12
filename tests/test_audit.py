@@ -1,7 +1,12 @@
+import shutil
+from copy import deepcopy
 from pathlib import Path
+
+import pytest
 
 from knowledge_loom.audit import audit_vault, matches_path
 from knowledge_loom.contract import load_vault
+from knowledge_loom.models import Vault
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -56,3 +61,44 @@ def test_double_star_patterns_match_zero_or_more_directories() -> None:
     assert matches_path("Health/**/*.md", "Health/alex.md")
     assert matches_path("Health/**/*.md", "Health/history/alex.md")
     assert not matches_path("Health/**/*.md", "People/alex.md")
+
+
+@pytest.mark.parametrize(
+    ("relative", "finding_code"),
+    [
+        ("AGENTS.md", "path.instruction-boundary"),
+        ("INDEX.md", "path.navigation-boundary"),
+        ("Projects/current-focus.md", "focus.boundary"),
+        ("Projects/parser-project.md", "path.metadata-boundary"),
+    ],
+)
+def test_audit_rejects_symlink_escape_from_contract_paths(
+    tmp_path: Path,
+    relative: str,
+    finding_code: str,
+) -> None:
+    root = tmp_path / "vault"
+    shutil.copytree(FIXTURES / "single-proactive", root)
+    target = root / relative
+    target.unlink()
+    outside = tmp_path / target.name
+    outside.write_text("---\nstatus: current\n---\n\n# Outside\n", encoding="utf-8")
+    target.symlink_to(outside)
+
+    findings = audit_vault(load_vault(root))
+    assert any(finding.code == finding_code and finding.path == relative for finding in findings)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["subjects", "navigation", "metadata_profiles", "history", "privacy", "focus_views"],
+)
+def test_malformed_contract_sections_report_errors_instead_of_crashing(field: str) -> None:
+    source = load_vault(FIXTURES / "single-proactive")
+    contract = deepcopy(source.contract)
+    contract[field] = []
+    vault = Vault(source.root, source.contract_path, contract, source.body)
+
+    findings = audit_vault(vault)
+
+    assert any(finding.severity == "error" for finding in findings)

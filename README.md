@@ -10,8 +10,8 @@ Knowledge Loom separates portable behavior from vault-specific content:
 - four skills initialize, audit, retrieve from, and maintain focus within a vault;
 - thin Codex and Claude Code adapters use the same protocol and behavior fixtures.
 
-This repository is currently a private, self-use v1 package. Its fixtures are fictional and must
-never contain real work, health, family, credential, or private-vault data.
+Fixtures are fictional and must never contain real work, health, family, credential, or private
+vault data.
 
 ## Skills
 
@@ -21,15 +21,33 @@ never contain real work, health, family, credential, or private-vault data.
 - `manage-current-focus` — maintain one explicitly selected focus view without exceeding its
   capacity limits.
 
-## Install
+## Install with `npx skills`
 
 Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), and at least one supported agent
 runtime.
 
 ```bash
-git clone git@github.com:magickaichen/knowledge-loom.git
+npx skills add magickaichen/knowledge-loom --list
+npx skills add magickaichen/knowledge-loom --skill '*' --global --agent codex
+```
+
+Add `--agent claude-code` to the second command to install for Claude Code too. Each selected skill
+contains its own protocol references and deterministic runner, so execution does not depend on the
+original repository checkout. The runner uses `uv` to provide its pinned Python dependency.
+
+The same command supports a private repository when the local Git, GitHub CLI, or SSH credentials
+can read it. Public access is required for unauthenticated installation and discovery on
+[skills.sh](https://skills.sh/).
+
+## Install from a local checkout
+
+Use this path for development or for live symlinks to an editable checkout:
+
+```bash
+git clone https://github.com/magickaichen/knowledge-loom.git
 cd knowledge-loom
 uv sync
+uv run python scripts/build_skill_packages.py --check
 python3 scripts/install.py
 python3 scripts/install.py --apply
 ```
@@ -110,6 +128,7 @@ See [the runtime-neutral protocol](references/protocol.md) and
 ## Validate
 
 ```bash
+uv run python scripts/build_skill_packages.py --check
 uv run pytest
 uv run knowledge-loom audit tests/fixtures/single-proactive
 uv run knowledge-loom audit tests/fixtures/shared-explicit
@@ -117,15 +136,15 @@ uv run python scripts/run_behavior_evals.py
 uv run python scripts/build_claude_desktop_skill.py
 ```
 
-The last command is a dry run. Add `--runtime codex --run` or `--runtime claude --run` to execute
-networked behavior evaluations. Both runtimes use the same cases for native description routing, canonical
-skill-path resolution, vault and subject ambiguity, preview and read-only boundaries, focus
-displacement, write authorization, lifecycle reporting, and deterministic audit classification.
+The behavior command is a dry run. Add `--runtime codex --run` or `--runtime claude --run` to
+execute networked behavior evaluations. Both runtimes use the same cases for native description
+routing, canonical skill-path resolution, vault and subject ambiguity, preview and read-only
+boundaries, focus displacement, write authorization, lifecycle reporting, and deterministic audit
+classification.
 
-Run plugin validators before publishing a change:
+Run the installed runtime's plugin validator before publishing a change. For Claude Code:
 
 ```bash
-python3 /path/to/plugin-creator/scripts/validate_plugin.py .
 claude plugin validate .
 ```
 
@@ -134,4 +153,4 @@ claude plugin validate .
 Knowledge Loom v1 does not ingest remote source systems, provide access control, encrypt notes,
 host a sync service, or migrate an existing vault's taxonomy. The Claude Desktop adapter supports
 connected-folder Cowork retrieval and capability-gated changes; it does not bypass local Git or
-private lifecycle adapters. Source distillation and public distribution UX are later concerns.
+private lifecycle adapters. Source distillation remains outside the v1 boundary.

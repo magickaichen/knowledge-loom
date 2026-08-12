@@ -10,11 +10,10 @@ parallel work.
 
 ## Load authority and resolve one view
 
-Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<package-root>` to the
-parent of the `skills/` directory containing that canonical path. Read
-`<package-root>/references/protocol.md` completely, then resolve one vault through **Select one
-vault**. Read its `KNOWLEDGE_VAULT.md`, the selected focus view, and only the linked current notes
-needed for the decision.
+Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<skill-root>` to the
+directory containing that canonical file. Read `<skill-root>/references/protocol.md` completely,
+then resolve one vault through **Select one vault**. Read its `KNOWLEDGE_VAULT.md`, the selected
+focus view, and only the linked current notes needed for the decision.
 
 - Use an explicitly named view when provided.
 - Use the only configured view when exactly one exists.
@@ -75,7 +74,7 @@ records the accepted state change and explicit displacement.
 After an edit, run:
 
 ```bash
-uv run --project <package-root> knowledge-loom audit <vault-path>
+uv run "<skill-root>/scripts/knowledge-loom.py" audit <vault-path>
 ```
 
 Confirm WIP limits, unique Start here, source links, explicit displacement, and the selected

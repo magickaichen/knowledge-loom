@@ -10,6 +10,8 @@ connector, or backup provider.
 - `references/contract-schema.md` defines `KNOWLEDGE_VAULT.md` schema version 1.
 - `src/knowledge_loom/` implements deterministic parsing, resolution, initialization, and audit.
 - `skills/` contains thin procedural entry points. Do not duplicate the full protocol in them.
+- `scripts/build_skill_packages.py` materializes generated, self-contained distribution files under
+  each skill. Edit the top-level sources, rebuild, and keep the generated copies exact.
 - `.codex-plugin/` and `.claude-plugin/` are runtime adapters, not policy sources.
 
 ## Safety boundaries
@@ -27,14 +29,10 @@ connector, or backup provider.
 Run these before committing:
 
 ```bash
+uv run python scripts/build_skill_packages.py --check
 uv run pytest
 uv run knowledge-loom audit tests/fixtures/single-proactive
 uv run knowledge-loom audit tests/fixtures/shared-explicit
+uv run python scripts/run_behavior_evals.py
 uv run python scripts/build_claude_desktop_skill.py
-python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/use-knowledge-vault
-python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/init-knowledge-vault
-python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/audit-knowledge-vault
-python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/manage-current-focus
-python3 /Users/mike.xiao/.codex/skills/.system/skill-creator/scripts/quick_validate.py adapters/claude-desktop/knowledge-loom
-python3 /Users/mike.xiao/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .
 ```
