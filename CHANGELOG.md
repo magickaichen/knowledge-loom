@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.2.0
+
+The deterministic tooling now runs on JavaScript instead of Python.
+
+### Changed
+
+- Replaced the source package, CLI, builders, installer, tests, and CI with Node.js modules.
+- Bundled the YAML parser into each skill's single `knowledge-loom.mjs` runner, so installed skills
+  do not run `npm install`, depend on a repository checkout, or fetch code on first use.
+- Declared the Node.js 20+ runtime requirement in every command-capable skill while keeping the
+  instruction-only Claude Desktop ZIP free of executable runtime requirements.
+
+### Compatibility
+
+- Preserved the `init`, `audit`, `resolve`, and `register` CLI commands, contract schema, exit
+  statuses, safety boundaries, and agent-neutral installation routes.
+
 ## v0.1.1
 
 Initial public release.

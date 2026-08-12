@@ -13,18 +13,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          python-version: "3.11"
-          enable-cache: true
-      - run: uv sync --locked --all-groups
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: >-
-          uv run python scripts/check_release_version.py "$GITHUB_REF_NAME"
+          node scripts/check-release-version.mjs "$GITHUB_REF_NAME"
           --notes-output "dist/release-notes.md"
-      - run: uv run python scripts/validate.py
+      - run: npm run validate
       - name: Build versioned Claude Desktop skill
         run: >-
-          uv run python scripts/build_claude_desktop_skill.py
+          node scripts/build-claude-desktop-skill.mjs
           --output "dist/knowledge-loom-claude-desktop-${GITHUB_REF_NAME}.zip"
       - name: Publish GitHub Release
         run: >-

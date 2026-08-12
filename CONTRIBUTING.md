@@ -5,15 +5,15 @@ the contract schema or protocol semantics so compatibility and migration behavio
 
 ## Development
 
-Install Python 3.11+ and [uv](https://docs.astral.sh/uv/), then run:
+Install Node.js 20+ and npm, then run:
 
 ```bash
-uv sync
-uv run python scripts/build_skill_packages.py
-uv run python scripts/validate.py --npx
+npm ci
+npm run build
+npm run validate:npx
 ```
 
-Edit the top-level protocol, schema, and Python package rather than their generated copies inside
+Edit the top-level protocol, schema, and JavaScript modules rather than their generated copies inside
 `skills/*/references` and `skills/*/scripts`. Include tests for behavioral or safety changes. Never
 place credentials or real personal, company, health, family, or private-vault content in issues,
 fixtures, logs, or pull requests.
@@ -27,14 +27,14 @@ repository-root plugin, as documented in OpenAI's
 reference. The `plugin-creator` scaffold's `./plugins/<name>` local path applies when a marketplace
 contains nested plugin directories; do not introduce that duplicate layout here.
 
-Keep the Python package, both plugin manifests, and the Claude marketplace on the same version,
-repository URL, and license. `tests/test_distribution.py` enforces those required copies.
+Keep `package.json`, both plugin manifests, and the Claude marketplace on the same version,
+repository URL, and license. `tests/distribution.test.mjs` enforces those required copies.
 
 ## Release
 
 1. Add the release notes under `## vX.Y.Z` at the top of `CHANGELOG.md`.
-2. Update the version in `pyproject.toml`, both plugin manifests, and the Claude marketplace.
-3. Run `uv run python scripts/validate.py --npx` and merge the change into `main`.
+2. Update the version in `package.json`, both plugin manifests, and the Claude marketplace.
+3. Run `npm run validate:npx` and merge the change into `main`.
 4. Create and push an annotated tag that matches the package version:
 
    ```bash

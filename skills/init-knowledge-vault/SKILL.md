@@ -1,6 +1,7 @@
 ---
 name: init-knowledge-vault
 description: Initialize a governed Markdown vault, conservatively adopt an existing one, or register a governed vault. Use when the user wants a vault contract, deterministic registration, or protocol adoption without bulk migration.
+compatibility: Requires Node.js 20+ and local file/command access.
 ---
 
 # Initialize Knowledge Vault
@@ -35,7 +36,7 @@ default.
 Use the CLI help as the command source:
 
 ```bash
-uv run "<skill-root>/scripts/knowledge-loom.py" init --help
+node "<skill-root>/scripts/knowledge-loom.mjs" init --help
 ```
 
 Build and run the resolved `init` command without `--apply`. Use adoption mode only for an existing
@@ -60,7 +61,7 @@ After authorization, rerun the exact previewed command with `--apply`.
 ## Register deterministically
 
 When registration is requested, inspect
-`uv run "<skill-root>/scripts/knowledge-loom.py" register --help`, preview the resolved ID and
+`node "<skill-root>/scripts/knowledge-loom.mjs" register --help`, preview the resolved ID and
 canonical path, then apply the same registry change only after confirmation. Preserve every
 existing registry entry; an ID already bound to another path is a conflict, not an update.
 
