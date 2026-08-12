@@ -6,7 +6,9 @@
     "name": "Mike Xiao",
     "url": "https://github.com/magickaichen"
   },
+  "homepage": "https://github.com/magickaichen/knowledge-loom",
   "repository": "https://github.com/magickaichen/knowledge-loom",
+  "license": "MIT",
   "keywords": ["knowledge", "markdown", "vault", "context", "governance"],
   "skills": "./skills/",
   "interface": {
@@ -16,6 +18,7 @@
     "developerName": "Mike Xiao",
     "category": "Productivity",
     "capabilities": ["Read", "Write", "Local files"],
+    "websiteURL": "https://github.com/magickaichen/knowledge-loom",
     "defaultPrompt": [
       "Audit this knowledge vault without changing it.",
       "Use the relevant vault context for this task.",

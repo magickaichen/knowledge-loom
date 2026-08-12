@@ -6,6 +6,8 @@
     "name": "Mike Xiao",
     "url": "https://github.com/magickaichen"
   },
+  "homepage": "https://github.com/magickaichen/knowledge-loom",
   "repository": "https://github.com/magickaichen/knowledge-loom",
+  "license": "MIT",
   "keywords": ["knowledge", "markdown", "vault", "context", "governance"]
 }

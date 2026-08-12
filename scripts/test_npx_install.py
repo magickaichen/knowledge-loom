@@ -17,6 +17,10 @@ SKILL_NAMES = (
     "manage-current-focus",
     "use-knowledge-vault",
 )
+INSTALL_ROOTS = (
+    Path(".agents/skills"),
+    Path(".claude/skills"),
+)
 
 
 def run(command: list[str], *, cwd: Path, capture_output: bool = False) -> subprocess.CompletedProcess[str]:
@@ -61,24 +65,26 @@ def main() -> int:
                 "*",
                 "--agent",
                 "codex",
+                "claude-code",
                 "--copy",
                 "--yes",
             ],
             cwd=workspace,
         )
-        installed_root = workspace / ".agents" / "skills"
-        for skill_name in SKILL_NAMES:
-            runner = installed_root / skill_name / "scripts" / "knowledge-loom.py"
-            run(
-                [
-                    uv,
-                    "run",
-                    str(runner),
-                    "audit",
-                    str(package_root / "tests" / "fixtures" / "single-proactive"),
-                ],
-                cwd=workspace,
-            )
+        for relative_root in INSTALL_ROOTS:
+            installed_root = workspace / relative_root
+            for skill_name in SKILL_NAMES:
+                runner = installed_root / skill_name / "scripts" / "knowledge-loom.py"
+                run(
+                    [
+                        uv,
+                        "run",
+                        str(runner),
+                        "audit",
+                        str(package_root / "tests" / "fixtures" / "single-proactive"),
+                    ],
+                    cwd=workspace,
+                )
 
         installed = json.loads(
             run(
@@ -91,7 +97,7 @@ def main() -> int:
         if names != set(SKILL_NAMES):
             raise SystemExit(f"installed skill mismatch: {sorted(names)}")
 
-    print(f"PASS npx {SKILLS_CLI} discovered, copied, and ran all four skills")
+    print(f"PASS npx {SKILLS_CLI} installed and ran all four skills for Codex and Claude Code")
     return 0
 
 

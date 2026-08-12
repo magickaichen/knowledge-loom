@@ -6,6 +6,8 @@ build-backend = "hatchling.build"
 name = "knowledge-loom"
 version = "0.1.1"
 description = "Agent-neutral governance and skills for local Markdown knowledge vaults"
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
   "PyYAML>=6.0.2,<7",
@@ -13,6 +15,11 @@ dependencies = [
 
 [project.scripts]
 knowledge-loom = "knowledge_loom.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/magickaichen/knowledge-loom"
+Repository = "https://github.com/magickaichen/knowledge-loom"
+Issues = "https://github.com/magickaichen/knowledge-loom/issues"
 
 [dependency-groups]
 dev = [
