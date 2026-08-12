@@ -1,0 +1,41 @@
+{
+  "name": "knowledge-loom",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Agent-neutral governance and skills for local Markdown knowledge vaults",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "Mike Xiao",
+    "url": "https://github.com/magickaichen"
+  },
+  "homepage": "https://github.com/magickaichen/knowledge-loom",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/magickaichen/knowledge-loom.git"
+  },
+  "bugs": {
+    "url": "https://github.com/magickaichen/knowledge-loom/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "knowledge-loom": "src/knowledge-loom/runner.mjs"
+  },
+  "scripts": {
+    "build": "node scripts/build-skill-packages.mjs && node scripts/build-claude-desktop-skill.mjs",
+    "build:check": "node scripts/build-skill-packages.mjs --check",
+    "cli": "node src/knowledge-loom/runner.mjs",
+    "test": "node scripts/run-tests.mjs",
+    "validate": "node scripts/validate.mjs",
+    "validate:npx": "node scripts/validate.mjs --npx"
+  },
+  "dependencies": {
+    "yaml": "2.9.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "fflate": "0.8.3"
+  }
+}

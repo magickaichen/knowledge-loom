@@ -1,0 +1,226 @@
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
+
+import { finding, loadNoteFrontmatter, validateContractData } from "./contract.mjs";
+import { checkFocusView } from "./focus.mjs";
+import {
+  canonicalPath,
+  isVaultRelativePath,
+  isWithin,
+  resolveVaultPath,
+  resolveVaultPatternPrefix,
+  toPosixRelative,
+} from "./pathing.mjs";
+
+function escapeRegex(character) {
+  return /[\\^$.*+?()[\]{}|]/.test(character) ? `\\${character}` : character;
+}
+
+function globRegex(pattern, { characterClasses = true } = {}) {
+  let index = 0;
+  let result = "^";
+  while (index < pattern.length) {
+    const character = pattern[index];
+    if (character === "*") {
+      if (pattern[index + 1] === "*") {
+        index += 2;
+        if (pattern[index] === "/") {
+          index += 1;
+          result += "(?:.*/)?";
+        } else {
+          result += ".*";
+        }
+        continue;
+      }
+      result += "[^/]*";
+    } else if (character === "?") {
+      result += "[^/]";
+    } else if (character === "[" && characterClasses) {
+      let close = index + 1;
+      if (["!", "^"].includes(pattern[close])) close += 1;
+      if (pattern[close] === "]") close += 1;
+      close = pattern.indexOf("]", close);
+      if (close < 0) {
+        result += "\\[";
+      } else {
+        let contents = pattern.slice(index + 1, close);
+        let prefix = "";
+        if (contents.startsWith("!")) {
+          prefix = "^";
+          contents = contents.slice(1);
+        } else if (contents.startsWith("^")) {
+          contents = `\\${contents}`;
+        }
+        let escapedContents = contents.replaceAll("\\", "\\\\").replaceAll("[", "\\[");
+        if (escapedContents.startsWith("]")) escapedContents = `\\${escapedContents}`;
+        result += `[${prefix}${escapedContents}]`;
+        index = close;
+      }
+    } else {
+      result += escapeRegex(character);
+    }
+    index += 1;
+  }
+  try {
+    return new RegExp(`${result}$`);
+  } catch (error) {
+    if (!characterClasses) throw error;
+    return globRegex(pattern, { characterClasses: false });
+  }
+}
+
+export function matchesPath(pattern, candidate) {
+  return globRegex(pattern).test(candidate);
+}
+
+function git(root, ...arguments_) {
+  return spawnSync("git", ["-C", root, ...arguments_], { encoding: "utf8" });
+}
+
+function auditDeclaredFiles(root, values, { boundaryCode, boundaryMessage, missingCode, missingMessage }) {
+  if (!Array.isArray(values)) return [];
+  const findings = [];
+  for (const relative of values) {
+    if (typeof relative !== "string" || !isVaultRelativePath(relative)) continue;
+    const resolved = resolveVaultPath(root, relative);
+    if (resolved === null) findings.push(finding("error", boundaryCode, boundaryMessage, relative));
+    else if (!fs.statSync(resolved, { throwIfNoEntry: false })?.isFile()) findings.push(finding("error", missingCode, missingMessage, relative));
+  }
+  return findings;
+}
+
+function patternPrefix(patternValue) {
+  const parts = [];
+  for (const part of patternValue.split("/")) {
+    if (/[*?[\]]/.test(part)) break;
+    parts.push(part);
+  }
+  return parts;
+}
+
+function walk(root) {
+  const result = [];
+  if (!fs.existsSync(root)) return result;
+  const visit = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const candidate = path.join(current, entry.name);
+      result.push(candidate);
+      if (entry.isDirectory() && !entry.isSymbolicLink()) visit(candidate);
+    }
+  };
+  if (fs.lstatSync(root).isDirectory() && !fs.lstatSync(root).isSymbolicLink()) visit(root);
+  else result.push(root);
+  return result;
+}
+
+function globPaths(root, patternValue) {
+  if (!/[*?[]/.test(patternValue)) {
+    const candidate = path.join(root, ...patternValue.split("/"));
+    return fs.existsSync(candidate) ? [candidate] : [];
+  }
+  const prefix = patternPrefix(patternValue);
+  const searchRoot = path.join(root, ...prefix);
+  return walk(searchRoot).filter((candidate) => matchesPath(patternValue, toPosixRelative(root, candidate)));
+}
+
+export function auditVault(vault) {
+  const findings = validateContractData(vault.contract);
+  const { root, contract } = vault;
+
+  findings.push(...auditDeclaredFiles(root, contract.instruction_roots ?? [], {
+    boundaryCode: "path.instruction-boundary",
+    boundaryMessage: "instruction root resolves outside the vault",
+    missingCode: "path.instruction-root",
+    missingMessage: "instruction root is missing",
+  }));
+
+  const navigation = contract.navigation && typeof contract.navigation === "object" && !Array.isArray(contract.navigation) ? contract.navigation : {};
+  findings.push(...auditDeclaredFiles(root, navigation.entrypoints ?? [], {
+    boundaryCode: "path.navigation-boundary",
+    boundaryMessage: "navigation entrypoint resolves outside the vault",
+    missingCode: "path.navigation",
+    missingMessage: "navigation entrypoint is missing",
+  }));
+
+  const subjectConfig = contract.subjects && typeof contract.subjects === "object" && !Array.isArray(contract.subjects) ? contract.subjects : {};
+  const subjects = new Set(Array.isArray(subjectConfig.values) ? subjectConfig.values : []);
+  const profiles = contract.metadata_profiles && typeof contract.metadata_profiles === "object" && !Array.isArray(contract.metadata_profiles) ? contract.metadata_profiles : {};
+  const checked = new Set();
+  for (const [profileName, profile] of Object.entries(profiles)) {
+    if (!profile || typeof profile !== "object" || Array.isArray(profile)) continue;
+    const severity = profile.severity ?? "error";
+    const required = Array.isArray(profile.required) ? profile.required : [];
+    const patterns = Array.isArray(profile.paths) ? profile.paths : [];
+    for (const patternValue of patterns) {
+      if (typeof patternValue !== "string" || !isVaultRelativePath(patternValue)) continue;
+      if (resolveVaultPatternPrefix(root, patternValue) === null) {
+        findings.push(finding("error", "path.metadata-boundary", `profile \`${profileName}\` path prefix resolves outside the vault`, patternValue));
+        continue;
+      }
+      let paths;
+      try {
+        paths = globPaths(root, patternValue);
+      } catch (error) {
+        findings.push(finding("error", "metadata.pattern", `profile \`${profileName}\` has an unusable path pattern: ${error.message}`, patternValue));
+        continue;
+      }
+      for (const candidate of paths) {
+        const relative = toPosixRelative(root, candidate);
+        if (!isWithin(root, candidate)) {
+          findings.push(finding("error", "path.metadata-boundary", `profile \`${profileName}\` matched a file outside the vault`, relative));
+          continue;
+        }
+        if (!fs.statSync(candidate, { throwIfNoEntry: false })?.isFile() || path.extname(candidate).toLocaleLowerCase() !== ".md") continue;
+        const key = `${profileName}\0${relative}`;
+        if (checked.has(key)) continue;
+        checked.add(key);
+        const metadata = loadNoteFrontmatter(candidate);
+        for (const field of required) {
+          if (!Object.hasOwn(metadata, field)) findings.push(finding(severity, "metadata.missing", `profile \`${profileName}\` requires \`${field}\``, relative));
+        }
+        const subjectKey = Object.hasOwn(metadata, "owner") ? "owner" : Object.hasOwn(metadata, "subject") ? "subject" : null;
+        if (subjectConfig.mode === "multiple" && subjectKey && !subjects.has(metadata[subjectKey])) {
+          findings.push(finding("error", "metadata.subject", `\`${subjectKey}\` is not declared in contract subjects`, relative));
+        }
+      }
+    }
+  }
+
+  const privacy = contract.privacy && typeof contract.privacy === "object" && !Array.isArray(contract.privacy) ? contract.privacy : {};
+  const neverTrack = Array.isArray(privacy.never_track) ? privacy.never_track : [];
+  const validNeverTrack = [];
+  for (const patternValue of neverTrack) {
+    if (typeof patternValue !== "string" || !isVaultRelativePath(patternValue)) continue;
+    if (resolveVaultPatternPrefix(root, patternValue) === null) {
+      findings.push(finding("error", "path.privacy-boundary", "privacy path prefix resolves outside the vault", patternValue));
+      continue;
+    }
+    validNeverTrack.push(patternValue);
+  }
+
+  const history = contract.history && typeof contract.history === "object" && !Array.isArray(contract.history) ? contract.history : {};
+  const gitCheck = git(root, "rev-parse", "--show-toplevel");
+  const gitRoot = gitCheck.status === 0 ? gitCheck.stdout.trim() : "";
+  const isGit = Boolean(gitRoot) && canonicalPath(gitRoot) === canonicalPath(root);
+  if (history.type === "git" && !isGit) findings.push(finding("error", "git.missing", "contract requires Git but root is not a Git repository"));
+  if (history.type === "none" && isGit) findings.push(finding("warning", "git.unconfigured", "root is a Git repository but contract declares no history"));
+
+  if (isGit) {
+    const status = git(root, "status", "--short");
+    if (status.stdout.trim()) findings.push(finding("info", "git.dirty", "working tree has uncommitted changes"));
+    const tracked = git(root, "ls-files");
+    for (const relative of tracked.stdout.split(/\r?\n/).filter(Boolean)) {
+      for (const patternValue of validNeverTrack) {
+        if (matchesPath(patternValue, relative)) findings.push(finding("error", "privacy.tracked", `tracked path matches privacy rule \`${patternValue}\``, relative));
+      }
+    }
+  }
+
+  const focusViews = contract.focus_views && typeof contract.focus_views === "object" && !Array.isArray(contract.focus_views) ? contract.focus_views : {};
+  for (const [name, view] of Object.entries(focusViews)) {
+    if (!view || typeof view !== "object" || Array.isArray(view) || typeof view.path !== "string" || !isVaultRelativePath(view.path)) continue;
+    findings.push(...checkFocusView(root, name, view));
+  }
+  return findings;
+}

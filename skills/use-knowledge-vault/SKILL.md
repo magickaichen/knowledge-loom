@@ -1,6 +1,7 @@
 ---
 name: use-knowledge-vault
 description: Retrieve targeted context from one governed Markdown vault and perform authorized durable capture. Use when a vault contract or wrapper is in scope, or the user asks to consult, remember, update, or sync vault knowledge.
+compatibility: Requires Node.js 20+ and local file/command access.
 ---
 
 # Use Knowledge Vault
@@ -26,7 +27,7 @@ policy, lifecycle, and failure behavior.
 4. After any write, run the deterministic audit:
 
    ```bash
-   uv run "<skill-root>/scripts/knowledge-loom.py" audit <vault-path>
+   node "<skill-root>/scripts/knowledge-loom.mjs" audit <vault-path>
    ```
 
    The write branch is complete only after the audit result and every required Git, sync, and backup

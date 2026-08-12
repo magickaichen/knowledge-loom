@@ -8,9 +8,10 @@ connector, or backup provider.
 
 - `references/protocol.md` defines runtime-neutral behavior.
 - `references/contract-schema.md` defines `KNOWLEDGE_VAULT.md` schema version 1.
-- `src/knowledge_loom/` implements deterministic parsing, resolution, initialization, and audit.
+- `src/knowledge-loom/` implements deterministic parsing, resolution, initialization, and audit.
 - `skills/` contains thin procedural entry points. Do not duplicate the full protocol in them.
-- `scripts/build_skill_packages.py` materializes generated, self-contained distribution files under
+- `scripts/build-skill-packages.mjs` bundles the JavaScript runtime and materializes generated,
+  self-contained distribution files under
   each skill. Edit the top-level sources, rebuild, and keep the generated copies exact.
 - `.codex-plugin/` and `.claude-plugin/` are runtime adapters, not policy sources.
 
@@ -29,5 +30,5 @@ connector, or backup provider.
 Run these before committing:
 
 ```bash
-uv run python scripts/validate.py --npx
+npm run validate:npx
 ```

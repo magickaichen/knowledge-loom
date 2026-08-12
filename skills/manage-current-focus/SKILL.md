@@ -1,6 +1,7 @@
 ---
 name: manage-current-focus
 description: Prioritize or update one declared current-focus view in a governed vault. Use to accept, complete, block, defer, or reorder commitments, or reconcile sourced status with current attention.
+compatibility: Requires Node.js 20+ and local file/command access.
 ---
 
 # Manage Current Focus
@@ -74,7 +75,7 @@ records the accepted state change and explicit displacement.
 After an edit, run:
 
 ```bash
-uv run "<skill-root>/scripts/knowledge-loom.py" audit <vault-path>
+node "<skill-root>/scripts/knowledge-loom.mjs" audit <vault-path>
 ```
 
 Confirm WIP limits, unique Start here, source links, explicit displacement, and the selected

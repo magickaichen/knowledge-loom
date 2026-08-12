@@ -1,6 +1,7 @@
 ---
 name: audit-knowledge-vault
 description: Audit one governed Markdown vault without modifying it. Use for contract, registry, metadata, subject, focus, privacy, Git, link, or lifecycle validation.
+compatibility: Requires Node.js 20+ and local file/command access.
 ---
 
 # Audit Knowledge Vault
@@ -17,7 +18,7 @@ ambiguity ends the audit before any vault is inspected.
 
 ## Run deterministic audit
 
-Use `uv run "<skill-root>/scripts/knowledge-loom.py" audit --help` as the command source, then audit
+Use `node "<skill-root>/scripts/knowledge-loom.mjs" audit --help` as the command source, then audit
 the selected path or ID with that runner. Use `--json` only when another tool will consume the
 result. Treat the command output and exit status as the source of truth for deterministic coverage
 rather than restating its implementation here.

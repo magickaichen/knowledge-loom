@@ -3,7 +3,7 @@
 Give any agent that supports Agent Skills a safe way to use the notes you already keep.
 
 Knowledge Loom is agent-neutral. Its four skills are ordinary `SKILL.md` folders, each with its
-own instructions, references, and Python runner. Install them with `npx skills` in Codex, Cursor,
+own instructions, references, and a self-contained JavaScript runner. Install them with `npx skills` in Codex, Cursor,
 OpenCode, Claude Code, and
 [other supported agents](https://github.com/vercel-labs/skills#supported-agents). The Claude Code
 and Codex plugins package those same four skill folders.
@@ -21,9 +21,11 @@ with ordinary Markdown folders, including Obsidian vaults.
 Pick one route for each agent. Installing through both `npx skills` and a plugin gives the same
 agent duplicate copies of every skill.
 
-Every route needs Python 3.11+ and [uv](https://docs.astral.sh/uv/). The `npx skills` route also
-needs Node.js. A compatible agent must support Agent Skills, local file access, and local command
-execution. A web chat without those capabilities cannot use a local vault directly.
+Codex, Claude Code, and other command-capable agents need Node.js 20+ for the deterministic runner.
+The runner already contains its YAML parser: an installed skill does not run `npm install`, use a
+package manager, or fetch code on first use. A compatible agent must support Agent Skills, local
+file access, and local command execution. A web chat without those capabilities cannot use a local
+vault directly. The Claude Desktop ZIP is instruction-only and does not require Node.js.
 
 <details open>
 <summary><strong>Codex and other supported agents: npx skills</strong></summary>
@@ -137,7 +139,8 @@ through `Customize → Skills → + Create skill → Upload a skill` and enable 
 To build the same self-contained ZIP from a checkout:
 
 ```bash
-uv run python scripts/build_claude_desktop_skill.py
+npm ci
+node scripts/build-claude-desktop-skill.mjs
 ```
 
 To use local notes, start a Cowork session and connect exactly one folder containing
@@ -155,9 +158,9 @@ CLI control:
 ```bash
 git clone https://github.com/magickaichen/knowledge-loom.git
 cd knowledge-loom
-uv sync
-python3 scripts/install.py
-python3 scripts/install.py --apply
+npm ci
+node scripts/install.mjs
+node scripts/install.mjs --apply
 ```
 
 The installer previews first, refuses collisions, and links the four skills into both
@@ -166,7 +169,7 @@ The installer previews first, refuses collisions, and links the four skills into
 Preview a vault from the command line:
 
 ```bash
-uv run knowledge-loom init ~/Documents/example-vault \
+npm run cli -- init ~/Documents/example-vault \
   --vault-id example \
   --title "Example Vault" \
   --subject owner
@@ -178,16 +181,16 @@ existing non-empty folder. Initialization does not rewrite existing notes or Git
 Audit and register the vault:
 
 ```bash
-uv run knowledge-loom audit ~/Documents/example-vault
-uv run knowledge-loom register example ~/Documents/example-vault
-uv run knowledge-loom register example ~/Documents/example-vault --apply
+npm run cli -- audit ~/Documents/example-vault
+npm run cli -- register example ~/Documents/example-vault
+npm run cli -- register example ~/Documents/example-vault --apply
 ```
 
 When more than one vault is registered, an unscoped request fails instead of guessing. Select a
 vault by ID or path:
 
 ```bash
-uv run knowledge-loom resolve example
+npm run cli -- resolve example
 ```
 
 ## How it works
@@ -205,13 +208,13 @@ access control, encrypt notes, host a sync service, or reorganize an existing va
 ## Develop and validate
 
 Fixtures are fictional and must not contain real work, health, family, credential, or private vault
-data. Edit the top-level Python package, protocol, and schema rather than generated copies inside
-individual skills.
+data. Edit the top-level JavaScript modules, protocol, and schema rather than generated copies
+inside individual skills.
 
 Run the complete validation entrypoint before committing:
 
 ```bash
-uv run python scripts/validate.py --npx
+npm run validate:npx
 ```
 
 It checks generated skill packages, unit tests, fixture audits, the behavior-eval matrix, the
