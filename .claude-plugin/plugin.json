@@ -9,5 +9,11 @@
   "homepage": "https://github.com/magickaichen/knowledge-loom",
   "repository": "https://github.com/magickaichen/knowledge-loom",
   "license": "MIT",
-  "keywords": ["knowledge", "markdown", "vault", "context", "governance"]
+  "keywords": ["knowledge", "markdown", "vault", "context", "governance"],
+  "skills": [
+    "./skills/audit-knowledge-vault",
+    "./skills/init-knowledge-vault",
+    "./skills/manage-current-focus",
+    "./skills/use-knowledge-vault"
+  ]
 }

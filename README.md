@@ -28,12 +28,14 @@ execution. A web chat without those capabilities cannot use a local vault direct
 <details open>
 <summary><strong>Codex and other supported agents: npx skills</strong></summary>
 
-Run one command. All four skills are selected automatically; choose only the agent or agents that
-should receive them:
+Run one command:
 
 ```bash
-npx skills add magickaichen/knowledge-loom --skill '*'
+npx skills@latest add magickaichen/knowledge-loom
 ```
+
+Select **Knowledge Loom** to install all four skills at once, or expand it to choose individual
+skills. Then choose the agent or agents that should receive them.
 
 The installer supports project and global installs. Each installed skill carries its own rules and
 runner, so it does not depend on the original repository checkout. Use `npx skills update` when you
@@ -218,9 +220,10 @@ for the contribution workflow.
 
 ## Releases
 
-Knowledge Loom uses semantic version tags such as `v0.1.1`. Pushing a matching tag runs the full
-local validation suite, checks that the tag matches every package manifest, and publishes a GitHub
-Release with generated notes and a versioned Claude Desktop ZIP.
+Knowledge Loom uses semantic version tags such as `v0.1.1`. Each version has a curated entry in the
+[changelog](CHANGELOG.md). Pushing a matching tag runs the full local validation suite, checks that
+the tag matches every package manifest and changelog entry, and publishes a GitHub Release with
+those notes and a versioned Claude Desktop ZIP.
 
 ## License
 

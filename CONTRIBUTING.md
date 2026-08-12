@@ -32,14 +32,15 @@ repository URL, and license. `tests/test_distribution.py` enforces those require
 
 ## Release
 
-1. Update the version in `pyproject.toml`, both plugin manifests, and the Claude marketplace.
-2. Run `uv run python scripts/validate.py --npx` and merge the change into `main`.
-3. Create and push an annotated tag that matches the package version:
+1. Add the release notes under `## vX.Y.Z` at the top of `CHANGELOG.md`.
+2. Update the version in `pyproject.toml`, both plugin manifests, and the Claude marketplace.
+3. Run `uv run python scripts/validate.py --npx` and merge the change into `main`.
+4. Create and push an annotated tag that matches the package version:
 
    ```bash
-   git tag -a v0.1.1 -m "Knowledge Loom v0.1.1"
+   git tag -a v0.1.1 -m "v0.1.1"
    git push origin v0.1.1
    ```
 
-The release workflow rejects a mismatched tag, runs the local validation suite, builds a versioned
-Claude Desktop ZIP, and publishes the GitHub Release with generated notes.
+The release workflow rejects a tag without matching package versions and changelog notes, runs the
+local validation suite, builds a versioned Claude Desktop ZIP, and publishes the curated notes.

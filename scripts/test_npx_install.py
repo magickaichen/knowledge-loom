@@ -5,9 +5,13 @@ from __future__ import annotations
 
 import json
 import os
+import pty
+import select
+import signal
 import shutil
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 SKILLS_CLI = os.environ.get("KNOWLEDGE_LOOM_SKILLS_CLI", "skills@1.5.22")
@@ -21,6 +25,7 @@ RUNNER_CHECK_ROOTS = (
     Path(".agents/skills"),
     Path(".claude/skills"),
 )
+INTERACTIVE_GROUP_PROMPT = "Select all 4 skills in Knowledge Loom."
 
 
 def run(command: list[str], *, cwd: Path, capture_output: bool = False) -> subprocess.CompletedProcess[str]:
@@ -35,6 +40,53 @@ def run(command: list[str], *, cwd: Path, capture_output: bool = False) -> subpr
     )
 
 
+def terminate_child_process_group(child_pid: int) -> None:
+    try:
+        os.killpg(child_pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    os.waitpid(child_pid, 0)
+
+
+def assert_interactive_group(npx: str, package_root: Path, workspace: Path) -> None:
+    command = [npx, "--yes", SKILLS_CLI, "add", str(package_root)]
+    environment = {
+        key: value
+        for key, value in {**os.environ, "DISABLE_TELEMETRY": "1"}.items()
+        if not key.startswith("CODEX_")
+    }
+    child_pid, terminal = pty.fork()
+    if child_pid == 0:
+        os.chdir(workspace)
+        os.execvpe(command[0], command, environment)
+
+    output = bytearray()
+    deadline = time.monotonic() + 30
+    try:
+        while time.monotonic() < deadline:
+            readable, _, _ = select.select([terminal], [], [], 0.2)
+            if terminal not in readable:
+                continue
+            try:
+                chunk = os.read(terminal, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            output.extend(chunk)
+            if INTERACTIVE_GROUP_PROMPT.encode() in output:
+                terminate_child_process_group(child_pid)
+                return
+    finally:
+        os.close(terminal)
+
+    terminate_child_process_group(child_pid)
+    rendered = output.decode(errors="replace")
+    raise SystemExit(
+        f"bare npx installer omitted the Knowledge Loom all-skills group:\n{rendered}"
+    )
+
+
 def main() -> int:
     package_root = Path(__file__).resolve().parents[1]
     npx = shutil.which("npx")
@@ -45,6 +97,7 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="knowledge-loom-npx-") as temporary:
         workspace = Path(temporary)
+        assert_interactive_group(npx, package_root, workspace)
         listing = run(
             [npx, "--yes", SKILLS_CLI, "add", str(package_root), "--list"],
             cwd=workspace,
@@ -114,7 +167,8 @@ def main() -> int:
             raise SystemExit(f"installed skill mismatch: {sorted(names)}")
 
     print(
-        f"PASS npx {SKILLS_CLI} installed all four skills for every supported agent "
+        f"PASS npx {SKILLS_CLI} offered one interactive Knowledge Loom group and installed all "
+        f"four skills for every supported agent "
         f"across {len(installed_roots)} distinct roots; Codex and Claude Code runners passed"
     )
     return 0
