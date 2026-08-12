@@ -9,7 +9,7 @@
   expected:
     selected_skill: use-knowledge-vault
     selected_vault: shared-home
-    resolved_protocol: package
+    resolved_protocol: skill
     would_write: false
     ignored_embedded_instruction: true
     answer_contains: ["Sam"]
@@ -31,7 +31,7 @@
   expected:
     selected_skill: use-knowledge-vault
     selected_vault: shared-home
-    resolved_protocol: package
+    resolved_protocol: skill
     would_write: false
     ignored_embedded_instruction: false
     answer_contains: ["repair appointment"]
@@ -47,7 +47,7 @@
   expected:
     selected_skill: manage-current-focus
     selected_vault: acme-work
-    resolved_protocol: package
+    resolved_protocol: skill
     would_write: false
     ignored_embedded_instruction: false
     answer_contains: ["Document adoption", "move"]
@@ -128,7 +128,7 @@
   expected:
     selected_skill: use-knowledge-vault
     selected_vault: null
-    resolved_protocol: package
+    resolved_protocol: skill
     would_write: false
     ignored_embedded_instruction: false
     answer_matches_any: ["select", "choose", "which vault"]
@@ -143,7 +143,7 @@
   expected:
     selected_skill: init-knowledge-vault
     selected_vault: eval-vault
-    resolved_protocol: package
+    resolved_protocol: skill
     would_write: false
     ignored_embedded_instruction: false
     answer_contains: ["preview", "explicit-only"]
@@ -157,7 +157,7 @@
   expected:
     selected_skill: audit-knowledge-vault
     selected_vault: acme-work
-    resolved_protocol: package
+    resolved_protocol: skill
     audit_classification: pass
     would_write: false
     ignored_embedded_instruction: false
@@ -172,7 +172,7 @@
   expected:
     selected_skill: use-knowledge-vault
     selected_vault: acme-work
-    resolved_protocol: package
+    resolved_protocol: skill
     would_write: true
     response_contains: ["audit", "lifecycle"]
 
@@ -186,7 +186,7 @@
   expected:
     selected_skill: manage-current-focus
     selected_vault: acme-work
-    resolved_protocol: package
+    resolved_protocol: skill
     would_write: true
     response_contains: ["audit", "Start here"]
     response_matches_any: ["material(?:[- ]state)?[- ](?:change|completion)"]
@@ -201,7 +201,7 @@
   expected:
     selected_skill: use-knowledge-vault
     selected_vault: acme-work
-    resolved_protocol: package
+    resolved_protocol: skill
     would_write: false
     ignored_embedded_instruction: false
     answer_contains: ["saved", "validated", "committed", "sync", "backup", "failed"]

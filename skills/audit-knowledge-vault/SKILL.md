@@ -10,17 +10,17 @@ destinations.
 
 ## Load authority and resolve scope
 
-Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<package-root>` to the
-parent of the `skills/` directory containing that canonical path. Read
-`<package-root>/references/contract-schema.md` and
-`<package-root>/references/protocol.md` completely. Resolve one vault through **Select one vault**;
+Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<skill-root>` to the
+directory containing that canonical file. Read `<skill-root>/references/contract-schema.md` and
+`<skill-root>/references/protocol.md` completely. Resolve one vault through **Select one vault**;
 ambiguity ends the audit before any vault is inspected.
 
 ## Run deterministic audit
 
-Use `knowledge-loom audit --help` as the command source, then audit the selected path or ID. Use
-`--json` only when another tool will consume the result. Treat the command output and exit status as
-the source of truth for deterministic coverage rather than restating its implementation here.
+Use `uv run "<skill-root>/scripts/knowledge-loom.py" audit --help` as the command source, then audit
+the selected path or ID with that runner. Use `--json` only when another tool will consume the
+result. Treat the command output and exit status as the source of truth for deterministic coverage
+rather than restating its implementation here.
 
 A dirty tree is operational context for later writes, not an audit failure by itself.
 

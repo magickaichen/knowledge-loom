@@ -9,10 +9,9 @@ Create or adopt one vault through a previewed contract change.
 
 ## Load authority
 
-Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<package-root>` to the
-parent of the `skills/` directory containing that canonical path. Read
-`<package-root>/references/protocol.md` and
-`<package-root>/references/contract-schema.md` completely before proposing changes.
+Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<skill-root>` to the
+directory containing that canonical file. Read `<skill-root>/references/protocol.md` and
+`<skill-root>/references/contract-schema.md` completely before proposing changes.
 
 ## Establish the contract
 
@@ -36,7 +35,7 @@ default.
 Use the CLI help as the command source:
 
 ```bash
-uv run --project <package-root> knowledge-loom init --help
+uv run "<skill-root>/scripts/knowledge-loom.py" init --help
 ```
 
 Build and run the resolved `init` command without `--apply`. Use adoption mode only for an existing
@@ -60,9 +59,10 @@ After authorization, rerun the exact previewed command with `--apply`.
 
 ## Register deterministically
 
-When registration is requested, inspect `knowledge-loom register --help`, preview the resolved ID
-and canonical path, then apply the same registry change only after confirmation. Preserve any other
-vault's existing entry.
+When registration is requested, inspect
+`uv run "<skill-root>/scripts/knowledge-loom.py" register --help`, preview the resolved ID and
+canonical path, then apply the same registry change only after confirmation. Preserve every
+existing registry entry; an ID already bound to another path is a conflict, not an update.
 
 ## Validate and report
 

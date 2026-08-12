@@ -140,6 +140,10 @@ def validate(case: dict, result: dict, package_root: Path) -> list[str]:
     expected_protocol = expected.get("resolved_protocol")
     if expected_protocol == "package":
         expected_protocol = str((package_root / "references" / "protocol.md").resolve())
+    elif expected_protocol == "skill":
+        expected_protocol = str(
+            (package_root / "skills" / case["skill"] / "references" / "protocol.md").resolve()
+        )
     if "resolved_protocol" in expected and result.get("resolved_protocol") != expected_protocol:
         errors.append(
             f"resolved_protocol: expected {expected_protocol!r}, got {result.get('resolved_protocol')!r}"
