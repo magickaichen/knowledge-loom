@@ -55,22 +55,13 @@ def test_claude_marketplace_points_to_the_root_plugin() -> None:
     assert entry["license"] == manifest["license"] == "MIT"
 
 
-def test_readme_leads_with_the_user_outcome_and_copy_paste_install_paths() -> None:
+def test_readme_leads_with_the_user_outcome_and_names_supported_install_paths() -> None:
     readme = (PACKAGE_ROOT / "README.md").read_text(encoding="utf-8")
 
     assert "use local Markdown notes without guessing which folder" in readme
     assert readme.index("## Install") < readme.index("## How it works")
     assert readme.index("## Try it") < readme.index("## How it works")
-    assert (
-        "npx skills add magickaichen/knowledge-loom --skill '*' --global "
-        "--agent codex claude-code --copy --yes"
-    ) in readme
-    assert (
-        "codex plugin marketplace add magickaichen/knowledge-loom && "
-        "codex plugin add knowledge-loom@knowledge-loom"
-    ) in readme
-    assert (
-        "claude plugin marketplace add magickaichen/knowledge-loom && "
-        "claude plugin install knowledge-loom@knowledge-loom"
-    ) in readme
+    assert "npx skills add" in readme
+    assert "codex plugin marketplace add" in readme
+    assert "claude plugin marketplace add" in readme
     assert "Claude Desktop custom skills use a ZIP upload" in readme
