@@ -28,10 +28,11 @@ execution. A web chat without those capabilities cannot use a local vault direct
 <details open>
 <summary><strong>Codex and other supported agents: npx skills</strong></summary>
 
-Run one command, then choose the agent or agents and install all four skills:
+Run one command. All four skills are selected automatically; choose only the agent or agents that
+should receive them:
 
 ```bash
-npx skills add magickaichen/knowledge-loom
+npx skills add magickaichen/knowledge-loom --skill '*'
 ```
 
 The installer supports project and global installs. Each installed skill carries its own rules and
@@ -126,16 +127,19 @@ you want a specific workflow.
 
 ## Claude Desktop and Cowork
 
-Claude Desktop custom skills use a ZIP upload rather than the Claude Code plugin marketplace. Build
-the self-contained ZIP from a checkout:
+Claude Desktop custom skills use a ZIP upload rather than the Claude Code plugin marketplace.
+Download `knowledge-loom-claude-desktop-vX.Y.Z.zip` from the
+[latest release](https://github.com/magickaichen/knowledge-loom/releases/latest), then upload it
+through `Customize → Skills → + Create skill → Upload a skill` and enable it.
+
+To build the same self-contained ZIP from a checkout:
 
 ```bash
 uv run python scripts/build_claude_desktop_skill.py
 ```
 
-Upload `dist/knowledge-loom-claude-desktop.zip` through
-`Customize → Skills → + Create skill → Upload a skill`, then enable it. To use local notes, start a
-Cowork session and connect exactly one folder containing `KNOWLEDGE_VAULT.md`.
+To use local notes, start a Cowork session and connect exactly one folder containing
+`KNOWLEDGE_VAULT.md`.
 
 Regular Claude Chat cannot read an unconnected local folder. The Desktop adapter refuses local
 vault claims without a connected Cowork folder and refuses writes when the session cannot complete
@@ -211,6 +215,12 @@ uv run python scripts/validate.py --npx
 It checks generated skill packages, unit tests, fixture audits, the behavior-eval matrix, the
 Claude Desktop ZIP, and a real `npx skills` copy installation. See [CONTRIBUTING.md](CONTRIBUTING.md)
 for the contribution workflow.
+
+## Releases
+
+Knowledge Loom uses semantic version tags such as `v0.1.1`. Pushing a matching tag runs the full
+local validation suite, checks that the tag matches every package manifest, and publishes a GitHub
+Release with generated notes and a versioned Claude Desktop ZIP.
 
 ## License
 

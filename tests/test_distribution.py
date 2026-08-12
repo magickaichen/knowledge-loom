@@ -67,6 +67,7 @@ def test_readme_leads_with_the_user_outcome_and_names_supported_install_paths() 
     assert readme.index("## Set up your first vault") < readme.index("## How it works")
     assert "Installing through both `npx skills` and a plugin" in rendered_text
     assert "npx skills add" in readme
+    assert "npx skills add magickaichen/knowledge-loom --skill '*'" in readme
     assert "other supported agents" in readme
     assert "codex plugin marketplace add" in readme
     assert "claude plugin marketplace add" in readme

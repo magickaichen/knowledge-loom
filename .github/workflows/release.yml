@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - run: uv sync --locked --all-groups
+      - run: uv run python scripts/check_release_version.py "$GITHUB_REF_NAME"
+      - run: uv run python scripts/validate.py
+      - name: Build versioned Claude Desktop skill
+        run: >-
+          uv run python scripts/build_claude_desktop_skill.py
+          --output "dist/knowledge-loom-claude-desktop-${GITHUB_REF_NAME}.zip"
+      - name: Publish GitHub Release
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          "dist/knowledge-loom-claude-desktop-${GITHUB_REF_NAME}.zip#Claude Desktop skill"
+          --verify-tag
+          --generate-notes
+          --title "Knowledge Loom ${GITHUB_REF_NAME}"
+        env:
+          GH_TOKEN: ${{ github.token }}
