@@ -21,9 +21,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       - run: uv sync --locked --all-groups
-      - run: uv run python scripts/build_skill_packages.py --check
-      - run: uv run pytest
-      - run: uv run knowledge-loom audit tests/fixtures/single-proactive
-      - run: uv run knowledge-loom audit tests/fixtures/shared-explicit
-      - run: uv run python scripts/run_behavior_evals.py
-      - run: uv run python scripts/build_claude_desktop_skill.py
+      - run: uv run python scripts/validate.py --npx

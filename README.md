@@ -128,19 +128,13 @@ See [the runtime-neutral protocol](references/protocol.md) and
 ## Validate
 
 ```bash
-uv run python scripts/build_skill_packages.py --check
-uv run pytest
-uv run knowledge-loom audit tests/fixtures/single-proactive
-uv run knowledge-loom audit tests/fixtures/shared-explicit
-uv run python scripts/run_behavior_evals.py
-uv run python scripts/build_claude_desktop_skill.py
+uv run python scripts/validate.py --npx
 ```
 
-The behavior command is a dry run. Add `--runtime codex --run` or `--runtime claude --run` to
-execute networked behavior evaluations. Both runtimes use the same cases for native description
-routing, canonical skill-path resolution, vault and subject ambiguity, preview and read-only
-boundaries, focus displacement, write authorization, lifecycle reporting, and deterministic audit
-classification.
+This single validation entrypoint checks generated packages, unit tests, fixture audits, the
+behavior-eval matrix, the Claude Desktop archive, and a real pinned `npx skills` copy installation.
+The behavior eval is a dry run; run `scripts/run_behavior_evals.py` directly with
+`--runtime codex --run` or `--runtime claude --run` for networked runtime evaluations.
 
 Run the installed runtime's plugin validator before publishing a change. For Claude Code:
 

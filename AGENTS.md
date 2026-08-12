@@ -29,10 +29,5 @@ connector, or backup provider.
 Run these before committing:
 
 ```bash
-uv run python scripts/build_skill_packages.py --check
-uv run pytest
-uv run knowledge-loom audit tests/fixtures/single-proactive
-uv run knowledge-loom audit tests/fixtures/shared-explicit
-uv run python scripts/run_behavior_evals.py
-uv run python scripts/build_claude_desktop_skill.py
+uv run python scripts/validate.py --npx
 ```

@@ -45,6 +45,16 @@ def test_each_copied_skill_runs_without_the_source_checkout(tmp_path: Path, skil
 
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout == "PASS no findings\n"
+    assert not list(installed.rglob("__pycache__"))
+
+
+def test_runtime_bytecode_is_not_treated_as_package_drift(tmp_path: Path) -> None:
+    skill_root = tmp_path / "skill"
+    cache = skill_root / "scripts" / "knowledge_loom" / "__pycache__" / "audit.pyc"
+    cache.parent.mkdir(parents=True)
+    cache.write_bytes(b"runtime cache")
+
+    assert BUILDER.managed_files(skill_root) == set()
 
 
 def test_skill_frontmatter_and_plugin_manifests_match_the_distribution() -> None:
