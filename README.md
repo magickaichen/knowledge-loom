@@ -1,63 +1,81 @@
 # Knowledge Loom
 
-Knowledge Loom lets Codex and Claude use local Markdown notes without guessing which folder to
-open, mixing one person's facts with another's, or writing behind your back.
+Give Codex and Claude a safe way to use the notes you already keep.
 
-A **vault** is any folder of Markdown files, including an Obsidian vault. Knowledge Loom adds a
-small rules file to that folder and gives your agent four skills:
+Your Markdown notes contain decisions, plans, project history, and personal context. Point an agent
+at the folder and it still has to guess which vault you meant, whose facts it found, and whether it
+may save what it learned.
 
-- `init-knowledge-vault` sets up or adopts a vault, with a preview before it writes anything.
-- `audit-knowledge-vault` checks the contract, metadata, privacy rules, Git state, and focus views.
-- `use-knowledge-vault` finds the smallest useful set of notes and handles approved updates.
-- `manage-current-focus` keeps a short list of what matters now.
+Knowledge Loom adds a small rules file to your Markdown folder. That file tells the agent what the
+vault contains, how to find the right notes, and where reading stops and writing begins. It works
+with ordinary Markdown folders, including Obsidian vaults.
 
-## Install
+## Installation
 
-Every install method needs Python 3.11+ and [uv](https://docs.astral.sh/uv/). The `npx` option also
-needs Node.js.
+Pick one route. The plugin routes install Knowledge Loom as a managed bundle. The `npx` route
+copies ordinary skill folders that you can inspect and edit. Installing both routes for the same
+agent gives it duplicate copies of every skill.
 
-### Recommended: Codex and Claude Code together
+Every route needs Python 3.11+ and [uv](https://docs.astral.sh/uv/). The `npx` route also needs
+Node.js.
 
-Copy one command to install all four skills for both agents:
+<details open>
+<summary><strong>Recommended: Codex and Claude Code together</strong></summary>
+
+Install all four skills for both agents with one command:
 
 ```bash
 npx skills add magickaichen/knowledge-loom --skill '*' --global --agent codex claude-code --copy --yes
 ```
 
-This is the shortest path if you only need the skills. Each installed skill carries its own
-protocol and runner, so it keeps working without the original repository checkout.
+Each copied skill carries its own rules and runner, so it does not depend on the original repository
+checkout. Use `npx skills update --global` when you want to pull a newer version.
 
-### Codex plugin
+</details>
 
-Register the repository marketplace and install the plugin:
+<details>
+<summary><strong>Codex plugin</strong></summary>
 
 ```bash
 codex plugin marketplace add magickaichen/knowledge-loom && codex plugin add knowledge-loom@knowledge-loom
 ```
 
-Start a new Codex task after installation so the four skills are available.
+Start a new Codex task after installation.
 
-### Claude Code plugin
+</details>
 
-Register the repository marketplace and install the plugin:
+<details>
+<summary><strong>Claude Code plugin</strong></summary>
 
 ```bash
 claude plugin marketplace add magickaichen/knowledge-loom && claude plugin install knowledge-loom@knowledge-loom
 ```
 
-Run `/reload-plugins` in an existing Claude Code session, or start a new one.
+Run `/reload-plugins` in an existing session, or start a new one.
+
+</details>
 
 Private repositories work when Git, GitHub CLI, or SSH credentials can read them. A public
 repository can be installed without GitHub authentication.
 
-## Try it
+## Set up your first vault
+
+### 1. Preview
 
 Open your Markdown folder in Codex or Claude Code and ask:
 
 > Initialize this folder as a knowledge vault. Show me the preview and do not write anything yet.
 
-Review the proposed contract, then approve it when the vault ID, subject, write policy, and files
-look right. Next, try:
+Knowledge Loom proposes a vault ID, subject, write policy, and files. It stops at the preview.
+
+### 2. Approve
+
+Check the proposal, then tell the agent to apply it. New vaults default to explicit-only writes, so
+permission to read your notes does not become permission to save every conversation.
+
+### 3. Use it
+
+Try any of these:
 
 > Audit this knowledge vault without changing it.
 
@@ -65,25 +83,39 @@ look right. Next, try:
 
 > Remember this decision in the vault.
 
-The last prompt may ask for confirmation. New vaults default to explicit-only writes, so an agent
-can read without gaining permission to save every conversation.
+The last request may need confirmation, depending on the vault's write policy.
 
-## What the boundary protects
+## Why this exists
 
-Knowledge Loom makes the agent resolve these questions before it uses your notes:
+An agent with access to your notes is useful only when its boundaries are clear. Knowledge Loom
+makes the agent settle five questions before it acts:
 
 1. Which one vault is in scope?
 2. Which person, project, or other subject does the request concern?
 3. Which notes are relevant?
-4. Is the agent allowed to save a lasting change?
+4. May the agent save a lasting change?
 5. If the vault requires Git, sync, or backup, which steps actually completed?
 
-Missing information stays unknown. A health fact recorded for Alex does not become a health fact
-about Sam. A successful Git commit does not get reported as a successful backup. Vault content is
-treated as data, while the checked-in contract and skill protocol control the workflow.
+This prevents four common failures. The agent cannot choose a vault because its topic looks
+similar, transfer Alex's health facts to Sam, turn a useful conversation into a silent write, or
+report a Git commit as a successful backup. Missing information stays unknown.
 
-The skills do not run a Knowledge Loom service or upload vault contents to one. Your agent runtime,
-Git remote, sync provider, and backup provider still have their own access and privacy rules.
+The skills do not upload notes to a Knowledge Loom service. Your agent runtime, Git remote, sync
+provider, and backup provider still have their own access and privacy rules.
+
+## The four skills
+
+- [`init-knowledge-vault`](skills/init-knowledge-vault/SKILL.md) previews and initializes a new
+  vault, or carefully adopts an existing folder.
+- [`audit-knowledge-vault`](skills/audit-knowledge-vault/SKILL.md) checks the rules file, metadata,
+  privacy paths, Git state, and focus views without modifying the vault.
+- [`use-knowledge-vault`](skills/use-knowledge-vault/SKILL.md) retrieves the smallest useful set of
+  notes and handles approved updates.
+- [`manage-current-focus`](skills/manage-current-focus/SKILL.md) maintains one short list of what
+  matters now.
+
+Codex and Claude load these skills when a request matches. You can also name a skill directly when
+you want a specific workflow.
 
 ## Claude Desktop and Cowork
 
@@ -118,7 +150,7 @@ python3 scripts/install.py --apply
 The installer previews first, refuses collisions, and links the four skills into both
 `~/.agents/skills` and `~/.claude/skills`.
 
-Preview a new vault:
+Preview a vault from the command line:
 
 ```bash
 uv run knowledge-loom init ~/Documents/example-vault \
@@ -127,7 +159,7 @@ uv run knowledge-loom init ~/Documents/example-vault \
   --subject owner
 ```
 
-Add `--apply` to create the contract. Use `--adopt` only when you deliberately add a contract to an
+Add `--apply` to create the rules file. Use `--adopt` only when you deliberately add one to an
 existing non-empty folder. Initialization does not rewrite existing notes or Git history.
 
 Audit and register the vault:
@@ -147,9 +179,9 @@ uv run knowledge-loom resolve example
 
 ## How it works
 
-Every vault has a versioned `KNOWLEDGE_VAULT.md` contract. It declares the vault identity, subjects,
-write rules, metadata profiles, focus views, Git history, sync, backup, and paths that must never be
-tracked. The four skills use the same runtime-neutral protocol in Codex and Claude.
+The rules file is a versioned `KNOWLEDGE_VAULT.md` contract. It declares the vault identity,
+subjects, write rules, metadata profiles, focus views, Git history, sync, backup, and paths that
+must never be tracked. The four skills use the same runtime-neutral protocol in Codex and Claude.
 
 Read the [protocol](references/protocol.md) and
 [contract schema](references/contract-schema.md) when you need the exact rules.
