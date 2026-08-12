@@ -24,6 +24,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from knowledge_loom.cli import main
@@ -51,7 +52,11 @@ def managed_files(skill_root: Path) -> set[Path]:
     for directory in ("references", "scripts"):
         root = skill_root / directory
         if root.exists():
-            files.update(path.relative_to(skill_root) for path in root.rglob("*") if path.is_file())
+            files.update(
+                path.relative_to(skill_root)
+                for path in root.rglob("*")
+                if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+            )
     return files
 
 

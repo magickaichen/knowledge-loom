@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from knowledge_loom.audit import audit_vault, matches_path
-from knowledge_loom.contract import load_vault
+from knowledge_loom.contract import load_vault, render_contract
 from knowledge_loom.models import Vault
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -102,3 +102,22 @@ def test_malformed_contract_sections_report_errors_instead_of_crashing(field: st
     findings = audit_vault(vault)
 
     assert any(finding.severity == "error" for finding in findings)
+
+
+def test_privacy_pattern_rejects_a_symlinked_prefix_outside_the_vault(tmp_path: Path) -> None:
+    root = tmp_path / "vault"
+    shutil.copytree(FIXTURES / "single-proactive", root)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "External").symlink_to(outside, target_is_directory=True)
+    vault = load_vault(root)
+    contract = deepcopy(vault.contract)
+    contract["privacy"]["never_track"] = ["External/**"]
+    vault.contract_path.write_text(render_contract(contract, vault.body), encoding="utf-8")
+
+    findings = audit_vault(load_vault(root))
+
+    assert any(
+        finding.code == "path.privacy-boundary" and finding.path == "External/**"
+        for finding in findings
+    )

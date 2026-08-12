@@ -30,6 +30,20 @@ def resolve_vault_path(root: Path, value: str) -> Path | None:
     return resolved_path
 
 
+def resolve_vault_pattern_prefix(root: Path, value: str) -> Path | None:
+    """Resolve the non-glob prefix of a validated pattern inside the vault."""
+    if not is_vault_relative_path(value):
+        return None
+
+    prefix_parts: list[str] = []
+    for part in PurePosixPath(value).parts:
+        if any(marker in part for marker in ("*", "?", "[")):
+            break
+        prefix_parts.append(part)
+    prefix = PurePosixPath(*prefix_parts).as_posix() if prefix_parts else "."
+    return resolve_vault_path(root, prefix)
+
+
 def is_within_vault(root: Path, path: Path) -> bool:
     try:
         resolved_root = root.resolve()

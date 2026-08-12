@@ -88,16 +88,20 @@ def _validate_path_values(
         return []
 
     for value in values:
-        if not is_vault_relative_path(value):
-            findings.append(
-                Finding(
-                    "error",
-                    "contract.path-boundary",
-                    f"`{field}` path must stay within the vault root",
-                    value,
-                )
-            )
+        _validate_path_value(value, description=f"`{field}` path", findings=findings)
     return values
+
+
+def _validate_path_value(value: str, *, description: str, findings: list[Finding]) -> None:
+    if not is_vault_relative_path(value):
+        findings.append(
+            Finding(
+                "error",
+                "contract.path-boundary",
+                f"{description} must stay within the vault root",
+                value,
+            )
+        )
 
 
 def validate_contract_data(contract: dict[str, Any]) -> list[Finding]:
@@ -181,15 +185,11 @@ def validate_contract_data(contract: dict[str, Any]) -> list[Finding]:
                 findings.append(Finding("error", "contract.metadata-paths", f"profile `{name}` requires string paths"))
             else:
                 for path in paths:
-                    if not is_vault_relative_path(path):
-                        findings.append(
-                            Finding(
-                                "error",
-                                "contract.path-boundary",
-                                f"metadata profile `{name}` path must stay within the vault root",
-                                path,
-                            )
-                        )
+                    _validate_path_value(
+                        path,
+                        description=f"metadata profile `{name}` path",
+                        findings=findings,
+                    )
             if not isinstance(profile.get("required"), list):
                 findings.append(Finding("error", "contract.metadata-required", f"profile `{name}` requires a field list"))
             if profile.get("severity", "error") not in {"error", "warning"}:
@@ -207,14 +207,11 @@ def validate_contract_data(contract: dict[str, Any]) -> list[Finding]:
             view_path = view.get("path")
             if not isinstance(view_path, str):
                 findings.append(Finding("error", "contract.focus-path", f"focus view `{name}` requires `path`"))
-            elif not is_vault_relative_path(view_path):
-                findings.append(
-                    Finding(
-                        "error",
-                        "contract.path-boundary",
-                        f"focus view `{name}` path must stay within the vault root",
-                        view_path,
-                    )
+            else:
+                _validate_path_value(
+                    view_path,
+                    description=f"focus view `{name}` path",
+                    findings=findings,
                 )
             if view.get("subject") not in subject_values:
                 findings.append(Finding("error", "contract.focus-subject", f"focus view `{name}` has unknown subject"))

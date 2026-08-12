@@ -7,7 +7,12 @@ from pathlib import Path
 from .contract import load_note_frontmatter, validate_contract_data
 from .focus import check_focus_view
 from .models import Finding, Vault
-from .pathing import is_vault_relative_path, is_within_vault, resolve_vault_path
+from .pathing import (
+    is_vault_relative_path,
+    is_within_vault,
+    resolve_vault_path,
+    resolve_vault_pattern_prefix,
+)
 
 
 def _glob_regex(pattern: str) -> re.Pattern[str]:
@@ -46,41 +51,58 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _audit_declared_files(
+    root: Path,
+    values: object,
+    *,
+    boundary_code: str,
+    boundary_message: str,
+    missing_code: str,
+    missing_message: str,
+) -> list[Finding]:
+    findings: list[Finding] = []
+    if not isinstance(values, list):
+        return findings
+    for relative in values:
+        if not isinstance(relative, str) or not is_vault_relative_path(relative):
+            continue
+        resolved = resolve_vault_path(root, relative)
+        if resolved is None:
+            findings.append(Finding("error", boundary_code, boundary_message, relative))
+        elif not resolved.is_file():
+            findings.append(Finding("error", missing_code, missing_message, relative))
+    return findings
+
+
 def audit_vault(vault: Vault) -> list[Finding]:
     findings = validate_contract_data(vault.contract)
     root = vault.root
     contract = vault.contract
 
-    instruction_roots = contract.get("instruction_roots", [])
-    if not isinstance(instruction_roots, list):
-        instruction_roots = []
-    for relative in instruction_roots:
-        if not isinstance(relative, str) or not is_vault_relative_path(relative):
-            continue
-        resolved = resolve_vault_path(root, relative)
-        if resolved is None:
-            findings.append(
-                Finding("error", "path.instruction-boundary", "instruction root resolves outside the vault", relative)
-            )
-        elif not resolved.is_file():
-            findings.append(Finding("error", "path.instruction-root", "instruction root is missing", relative))
+    findings.extend(
+        _audit_declared_files(
+            root,
+            contract.get("instruction_roots", []),
+            boundary_code="path.instruction-boundary",
+            boundary_message="instruction root resolves outside the vault",
+            missing_code="path.instruction-root",
+            missing_message="instruction root is missing",
+        )
+    )
 
     navigation = contract.get("navigation", {})
     if not isinstance(navigation, dict):
         navigation = {}
-    entrypoints = navigation.get("entrypoints", [])
-    if not isinstance(entrypoints, list):
-        entrypoints = []
-    for relative in entrypoints:
-        if not isinstance(relative, str) or not is_vault_relative_path(relative):
-            continue
-        resolved = resolve_vault_path(root, relative)
-        if resolved is None:
-            findings.append(
-                Finding("error", "path.navigation-boundary", "navigation entrypoint resolves outside the vault", relative)
-            )
-        elif not resolved.is_file():
-            findings.append(Finding("error", "path.navigation", "navigation entrypoint is missing", relative))
+    findings.extend(
+        _audit_declared_files(
+            root,
+            navigation.get("entrypoints", []),
+            boundary_code="path.navigation-boundary",
+            boundary_message="navigation entrypoint resolves outside the vault",
+            missing_code="path.navigation",
+            missing_message="navigation entrypoint is missing",
+        )
+    )
 
     subject_config = contract.get("subjects", {})
     if not isinstance(subject_config, dict):
@@ -105,6 +127,16 @@ def audit_vault(vault: Vault) -> list[Finding]:
         for pattern in patterns:
             if not isinstance(pattern, str) or not is_vault_relative_path(pattern):
                 continue
+            if resolve_vault_pattern_prefix(root, pattern) is None:
+                findings.append(
+                    Finding(
+                        "error",
+                        "path.metadata-boundary",
+                        f"profile `{profile_name}` path prefix resolves outside the vault",
+                        pattern,
+                    )
+                )
+                continue
             try:
                 matches = root.glob(pattern)
                 paths = list(matches)
@@ -119,8 +151,6 @@ def audit_vault(vault: Vault) -> list[Finding]:
                 )
                 continue
             for path in paths:
-                if not path.is_file() or path.suffix.casefold() != ".md":
-                    continue
                 if not is_within_vault(root, path):
                     findings.append(
                         Finding(
@@ -130,6 +160,8 @@ def audit_vault(vault: Vault) -> list[Finding]:
                             path.relative_to(root).as_posix(),
                         )
                     )
+                    continue
+                if not path.is_file() or path.suffix.casefold() != ".md":
                     continue
                 relative = path.relative_to(root).as_posix()
                 key = (profile_name, relative)
@@ -158,6 +190,26 @@ def audit_vault(vault: Vault) -> list[Finding]:
                         )
                     )
 
+    privacy = contract.get("privacy", {})
+    never_track = privacy.get("never_track", []) if isinstance(privacy, dict) else []
+    if not isinstance(never_track, list):
+        never_track = []
+    valid_never_track: list[str] = []
+    for pattern in never_track:
+        if not isinstance(pattern, str) or not is_vault_relative_path(pattern):
+            continue
+        if resolve_vault_pattern_prefix(root, pattern) is None:
+            findings.append(
+                Finding(
+                    "error",
+                    "path.privacy-boundary",
+                    "privacy path prefix resolves outside the vault",
+                    pattern,
+                )
+            )
+            continue
+        valid_never_track.append(pattern)
+
     history = contract.get("history", {})
     history_type = history.get("type") if isinstance(history, dict) else None
     git_check = _git(root, "rev-parse", "--show-toplevel")
@@ -176,13 +228,9 @@ def audit_vault(vault: Vault) -> list[Finding]:
         if status.stdout.strip():
             findings.append(Finding("info", "git.dirty", "working tree has uncommitted changes"))
         tracked = _git(root, "ls-files")
-        privacy = contract.get("privacy", {})
-        never_track = privacy.get("never_track", []) if isinstance(privacy, dict) else []
-        if not isinstance(never_track, list):
-            never_track = []
         for relative in tracked.stdout.splitlines():
-            for pattern in never_track:
-                if isinstance(pattern, str) and is_vault_relative_path(pattern) and matches_path(pattern, relative):
+            for pattern in valid_never_track:
+                if matches_path(pattern, relative):
                     findings.append(
                         Finding(
                             "error",
