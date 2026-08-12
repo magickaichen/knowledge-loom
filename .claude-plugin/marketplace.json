@@ -1,0 +1,25 @@
+{
+  "name": "knowledge-loom",
+  "owner": {
+    "name": "Mike Xiao",
+    "url": "https://github.com/magickaichen"
+  },
+  "description": "Skills for using local Markdown notes with explicit vault, subject, and write boundaries.",
+  "plugins": [
+    {
+      "name": "knowledge-loom",
+      "source": "./",
+      "description": "Keep Codex and Claude inside clear boundaries when they read or update local Markdown notes.",
+      "version": "0.1.1",
+      "author": {
+        "name": "Mike Xiao",
+        "url": "https://github.com/magickaichen"
+      },
+      "homepage": "https://github.com/magickaichen/knowledge-loom",
+      "repository": "https://github.com/magickaichen/knowledge-loom",
+      "license": "MIT",
+      "category": "productivity",
+      "tags": ["knowledge", "markdown", "vault", "governance"]
+    }
+  ]
+}
