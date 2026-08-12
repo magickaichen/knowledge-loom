@@ -1,6 +1,12 @@
 # Knowledge Loom
 
-Give Codex and Claude a safe way to use the notes you already keep.
+Give any agent that supports Agent Skills a safe way to use the notes you already keep.
+
+Knowledge Loom is agent-neutral. Its four skills are ordinary `SKILL.md` folders, each with its
+own instructions, references, and Python runner. Install them with `npx skills` in Codex, Cursor,
+OpenCode, Claude Code, and
+[other supported agents](https://github.com/vercel-labs/skills#supported-agents). The Claude Code
+and Codex plugins package those same four skill folders.
 
 Your Markdown notes contain decisions, plans, project history, and personal context. Point an agent
 at the folder and it still has to guess which vault you meant, whose facts it found, and whether it
@@ -12,46 +18,47 @@ with ordinary Markdown folders, including Obsidian vaults.
 
 ## Installation
 
-Pick one route. The plugin routes install Knowledge Loom as a managed bundle. The `npx` route
-copies ordinary skill folders that you can inspect and edit. Installing both routes for the same
-agent gives it duplicate copies of every skill.
+Pick one route for each agent. Installing through both `npx skills` and a plugin gives the same
+agent duplicate copies of every skill.
 
-Every route needs Python 3.11+ and [uv](https://docs.astral.sh/uv/). The `npx` route also needs
-Node.js.
+Every route needs Python 3.11+ and [uv](https://docs.astral.sh/uv/). The `npx skills` route also
+needs Node.js. A compatible agent must support Agent Skills, local file access, and local command
+execution. A web chat without those capabilities cannot use a local vault directly.
 
 <details open>
-<summary><strong>Recommended: Codex and Claude Code together</strong></summary>
+<summary><strong>Codex and other supported agents: npx skills</strong></summary>
 
-Install all four skills for both agents with one command:
+Run one command, then choose the agent or agents and install all four skills:
 
 ```bash
-npx skills add magickaichen/knowledge-loom --skill '*' --global --agent codex claude-code --copy --yes
+npx skills add magickaichen/knowledge-loom
 ```
 
-Each copied skill carries its own rules and runner, so it does not depend on the original repository
-checkout. Use `npx skills update --global` when you want to pull a newer version.
+The installer supports project and global installs. Each installed skill carries its own rules and
+runner, so it does not depend on the original repository checkout. Use `npx skills update` when you
+want to pull a newer version.
 
 </details>
 
-<details>
-<summary><strong>Codex plugin</strong></summary>
-
-```bash
-codex plugin marketplace add magickaichen/knowledge-loom && codex plugin add knowledge-loom@knowledge-loom
-```
-
-Start a new Codex task after installation.
-
-</details>
-
-<details>
-<summary><strong>Claude Code plugin</strong></summary>
+<details open>
+<summary><strong>Claude Code: plugin</strong></summary>
 
 ```bash
 claude plugin marketplace add magickaichen/knowledge-loom && claude plugin install knowledge-loom@knowledge-loom
 ```
 
 Run `/reload-plugins` in an existing session, or start a new one.
+
+</details>
+
+<details>
+<summary><strong>Codex: plugin</strong></summary>
+
+```bash
+codex plugin marketplace add magickaichen/knowledge-loom && codex plugin add knowledge-loom@knowledge-loom
+```
+
+Start a new Codex task after installation.
 
 </details>
 
@@ -62,7 +69,7 @@ repository can be installed without GitHub authentication.
 
 ### 1. Preview
 
-Open your Markdown folder in Codex or Claude Code and ask:
+Open your Markdown folder in your agent and ask:
 
 > Initialize this folder as a knowledge vault. Show me the preview and do not write anything yet.
 
@@ -114,7 +121,7 @@ provider, and backup provider still have their own access and privacy rules.
 - [`manage-current-focus`](skills/manage-current-focus/SKILL.md) maintains one short list of what
   matters now.
 
-Codex and Claude load these skills when a request matches. You can also name a skill directly when
+Compatible agents load these skills when a request matches. You can also name a skill directly when
 you want a specific workflow.
 
 ## Claude Desktop and Cowork
@@ -181,7 +188,7 @@ uv run knowledge-loom resolve example
 
 The rules file is a versioned `KNOWLEDGE_VAULT.md` contract. It declares the vault identity,
 subjects, write rules, metadata profiles, focus views, Git history, sync, backup, and paths that
-must never be tracked. The four skills use the same runtime-neutral protocol in Codex and Claude.
+must never be tracked. Every installation route uses the same runtime-neutral protocol.
 
 Read the [protocol](references/protocol.md) and
 [contract schema](references/contract-schema.md) when you need the exact rules.

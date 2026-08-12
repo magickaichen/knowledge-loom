@@ -60,12 +60,14 @@ def test_readme_leads_with_the_user_outcome_and_names_supported_install_paths() 
     opening = readme[:800]
     rendered_text = " ".join(readme.split())
 
-    assert "Give Codex and Claude a safe way" in opening
+    assert "Give any agent that supports Agent Skills a safe way" in opening
+    assert "Knowledge Loom is agent-neutral" in opening
     assert "which vault you meant" in opening
     assert readme.index("## Installation") < readme.index("## How it works")
     assert readme.index("## Set up your first vault") < readme.index("## How it works")
-    assert "Installing both routes for the same agent gives it duplicate copies" in rendered_text
+    assert "Installing through both `npx skills` and a plugin" in rendered_text
     assert "npx skills add" in readme
+    assert "other supported agents" in readme
     assert "codex plugin marketplace add" in readme
     assert "claude plugin marketplace add" in readme
     assert "Claude Desktop custom skills use a ZIP upload" in readme

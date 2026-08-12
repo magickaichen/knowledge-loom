@@ -17,7 +17,7 @@ SKILL_NAMES = (
     "manage-current-focus",
     "use-knowledge-vault",
 )
-INSTALL_ROOTS = (
+RUNNER_CHECK_ROOTS = (
     Path(".agents/skills"),
     Path(".claude/skills"),
 )
@@ -64,14 +64,30 @@ def main() -> int:
                 "--skill",
                 "*",
                 "--agent",
-                "codex",
-                "claude-code",
+                "*",
                 "--copy",
                 "--yes",
             ],
             cwd=workspace,
         )
-        for relative_root in INSTALL_ROOTS:
+
+        installed_roots: dict[Path, set[str]] = {}
+        for skill_file in workspace.rglob("SKILL.md"):
+            if skill_file.parent.name in SKILL_NAMES:
+                installed_roots.setdefault(skill_file.parent.parent, set()).add(
+                    skill_file.parent.name
+                )
+        if len(installed_roots) <= len(RUNNER_CHECK_ROOTS):
+            raise SystemExit(
+                "npx all-agent installation did not create additional agent install roots"
+            )
+        for installed_root, skill_names in installed_roots.items():
+            if skill_names != set(SKILL_NAMES):
+                raise SystemExit(
+                    f"incomplete all-agent installation at {installed_root}: {sorted(skill_names)}"
+                )
+
+        for relative_root in RUNNER_CHECK_ROOTS:
             installed_root = workspace / relative_root
             for skill_name in SKILL_NAMES:
                 runner = installed_root / skill_name / "scripts" / "knowledge-loom.py"
@@ -97,7 +113,10 @@ def main() -> int:
         if names != set(SKILL_NAMES):
             raise SystemExit(f"installed skill mismatch: {sorted(names)}")
 
-    print(f"PASS npx {SKILLS_CLI} installed and ran all four skills for Codex and Claude Code")
+    print(
+        f"PASS npx {SKILLS_CLI} installed all four skills for every supported agent "
+        f"across {len(installed_roots)} distinct roots; Codex and Claude Code runners passed"
+    )
     return 0
 
 
