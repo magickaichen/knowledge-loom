@@ -7,6 +7,12 @@ from pathlib import Path
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = "https://github.com/magickaichen/knowledge-loom"
 PLUGIN_NAME = "knowledge-loom"
+CLAUDE_PLUGIN_SKILLS = [
+    "./skills/audit-knowledge-vault",
+    "./skills/init-knowledge-vault",
+    "./skills/manage-current-focus",
+    "./skills/use-knowledge-vault",
+]
 
 
 def load_json(relative: str) -> dict[str, object]:
@@ -55,6 +61,12 @@ def test_claude_marketplace_points_to_the_root_plugin() -> None:
     assert entry["license"] == manifest["license"] == "MIT"
 
 
+def test_claude_plugin_groups_all_four_skills_for_interactive_installers() -> None:
+    manifest = load_json(".claude-plugin/plugin.json")
+
+    assert manifest["skills"] == CLAUDE_PLUGIN_SKILLS
+
+
 def test_readme_leads_with_the_user_outcome_and_names_supported_install_paths() -> None:
     readme = (PACKAGE_ROOT / "README.md").read_text(encoding="utf-8")
     opening = readme[:800]
@@ -66,8 +78,9 @@ def test_readme_leads_with_the_user_outcome_and_names_supported_install_paths() 
     assert readme.index("## Installation") < readme.index("## How it works")
     assert readme.index("## Set up your first vault") < readme.index("## How it works")
     assert "Installing through both `npx skills` and a plugin" in rendered_text
-    assert "npx skills add" in readme
-    assert "npx skills add magickaichen/knowledge-loom --skill '*'" in readme
+    assert "npx skills@latest add" in readme
+    assert "npx skills@latest add magickaichen/knowledge-loom" in readme
+    assert "--skill '*'" not in readme
     assert "other supported agents" in readme
     assert "codex plugin marketplace add" in readme
     assert "claude plugin marketplace add" in readme

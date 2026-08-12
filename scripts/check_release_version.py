@@ -40,11 +40,38 @@ def validate_release_tag(tag: str) -> str:
     return version
 
 
+def changelog_notes(tag: str) -> str:
+    lines = (PACKAGE_ROOT / "CHANGELOG.md").read_text(encoding="utf-8").splitlines()
+    heading = f"## {tag}"
+    try:
+        start = lines.index(heading) + 1
+    except ValueError as error:
+        raise ValueError(f"CHANGELOG.md has no {heading!r} section") from error
+
+    end = next(
+        (index for index in range(start, len(lines)) if lines[index].startswith("## ")),
+        len(lines),
+    )
+    notes = "\n".join(lines[start:end]).strip()
+    if not notes:
+        raise ValueError(f"CHANGELOG.md section {heading!r} is empty")
+    return f"{notes}\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("tag", help="release tag in vX.Y.Z form")
+    parser.add_argument(
+        "--notes-output",
+        type=Path,
+        help="write the matching CHANGELOG.md section to this file",
+    )
     args = parser.parse_args()
     version = validate_release_tag(args.tag)
+    notes = changelog_notes(args.tag)
+    if args.notes_output is not None:
+        args.notes_output.parent.mkdir(parents=True, exist_ok=True)
+        args.notes_output.write_text(notes, encoding="utf-8")
     print(f"PASS release tag v{version} matches every package manifest")
     return 0
 
