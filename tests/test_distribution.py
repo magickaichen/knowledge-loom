@@ -57,10 +57,14 @@ def test_claude_marketplace_points_to_the_root_plugin() -> None:
 
 def test_readme_leads_with_the_user_outcome_and_names_supported_install_paths() -> None:
     readme = (PACKAGE_ROOT / "README.md").read_text(encoding="utf-8")
+    opening = readme[:800]
+    rendered_text = " ".join(readme.split())
 
-    assert "use local Markdown notes without guessing which folder" in readme
-    assert readme.index("## Install") < readme.index("## How it works")
-    assert readme.index("## Try it") < readme.index("## How it works")
+    assert "Give Codex and Claude a safe way" in opening
+    assert "which vault you meant" in opening
+    assert readme.index("## Installation") < readme.index("## How it works")
+    assert readme.index("## Set up your first vault") < readme.index("## How it works")
+    assert "Installing both routes for the same agent gives it duplicate copies" in rendered_text
     assert "npx skills add" in readme
     assert "codex plugin marketplace add" in readme
     assert "claude plugin marketplace add" in readme
