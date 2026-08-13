@@ -7976,6 +7976,19 @@ function loadRegistry(registryPath = defaultRegistryPath()) {
   if (!data || typeof data !== "object" || Array.isArray(data) || data.schema_version !== 1 || !data.vaults || typeof data.vaults !== "object" || Array.isArray(data.vaults)) {
     throw new ResolutionError(`${resolved}: registry must have schema_version 1 and a vaults mapping`);
   }
+  if (data.projects !== void 0) {
+    if (!data.projects || typeof data.projects !== "object" || Array.isArray(data.projects)) {
+      throw new ResolutionError(`${resolved}: registry projects must be a mapping`);
+    }
+    for (const [projectRoot, record] of Object.entries(data.projects)) {
+      if (!path5.isAbsolute(expandHome(projectRoot))) {
+        throw new ResolutionError(`${resolved}: project association path must be absolute: ${projectRoot}`);
+      }
+      if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.vault_id !== "string" || !record.vault_id) {
+        throw new ResolutionError(`${resolved}: project association ${projectRoot} must contain a vault_id`);
+      }
+    }
+  }
   return data;
 }
 function renderRegistry(data) {
@@ -8026,20 +8039,51 @@ function registeredCandidates(registry) {
   }
   return candidates;
 }
+function registeredVault(vaultId, registry) {
+  const record = registry.vaults[vaultId];
+  if (!record) throw new ResolutionError(`unknown registered vault ID \`${vaultId}\``);
+  if (typeof record !== "object" || Array.isArray(record) || typeof record.path !== "string") {
+    throw new ResolutionError(`invalid registered vault record \`${vaultId}\``);
+  }
+  return loadVault(record.path);
+}
+function projectAssociation(start, registry) {
+  let current = canonicalPath(start);
+  if (fs6.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path5.dirname(current);
+  const matches = [];
+  for (const [configuredRoot, record] of Object.entries(registry.projects ?? {})) {
+    const root = canonicalPath(configuredRoot);
+    if (!isWithin(root, current)) continue;
+    const relative = path5.relative(root, current);
+    const distance = relative ? relative.split(path5.sep).length : 0;
+    matches.push({ record, distance });
+  }
+  if (!matches.length) return null;
+  const nearestDistance = Math.min(...matches.map((match) => match.distance));
+  const nearest = matches.filter((match) => match.distance === nearestDistance);
+  const vaultIds = new Set(nearest.map((match) => match.record.vault_id));
+  if (vaultIds.size > 1) {
+    throw new ResolutionError(`project association is ambiguous at \`${current}\`; matching roots resolve to: ${[...vaultIds].sort().join(", ")}`);
+  }
+  return nearest[0];
+}
 function resolveVault(selector = null, { cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
-  const registry = loadRegistry(registryPath);
   if (selector !== null && selector !== void 0) {
     const selectorPath = path5.resolve(expandHome(String(selector)));
     if (fs6.existsSync(selectorPath)) {
       const root = fs6.statSync(selectorPath).isDirectory() ? selectorPath : path5.dirname(selectorPath);
       return loadVault(root);
     }
-    const record = registry.vaults[String(selector)];
+    const registry2 = loadRegistry(registryPath);
+    const record = registry2.vaults[String(selector)];
     if (record && typeof record === "object" && !Array.isArray(record) && typeof record.path === "string") return loadVault(record.path);
     throw new ResolutionError(`unknown vault selector: ${selector}`);
   }
   const ancestor = findAncestorVault(cwd);
   if (ancestor) return loadVault(ancestor);
+  const registry = loadRegistry(registryPath);
+  const association = projectAssociation(cwd, registry);
+  if (association) return registeredVault(association.record.vault_id, registry);
   const candidates = registeredCandidates(registry);
   if (candidates.length === 1) return loadVault(candidates[0][1]);
   if (!candidates.length) throw new ResolutionError("no vault selected, no ancestor contract found, and registry has no valid vaults");
@@ -8069,20 +8113,52 @@ function registerVault(vaultId, root, { registryPath = defaultRegistryPath(), ap
   }
   return [resolvedRegistryPath, rendered];
 }
+function associateProject(vaultId, projectRoot, {
+  registryPath = defaultRegistryPath(),
+  apply = false,
+  replace = false,
+  rename = fs6.renameSync
+} = {}) {
+  const normalizedVaultId = String(vaultId);
+  const resolvedRegistryPath = path5.resolve(expandHome(String(registryPath)));
+  const data = loadRegistry(resolvedRegistryPath);
+  registeredVault(normalizedVaultId, data);
+  const root = canonicalPath(projectRoot);
+  if (!fs6.statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new ResolutionError(`project path is not an existing directory: ${root}`);
+  }
+  data.projects ??= {};
+  for (const [configuredRoot, record] of Object.entries(data.projects)) {
+    if (canonicalPath(configuredRoot) !== root) continue;
+    if (record.vault_id !== normalizedVaultId && !replace) {
+      throw new ResolutionError(`project \`${root}\` already points to \`${record.vault_id}\`; refusing to replace it with \`${normalizedVaultId}\``);
+    }
+    if (configuredRoot !== root) delete data.projects[configuredRoot];
+  }
+  data.projects[root] = { vault_id: normalizedVaultId };
+  const rendered = renderRegistry(data);
+  if (apply) {
+    const current = fs6.existsSync(resolvedRegistryPath) ? fs6.readFileSync(resolvedRegistryPath, "utf8") : null;
+    if (current !== rendered) atomicWriteText(resolvedRegistryPath, rendered, { rename });
+  }
+  return [resolvedRegistryPath, rendered, root];
+}
 
 // src/knowledge-loom/cli.mjs
-var HELP = `usage: knowledge-loom {audit,resolve,register,init} ...
+var HELP = `usage: knowledge-loom {audit,resolve,register,associate,init} ...
 
 commands:
   audit       run a read-only vault audit
   resolve     resolve one vault deterministically
   register    preview or register a vault
+  associate   preview or associate a project with a registered vault
   init        preview or initialize a vault contract
 `;
 var COMMAND_HELP = {
   audit: "usage: knowledge-loom audit [selector] [--registry PATH] [--json]\n",
   resolve: "usage: knowledge-loom resolve [selector] [--registry PATH]\n",
   register: "usage: knowledge-loom register vault_id path [--registry PATH] [--apply]\n",
+  associate: "usage: knowledge-loom associate vault_id project_path [--registry PATH] [--replace] [--apply]\n",
   init: "usage: knowledge-loom init path --vault-id ID --title TITLE --subject SUBJECT [--subject SUBJECT ...] [--write-policy POLICY] [--current-state-policy POLICY] [--history TYPE] [--adopt] [--apply]\n"
 };
 function parseArguments(arguments_) {
@@ -8092,7 +8168,7 @@ function parseArguments(arguments_) {
   if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`unknown command: ${command}`);
   if (arguments_.slice(1).includes("--help") || arguments_.slice(1).includes("-h")) return { help: true, command };
   const options = { command, positional: [], subject: [] };
-  const flags = new Set(command === "audit" ? ["--json"] : command === "init" ? ["--adopt", "--apply"] : command === "register" ? ["--apply"] : []);
+  const flags = new Set(command === "audit" ? ["--json"] : command === "init" ? ["--adopt", "--apply"] : command === "register" ? ["--apply"] : command === "associate" ? ["--replace", "--apply"] : []);
   const valueOptions = /* @__PURE__ */ new Set(["--registry"]);
   if (command === "init") {
     for (const name of ["--vault-id", "--title", "--subject", "--write-policy", "--current-state-policy", "--history"]) valueOptions.add(name);
@@ -8154,6 +8230,20 @@ function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(), stdou
       if (options.apply) stdout.write(`registered ${options.positional[0]} in ${registryPath}
 `);
       else stdout.write(`DRY RUN would write ${registryPath}
+
+${rendered2}`);
+      return 0;
+    }
+    if (options.command === "associate") {
+      requirePositionals(options, 2, COMMAND_HELP.associate);
+      const [registryPath, rendered2, projectRoot] = associateProject(options.positional[0], options.positional[1], {
+        registryPath: options.registry,
+        apply: options.apply === true,
+        replace: options.replace === true
+      });
+      if (options.apply) stdout.write(`associated ${projectRoot} with ${options.positional[0]} in ${registryPath}
+`);
+      else stdout.write(`DRY RUN would associate ${projectRoot} with ${options.positional[0]} in ${registryPath}
 
 ${rendered2}`);
       return 0;

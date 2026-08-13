@@ -83,6 +83,12 @@ test("README leads with the outcome and explains the no-install runner", () => {
   assert.match(rendered, /Installing through both `npx skills` and a plugin/);
   assert.match(readme, /npx skills@latest add magickaichen\/knowledge-loom/);
   assert.doesNotMatch(readme, /--skill '\*'/);
+  assert.match(readme, /\$use-knowledge-vault/);
+  assert.match(readme, /\/use-knowledge-vault/);
+  assert.match(readme, /\$knowledge-loom:use-knowledge-vault/);
+  assert.match(readme, /\/knowledge-loom:use-knowledge-vault/);
+  assert.match(readme, /~\/\.config\/knowledge-vault\/registry\.yaml/);
+  assert.match(readme, /associate example ~\/code\/example-project --apply/);
   assert.match(readme, /Node\.js 20\+/);
   assert.match(readme, /does not run `npm install`/);
   assert.match(readme, /Claude Desktop custom skills use a ZIP upload/);

@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.3.0
+
+Projects can now select their registered vault automatically.
+
+### Added
+
+- Added preview-first `associate` CLI support for binding a canonical project directory to a
+  registered vault ID.
+- Added deterministic project-aware resolution: explicit selectors still win, a vault's own
+  nearest contract stays authoritative, and the nearest nested project association wins before the
+  single-vault fallback.
+- Added direct invocation examples for standalone and plugin installs in Codex and Claude Code.
+
+### Safety
+
+- Kept project associations in the local user registry instead of modifying project repositories.
+- Invalid or conflicting associations fail closed and do not expand a vault's declared authority.
+
 ## v0.2.0
 
 The deterministic tooling now runs on JavaScript instead of Python.

@@ -6,7 +6,7 @@ import YAML from "yaml";
 
 import { CONTRACT_NAME, loadVault } from "./contract.mjs";
 import { ContractError, ResolutionError } from "./errors.mjs";
-import { canonicalPath, expandHome } from "./pathing.mjs";
+import { canonicalPath, expandHome, isWithin } from "./pathing.mjs";
 
 export { ResolutionError } from "./errors.mjs";
 
@@ -27,6 +27,19 @@ export function loadRegistry(registryPath = defaultRegistryPath()) {
   }
   if (!data || typeof data !== "object" || Array.isArray(data) || data.schema_version !== 1 || !data.vaults || typeof data.vaults !== "object" || Array.isArray(data.vaults)) {
     throw new ResolutionError(`${resolved}: registry must have schema_version 1 and a vaults mapping`);
+  }
+  if (data.projects !== undefined) {
+    if (!data.projects || typeof data.projects !== "object" || Array.isArray(data.projects)) {
+      throw new ResolutionError(`${resolved}: registry projects must be a mapping`);
+    }
+    for (const [projectRoot, record] of Object.entries(data.projects)) {
+      if (!path.isAbsolute(expandHome(projectRoot))) {
+        throw new ResolutionError(`${resolved}: project association path must be absolute: ${projectRoot}`);
+      }
+      if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.vault_id !== "string" || !record.vault_id) {
+        throw new ResolutionError(`${resolved}: project association ${projectRoot} must contain a vault_id`);
+      }
+    }
   }
   return data;
 }
@@ -80,14 +93,44 @@ function registeredCandidates(registry) {
   return candidates;
 }
 
+function registeredVault(vaultId, registry) {
+  const record = registry.vaults[vaultId];
+  if (!record) throw new ResolutionError(`unknown registered vault ID \`${vaultId}\``);
+  if (typeof record !== "object" || Array.isArray(record) || typeof record.path !== "string") {
+    throw new ResolutionError(`invalid registered vault record \`${vaultId}\``);
+  }
+  return loadVault(record.path);
+}
+
+function projectAssociation(start, registry) {
+  let current = canonicalPath(start);
+  if (fs.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path.dirname(current);
+  const matches = [];
+  for (const [configuredRoot, record] of Object.entries(registry.projects ?? {})) {
+    const root = canonicalPath(configuredRoot);
+    if (!isWithin(root, current)) continue;
+    const relative = path.relative(root, current);
+    const distance = relative ? relative.split(path.sep).length : 0;
+    matches.push({ record, distance });
+  }
+  if (!matches.length) return null;
+  const nearestDistance = Math.min(...matches.map((match) => match.distance));
+  const nearest = matches.filter((match) => match.distance === nearestDistance);
+  const vaultIds = new Set(nearest.map((match) => match.record.vault_id));
+  if (vaultIds.size > 1) {
+    throw new ResolutionError(`project association is ambiguous at \`${current}\`; matching roots resolve to: ${[...vaultIds].sort().join(", ")}`);
+  }
+  return nearest[0];
+}
+
 export function resolveVault(selector = null, { cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
-  const registry = loadRegistry(registryPath);
   if (selector !== null && selector !== undefined) {
     const selectorPath = path.resolve(expandHome(String(selector)));
     if (fs.existsSync(selectorPath)) {
       const root = fs.statSync(selectorPath).isDirectory() ? selectorPath : path.dirname(selectorPath);
       return loadVault(root);
     }
+    const registry = loadRegistry(registryPath);
     const record = registry.vaults[String(selector)];
     if (record && typeof record === "object" && !Array.isArray(record) && typeof record.path === "string") return loadVault(record.path);
     throw new ResolutionError(`unknown vault selector: ${selector}`);
@@ -95,6 +138,9 @@ export function resolveVault(selector = null, { cwd = process.cwd(), registryPat
 
   const ancestor = findAncestorVault(cwd);
   if (ancestor) return loadVault(ancestor);
+  const registry = loadRegistry(registryPath);
+  const association = projectAssociation(cwd, registry);
+  if (association) return registeredVault(association.record.vault_id, registry);
   const candidates = registeredCandidates(registry);
   if (candidates.length === 1) return loadVault(candidates[0][1]);
   if (!candidates.length) throw new ResolutionError("no vault selected, no ancestor contract found, and registry has no valid vaults");
@@ -124,4 +170,38 @@ export function registerVault(vaultId, root, { registryPath = defaultRegistryPat
     if (current !== rendered) atomicWriteText(resolvedRegistryPath, rendered, { rename });
   }
   return [resolvedRegistryPath, rendered];
+}
+
+export function associateProject(vaultId, projectRoot, {
+  registryPath = defaultRegistryPath(),
+  apply = false,
+  replace = false,
+  rename = fs.renameSync,
+} = {}) {
+  const normalizedVaultId = String(vaultId);
+  const resolvedRegistryPath = path.resolve(expandHome(String(registryPath)));
+  const data = loadRegistry(resolvedRegistryPath);
+  registeredVault(normalizedVaultId, data);
+
+  const root = canonicalPath(projectRoot);
+  if (!fs.statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new ResolutionError(`project path is not an existing directory: ${root}`);
+  }
+
+  data.projects ??= {};
+  for (const [configuredRoot, record] of Object.entries(data.projects)) {
+    if (canonicalPath(configuredRoot) !== root) continue;
+    if (record.vault_id !== normalizedVaultId && !replace) {
+      throw new ResolutionError(`project \`${root}\` already points to \`${record.vault_id}\`; refusing to replace it with \`${normalizedVaultId}\``);
+    }
+    if (configuredRoot !== root) delete data.projects[configuredRoot];
+  }
+  data.projects[root] = { vault_id: normalizedVaultId };
+
+  const rendered = renderRegistry(data);
+  if (apply) {
+    const current = fs.existsSync(resolvedRegistryPath) ? fs.readFileSync(resolvedRegistryPath, "utf8") : null;
+    if (current !== rendered) atomicWriteText(resolvedRegistryPath, rendered, { rename });
+  }
+  return [resolvedRegistryPath, rendered, root];
 }

@@ -13,8 +13,10 @@ destinations.
 
 Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<skill-root>` to the
 directory containing that canonical file. Read `<skill-root>/references/contract-schema.md` and
-`<skill-root>/references/protocol.md` completely. Resolve one vault through **Select one vault**;
-ambiguity ends the audit before any vault is inspected.
+`<skill-root>/references/protocol.md` completely. From the active project directory, inspect
+`node "<skill-root>/scripts/knowledge-loom.mjs" resolve --help`, then run `resolve`, appending a
+selector only when one was supplied. Treat its returned canonical root as the only selected vault;
+any resolution error ends the audit before a vault is inspected.
 
 ## Run deterministic audit
 

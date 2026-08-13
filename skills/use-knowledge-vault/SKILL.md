@@ -18,8 +18,11 @@ policy, lifecycle, and failure behavior.
 
 ## Run the loop
 
-1. Complete **Select one vault** from the protocol. Continue only with one resolved contract; on
-   ambiguity, pause vault work and request a selection.
+1. From the active project directory, inspect
+   `node "<skill-root>/scripts/knowledge-loom.mjs" resolve --help`, then run `resolve`. Append a
+   selector only when the user or invoking wrapper supplied one. Treat the returned canonical root
+   as the only selected vault, read its contract completely, and pause vault work on any resolution
+   error.
 2. Complete **Retrieve**, then finish the primary task using only context that materially affects
    its result.
 3. Evaluate **Write authorization** after the primary task. Enter **Distill** only when the selected

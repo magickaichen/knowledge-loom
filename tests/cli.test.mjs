@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import YAML from "yaml";
 
 import { runCli } from "../src/knowledge-loom/cli.mjs";
+import { FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
 function memoryStream() {
   let contents = "";
@@ -38,4 +41,27 @@ test("init expands a literal home path before previewing", () => {
   ], { stdout, stderr });
   assert.equal(status, 0, stderr.toString());
   assert.match(stdout.toString(), new RegExp(`DRY RUN would create ${path.join(os.homedir(), relative).replaceAll("\\", "\\\\")}`));
+});
+
+test("associate previews and applies a project-to-vault binding", (t) => {
+  const temporary = temporaryDirectory(t);
+  const project = path.join(temporary, "project");
+  const registry = path.join(temporary, "registry.yaml");
+  fs.mkdirSync(project);
+  fs.writeFileSync(registry, YAML.stringify({
+    schema_version: 1,
+    vaults: { "acme-work": { path: path.join(FIXTURES, "single-proactive") } },
+  }));
+
+  let stdout = memoryStream();
+  let stderr = memoryStream();
+  assert.equal(runCli(["associate", "acme-work", project, "--registry", registry], { stdout, stderr }), 0, stderr.toString());
+  assert.match(stdout.toString(), /DRY RUN would associate/);
+  assert.equal(YAML.parse(fs.readFileSync(registry, "utf8")).projects, undefined);
+
+  stdout = memoryStream();
+  stderr = memoryStream();
+  assert.equal(runCli(["associate", "acme-work", project, "--registry", registry, "--apply"], { stdout, stderr }), 0, stderr.toString());
+  assert.match(stdout.toString(), /associated .* with acme-work/);
+  assert.deepEqual(Object.values(YAML.parse(fs.readFileSync(registry, "utf8")).projects), [{ vault_id: "acme-work" }]);
 });
