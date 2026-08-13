@@ -4,14 +4,15 @@ import { auditVault } from "./audit.mjs";
 import { validateContractData } from "./contract.mjs";
 import { buildContract, initializeVault } from "./initializer.mjs";
 import { expandHome } from "./pathing.mjs";
-import { registerVault, resolveVault } from "./registry.mjs";
+import { associateProject, registerVault, resolveVault } from "./registry.mjs";
 
-const HELP = `usage: knowledge-loom {audit,resolve,register,init} ...
+const HELP = `usage: knowledge-loom {audit,resolve,register,associate,init} ...
 
 commands:
   audit       run a read-only vault audit
   resolve     resolve one vault deterministically
   register    preview or register a vault
+  associate   preview or associate a project with a registered vault
   init        preview or initialize a vault contract
 `;
 
@@ -19,6 +20,7 @@ const COMMAND_HELP = {
   audit: "usage: knowledge-loom audit [selector] [--registry PATH] [--json]\n",
   resolve: "usage: knowledge-loom resolve [selector] [--registry PATH]\n",
   register: "usage: knowledge-loom register vault_id path [--registry PATH] [--apply]\n",
+  associate: "usage: knowledge-loom associate vault_id project_path [--registry PATH] [--replace] [--apply]\n",
   init: "usage: knowledge-loom init path --vault-id ID --title TITLE --subject SUBJECT [--subject SUBJECT ...] [--write-policy POLICY] [--current-state-policy POLICY] [--history TYPE] [--adopt] [--apply]\n",
 };
 
@@ -30,7 +32,15 @@ function parseArguments(arguments_) {
   if (arguments_.slice(1).includes("--help") || arguments_.slice(1).includes("-h")) return { help: true, command };
 
   const options = { command, positional: [], subject: [] };
-  const flags = new Set(command === "audit" ? ["--json"] : command === "init" ? ["--adopt", "--apply"] : command === "register" ? ["--apply"] : []);
+  const flags = new Set(command === "audit"
+    ? ["--json"]
+    : command === "init"
+      ? ["--adopt", "--apply"]
+      : command === "register"
+        ? ["--apply"]
+        : command === "associate"
+          ? ["--replace", "--apply"]
+          : []);
   const valueOptions = new Set(["--registry"]);
   if (command === "init") {
     for (const name of ["--vault-id", "--title", "--subject", "--write-policy", "--current-state-policy", "--history"]) valueOptions.add(name);
@@ -92,6 +102,17 @@ export function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd()
       const [registryPath, rendered] = registerVault(options.positional[0], options.positional[1], { registryPath: options.registry, apply: options.apply === true });
       if (options.apply) stdout.write(`registered ${options.positional[0]} in ${registryPath}\n`);
       else stdout.write(`DRY RUN would write ${registryPath}\n\n${rendered}`);
+      return 0;
+    }
+    if (options.command === "associate") {
+      requirePositionals(options, 2, COMMAND_HELP.associate);
+      const [registryPath, rendered, projectRoot] = associateProject(options.positional[0], options.positional[1], {
+        registryPath: options.registry,
+        apply: options.apply === true,
+        replace: options.replace === true,
+      });
+      if (options.apply) stdout.write(`associated ${projectRoot} with ${options.positional[0]} in ${registryPath}\n`);
+      else stdout.write(`DRY RUN would associate ${projectRoot} with ${options.positional[0]} in ${registryPath}\n\n${rendered}`);
       return 0;
     }
 

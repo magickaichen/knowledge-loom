@@ -25,11 +25,14 @@ Resolve a vault deterministically:
 
 1. Use an explicit path or registry ID supplied by the user or invoking wrapper.
 2. Otherwise use the nearest ancestor containing `KNOWLEDGE_VAULT.md`.
-3. Otherwise consult the registry.
-4. If the registry contains exactly one valid vault, use it.
-5. If multiple candidates remain, ask for a selection.
+3. Otherwise use the nearest project association in the registry.
+4. Otherwise, if the registry contains exactly one valid vault, use it.
+5. If multiple candidates remain, ask for a selection. If a matching association is invalid, stop
+   and report it instead of falling back.
 
 Never select a vault from topic similarity. Never combine vaults without explicit authorization.
+Project associations select a registered vault; they do not extend that vault's read, write, sync,
+or backup authority.
 
 ## Retrieve
 

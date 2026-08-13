@@ -33,7 +33,7 @@ test("release checker writes curated changelog notes", (t) => {
   const result = runChecker(`v${version}`, "--notes-output", notes);
   assert.equal(result.status, 0, result.stderr);
   const contents = fs.readFileSync(notes, "utf8");
-  assert.ok(contents.startsWith("The deterministic tooling now runs on JavaScript instead of Python."));
+  assert.ok(contents.startsWith("Projects can now select their registered vault automatically."));
   assert.doesNotMatch(contents, /Full Changelog/);
 });
 

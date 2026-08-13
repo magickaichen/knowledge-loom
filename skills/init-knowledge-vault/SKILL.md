@@ -1,6 +1,6 @@
 ---
 name: init-knowledge-vault
-description: Initialize a governed Markdown vault, conservatively adopt an existing one, or register a governed vault. Use when the user wants a vault contract, deterministic registration, or protocol adoption without bulk migration.
+description: Initialize a governed Markdown vault, conservatively adopt an existing one, register it, or associate a project with it. Use for vault contracts, deterministic registration or project linking, and protocol adoption without bulk migration.
 compatibility: Requires Node.js 20+ and local file/command access.
 ---
 
@@ -64,6 +64,14 @@ When registration is requested, inspect
 `node "<skill-root>/scripts/knowledge-loom.mjs" register --help`, preview the resolved ID and
 canonical path, then apply the same registry change only after confirmation. Preserve every
 existing registry entry; an ID already bound to another path is a conflict, not an update.
+
+## Associate a project
+
+When project association is requested, inspect
+`node "<skill-root>/scripts/knowledge-loom.mjs" associate --help`. Resolve the registered vault ID
+and canonical project directory, then run `associate` without `--apply`. Apply the same preview only
+after confirmation. Preserve other project associations; replace an existing binding only when the
+user explicitly approves `--replace`.
 
 ## Validate and report
 

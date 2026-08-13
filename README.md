@@ -70,13 +70,54 @@ Start a new Codex task after installation.
 Private repositories work when Git, GitHub CLI, or SSH credentials can read them. A public
 repository can be installed without GitHub authentication.
 
+## Invoke a skill directly
+
+Skills also load automatically when a request matches, but naming one is useful when you want a
+specific workflow. Invocation syntax depends on the agent and installation route:
+
+| Installed with | Codex | Claude Code |
+|---|---|---|
+| `npx skills` | `$use-knowledge-vault` | `/use-knowledge-vault` |
+| plugin | `$knowledge-loom:use-knowledge-vault` | `/knowledge-loom:use-knowledge-vault` |
+
+The same naming rule applies to `init-knowledge-vault`, `audit-knowledge-vault`, and
+`manage-current-focus`. These go in the agent prompt box, not in a shell. See the official
+[Codex skill guide](https://learn.chatgpt.com/docs/build-skills) and
+[Claude Code skill guide](https://code.claude.com/docs/en/slash-commands) for each runtime's
+invocation model.
+
+For example, with an `npx skills` install:
+
+Codex:
+
+```text
+$use-knowledge-vault Find the decision context relevant to this project, then answer my question.
+```
+
+Claude Code:
+
+```text
+/use-knowledge-vault Find the decision context relevant to this project, then answer my question.
+```
+
 ## Set up your first vault
 
 ### 1. Preview
 
-Open your Markdown folder in your agent and ask:
+Open your Markdown folder in your agent and paste the matching prompt. These examples assume an
+`npx skills` install; add the `knowledge-loom:` namespace shown above for a plugin install.
 
-> Initialize this folder as a knowledge vault. Show me the preview and do not write anything yet.
+Codex:
+
+```text
+$init-knowledge-vault Initialize this folder as a knowledge vault. Show me the preview and do not write anything yet.
+```
+
+Claude Code:
+
+```text
+/init-knowledge-vault Initialize this folder as a knowledge vault. Show me the preview and do not write anything yet.
+```
 
 Knowledge Loom proposes a vault ID, subject, write policy, and files. It stops at the preview.
 
@@ -87,15 +128,65 @@ permission to read your notes does not become permission to save every conversat
 
 ### 3. Use it
 
-Try any of these:
+Try any of these in Codex after setup. In Claude Code, replace `$` with `/`; add the plugin
+namespace when applicable.
 
-> Audit this knowledge vault without changing it.
+```text
+$audit-knowledge-vault Audit this knowledge vault without changing it.
+```
 
-> Use this vault to find the context relevant to my question.
+```text
+$use-knowledge-vault Use this vault to find the context relevant to my question.
+```
 
-> Remember this decision in the vault.
+```text
+$use-knowledge-vault Remember this decision in the vault.
+```
 
 The last request may need confirmation, depending on the vault's write policy.
+
+## Link a project to a vault once
+
+When you have several vaults, bind each project folder to its usual vault once. The skill can then
+resolve that vault from the active project directory, so later prompts do not need a vault ID.
+
+First make sure the vault is registered. Then open the project folder in Codex or Claude Code and
+preview the association:
+
+```text
+$init-knowledge-vault Associate this project with the registered vault example. Preview only.
+```
+
+In Claude Code, use `/init-knowledge-vault`; use the namespaced form for a plugin install. Approve
+the exact preview to save the association. After that, a prompt such as this resolves `example`
+automatically from anywhere inside the project:
+
+```text
+$use-knowledge-vault What did we previously decide about this project's architecture?
+```
+
+Knowledge Loom keeps vault IDs and project associations in the local user registry:
+
+```text
+~/.config/knowledge-vault/registry.yaml
+```
+
+Set `KNOWLEDGE_VAULT_REGISTRY` to use another registry file. The registry has this shape:
+
+```yaml
+schema_version: 1
+vaults:
+  example:
+    path: /Users/you/Documents/example-vault
+projects:
+  /Users/you/code/example-project:
+    vault_id: example
+```
+
+The registry stays outside both repositories. An explicit ID or path still wins. Inside a vault,
+the nearest `KNOWLEDGE_VAULT.md` wins. Otherwise, the nearest project association wins; nested
+projects can deliberately override a parent association. A broken association stops resolution
+instead of silently choosing another vault.
 
 ## Why this exists
 
@@ -186,8 +277,17 @@ npm run cli -- register example ~/Documents/example-vault
 npm run cli -- register example ~/Documents/example-vault --apply
 ```
 
-When more than one vault is registered, an unscoped request fails instead of guessing. Select a
-vault by ID or path:
+Associate a project with the registered vault. Both registration and association preview by
+default:
+
+```bash
+npm run cli -- associate example ~/code/example-project
+npm run cli -- associate example ~/code/example-project --apply
+```
+
+Use `--replace` only when deliberately changing an existing project binding. When no contract or
+project association applies and more than one vault is registered, an unscoped request fails
+instead of guessing. Select a vault by ID or path:
 
 ```bash
 npm run cli -- resolve example
