@@ -64,6 +64,25 @@ test("explicit selector takes precedence over a project association", (t) => {
   assert.equal(resolveVault("shared-home", { cwd: project, registryPath: registry }).contract.vault_id, "shared-home");
 });
 
+test("explicit registry ID ignores malformed unrelated project associations", (t) => {
+  const temporary = temporaryDirectory(t);
+  const registry = path.join(temporary, "registry.yaml");
+  writeRegistry(registry, {
+    "acme-work": { path: path.join(FIXTURES, "single-proactive") },
+  }, {
+    [path.join(temporary, "unrelated")]: 42,
+  });
+
+  assert.equal(resolveVault("acme-work", { cwd: temporary, registryPath: registry }).contract.vault_id, "acme-work");
+
+  fs.writeFileSync(registry, YAML.stringify({
+    schema_version: 1,
+    vaults: { "acme-work": { path: path.join(FIXTURES, "single-proactive") } },
+    projects: [],
+  }));
+  assert.equal(resolveVault("acme-work", { cwd: temporary, registryPath: registry }).contract.vault_id, "acme-work");
+});
+
 test("nearest nested project association wins", (t) => {
   const temporary = temporaryDirectory(t);
   const project = path.join(temporary, "project");
@@ -123,6 +142,23 @@ test("a matching association with an unknown vault ID fails instead of falling b
   assert.throws(
     () => resolveVault(null, { cwd: project, registryPath: registry }),
     (error) => error instanceof ResolutionError && /unknown registered vault ID `missing`/.test(error.message),
+  );
+});
+
+test("a malformed matching project association fails instead of falling back", (t) => {
+  const temporary = temporaryDirectory(t);
+  const project = path.join(temporary, "project");
+  const registry = path.join(temporary, "registry.yaml");
+  fs.mkdirSync(project);
+  writeRegistry(registry, {
+    "acme-work": { path: path.join(FIXTURES, "single-proactive") },
+  }, {
+    [project]: 42,
+  });
+
+  assert.throws(
+    () => resolveVault(null, { cwd: project, registryPath: registry }),
+    (error) => error instanceof ResolutionError && /matching project association .* must contain a vault_id/.test(error.message),
   );
 });
 
