@@ -8038,30 +8038,37 @@ function registeredVault(vaultId, registry) {
   }
   return vault;
 }
-function projectAssociation(start, registry) {
-  if (registry.projects === void 0) return null;
-  if (!registry.projects || typeof registry.projects !== "object" || Array.isArray(registry.projects)) {
+function requireProjectsMapping(projects) {
+  if (!projects || typeof projects !== "object" || Array.isArray(projects)) {
     throw new ResolutionError("registry projects must be a mapping");
   }
+  return projects;
+}
+function projectRecord(configuredRoot, record, { matching = false } = {}) {
+  if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.vault_id !== "string" || !record.vault_id) {
+    throw new ResolutionError(`${matching ? "matching " : ""}project association \`${configuredRoot}\` must contain a vault_id`);
+  }
+  return record;
+}
+function projectAssociation(start, registry) {
+  if (registry.projects === void 0) return null;
+  const projects = requireProjectsMapping(registry.projects);
   let current = canonicalPath(start);
   if (fs6.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path5.dirname(current);
   const matches = [];
-  for (const [configuredRoot, record] of Object.entries(registry.projects ?? {})) {
+  for (const [configuredRoot, record] of Object.entries(projects)) {
     const expandedRoot = expandHome(configuredRoot);
     if (!path5.isAbsolute(expandedRoot)) continue;
     const root = canonicalPath(expandedRoot);
     if (!isWithin(root, current)) continue;
-    if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.vault_id !== "string" || !record.vault_id) {
-      throw new ResolutionError(`matching project association \`${configuredRoot}\` must contain a vault_id`);
-    }
     const relative = path5.relative(root, current);
     const distance = relative ? relative.split(path5.sep).length : 0;
-    matches.push({ record, distance });
+    matches.push({ configuredRoot, record, distance });
   }
   if (!matches.length) return null;
   const nearestDistance = Math.min(...matches.map((match) => match.distance));
   const nearest = matches.filter((match) => match.distance === nearestDistance);
-  const vaultIds = new Set(nearest.map((match) => match.record.vault_id));
+  const vaultIds = new Set(nearest.map((match) => projectRecord(match.configuredRoot, match.record, { matching: true }).vault_id));
   if (vaultIds.size > 1) {
     throw new ResolutionError(`project association is ambiguous at \`${current}\`; matching roots resolve to: ${[...vaultIds].sort().join(", ")}`);
   }
@@ -8127,25 +8134,21 @@ function associateProject(vaultId, projectRoot, {
   if (!fs6.statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
     throw new ResolutionError(`project path is not an existing directory: ${root}`);
   }
-  if (data.projects !== void 0 && (!data.projects || typeof data.projects !== "object" || Array.isArray(data.projects))) {
-    throw new ResolutionError("registry projects must be a mapping");
-  }
   data.projects ??= {};
-  for (const [configuredRoot, record] of Object.entries(data.projects)) {
+  const projects = requireProjectsMapping(data.projects);
+  for (const [configuredRoot, unvalidatedRecord] of Object.entries(projects)) {
     const expandedRoot = expandHome(configuredRoot);
     if (!path5.isAbsolute(expandedRoot)) {
       throw new ResolutionError(`project association path must be absolute: ${configuredRoot}`);
     }
-    if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.vault_id !== "string" || !record.vault_id) {
-      throw new ResolutionError(`project association \`${configuredRoot}\` must contain a vault_id`);
-    }
+    const record = projectRecord(configuredRoot, unvalidatedRecord);
     if (canonicalPath(expandedRoot) !== root) continue;
     if (record.vault_id !== normalizedVaultId && !replace) {
       throw new ResolutionError(`project \`${root}\` already points to \`${record.vault_id}\`; refusing to replace it with \`${normalizedVaultId}\``);
     }
-    if (configuredRoot !== root) delete data.projects[configuredRoot];
+    if (configuredRoot !== root) delete projects[configuredRoot];
   }
-  data.projects[root] = { vault_id: normalizedVaultId };
+  projects[root] = { vault_id: normalizedVaultId };
   const rendered = renderRegistry(data);
   if (apply) {
     const current = fs6.existsSync(resolvedRegistryPath) ? fs6.readFileSync(resolvedRegistryPath, "utf8") : null;

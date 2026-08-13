@@ -100,6 +100,23 @@ test("nearest nested project association wins", (t) => {
   assert.equal(resolveVault(null, { cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
 });
 
+test("valid nearest association wins over a malformed parent association", (t) => {
+  const temporary = temporaryDirectory(t);
+  const project = path.join(temporary, "project");
+  const packages = path.join(project, "packages");
+  const nested = path.join(packages, "app");
+  const registry = path.join(temporary, "registry.yaml");
+  fs.mkdirSync(nested, { recursive: true });
+  writeRegistry(registry, {
+    "acme-work": { path: path.join(FIXTURES, "single-proactive") },
+  }, {
+    [project]: 42,
+    [packages]: { vault_id: "acme-work" },
+  });
+
+  assert.equal(resolveVault(null, { cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
+});
+
 test("nearest vault contract takes precedence over a project association", (t) => {
   const temporary = temporaryDirectory(t);
   const vault = path.join(temporary, "vault");
