@@ -152,6 +152,24 @@ export function validateContractData(contract) {
     findings.push(finding("error", "contract.backup-adapter", "lifecycle backup requires `adapter`"));
   }
 
+  if (Object.hasOwn(contract, "content_checks")) {
+    const contentChecks = mapping(contract, "content_checks", findings);
+    if (
+      contract.content_checks
+      && typeof contract.content_checks === "object"
+      && !Array.isArray(contract.content_checks)
+      && (typeof contentChecks.adapter !== "string" || !VAULT_ID_RE.test(contentChecks.adapter))
+    ) {
+      findings.push(
+        finding(
+          "error",
+          "contract.content-check-adapter",
+          "`content_checks.adapter` must be a kebab-case ID",
+        ),
+      );
+    }
+  }
+
   validatePathValues(contract.instruction_roots, { field: "instruction_roots", findings });
   const navigation = mapping(contract, "navigation", findings);
   validatePathValues(navigation.entrypoints, { field: "navigation.entrypoints", findings, requireNonempty: true });

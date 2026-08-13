@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.4.0
+
+One audit can now enforce both portable vault structure and local content rules.
+
+### Added
+
+- Added optional `content_checks.adapter` declarations to vault contracts and trusted executable
+  mappings to the local user registry.
+- Merged declared checker results into the existing `knowledge-loom audit` report with observable
+  adapter source, validation date, file path, and line information.
+- Documented one checker result interface for vault-specific rules without adding a second audit or
+  validation command.
+
+### Safety
+
+- Kept executable commands and private paths outside vault contracts and reusable skill packages.
+- Started checkers directly without a shell and bounded their runtime and output.
+- Failed closed when a checker is missing, invalid, timed out, inconsistent, or requested by an
+  invalid contract.
+- Kept compatibility requirements in skill bodies so every package uses portable skill
+  frontmatter.
+
 ## v0.3.0
 
 Projects can now select their registered vault automatically.

@@ -2,13 +2,216 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import YAML from "yaml";
 
 import { auditVault, matchesPath } from "../src/knowledge-loom/audit.mjs";
+import { runDeclaredContentCheck } from "../src/knowledge-loom/content-checks.mjs";
 import { loadVault, renderContract } from "../src/knowledge-loom/contract.mjs";
 import { copyFixture, FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
+function contentCheckFixture(t, { result, exitCode = 0, rawOutput = null, arguments_ = null } = {}) {
+  const temporary = temporaryDirectory(t);
+  const root = copyFixture("single-proactive", path.join(temporary, "vault"));
+  const vault = loadVault(root);
+  const contract = structuredClone(vault.contract);
+  contract.content_checks = { adapter: "fictional-content-check" };
+  fs.writeFileSync(vault.contractPath, renderContract(contract, vault.body));
+
+  const script = path.join(temporary, "content-check.mjs");
+  const outputExpression = rawOutput === null
+    ? `JSON.stringify({ ...${JSON.stringify(result)}, root: process.argv[2] })`
+    : JSON.stringify(rawOutput);
+  fs.writeFileSync(
+    script,
+    `process.stdout.write(${outputExpression}); process.exitCode = ${exitCode};\n`,
+  );
+
+  const registry = path.join(temporary, "registry.yaml");
+  fs.writeFileSync(
+    registry,
+    YAML.stringify({
+      schema_version: 1,
+      vaults: {},
+      content_check_adapters: {
+        "fictional-content-check": {
+          executable: process.execPath,
+          arguments: arguments_ ?? [script, "{vault_root}"],
+        },
+      },
+    }),
+  );
+  return { root, registry, script };
+}
+
 test("clean fixtures have no errors", () => {
   for (const name of ["single-proactive", "shared-explicit"]) assert.deepEqual(auditVault(loadVault(path.join(FIXTURES, name))), []);
+});
+
+test("declared content checker passes inside the single audit", (t) => {
+  const { root, registry } = contentCheckFixture(t, {
+    result: { status: "pass", validationDate: "2026-08-12", findings: [] },
+  });
+  assert.deepEqual(auditVault(loadVault(root), { registryPath: registry }), [
+    {
+      severity: "info",
+      code: "content-check.fictional-content-check.passed",
+      message: "content check passed (2026-08-12)",
+      path: null,
+      source: "content-check:fictional-content-check",
+    },
+  ]);
+});
+
+test("declared content checker findings merge with source and line", (t) => {
+  const { root, registry } = contentCheckFixture(t, {
+    result: {
+      status: "fail",
+      validationDate: "2026-08-12",
+      findings: [
+        {
+          severity: "error",
+          code: "content.tldr-item-count",
+          message: "TL;DR has 2 top-level items; expected 3-5",
+          path: "Projects/example.md",
+          line: 12,
+        },
+      ],
+    },
+    exitCode: 1,
+  });
+  assert.deepEqual(auditVault(loadVault(root), { registryPath: registry }), [
+    {
+      severity: "error",
+      code: "content-check.fictional-content-check.content.tldr-item-count",
+      message: "TL;DR has 2 top-level items; expected 3-5",
+      path: "Projects/example.md",
+      line: 12,
+      source: "content-check:fictional-content-check",
+    },
+  ]);
+});
+
+test("missing declared content checker is an audit error", (t) => {
+  const { root, registry } = contentCheckFixture(t, {
+    result: { status: "pass", validationDate: "2026-08-12", findings: [] },
+  });
+  fs.writeFileSync(registry, YAML.stringify({ schema_version: 1, vaults: {} }));
+  assert.ok(
+    auditVault(loadVault(root), { registryPath: registry }).some(
+      (item) => item.code === "content-check.adapter-missing",
+    ),
+  );
+});
+
+test("built-in errors prevent content checker execution", (t) => {
+  const { root, registry, script } = contentCheckFixture(t, {
+    result: { status: "pass", validationDate: "2026-08-12", findings: [] },
+  });
+  const marker = path.join(path.dirname(script), "checker-ran");
+  fs.writeFileSync(
+    script,
+    `import fs from "node:fs"; fs.writeFileSync(${JSON.stringify(marker)}, "ran");\n`,
+  );
+  const vault = loadVault(root);
+  const contract = structuredClone(vault.contract);
+  contract.instruction_roots = ["missing.md"];
+  fs.writeFileSync(vault.contractPath, renderContract(contract, vault.body));
+
+  assert.ok(
+    auditVault(loadVault(root), { registryPath: registry }).some(
+      (item) => item.code === "path.instruction-root",
+    ),
+  );
+  assert.equal(fs.existsSync(marker), false);
+});
+
+for (const [name, setup, code] of [
+  [
+    "invalid JSON",
+    { result: null, rawOutput: "not json" },
+    "content-check.output",
+  ],
+  [
+    "inconsistent exit status",
+    { result: { status: "pass", validationDate: "2026-08-12", findings: [] }, exitCode: 1 },
+    "content-check.exit-status",
+  ],
+]) {
+  test(`content checker reports ${name}`, (t) => {
+    const { root, registry } = contentCheckFixture(t, setup);
+    assert.ok(
+      auditVault(loadVault(root), { registryPath: registry }).some((item) => item.code === code),
+    );
+  });
+}
+
+test("unsupported adapter placeholders fail before execution", (t) => {
+  const { root, registry, script } = contentCheckFixture(t, {
+    result: { status: "pass", validationDate: "2026-08-12", findings: [] },
+    arguments_: ["{unknown}"],
+  });
+  const marker = path.join(path.dirname(script), "checker-ran");
+  fs.writeFileSync(
+    script,
+    `import fs from "node:fs"; fs.writeFileSync(${JSON.stringify(marker)}, "ran");\n`,
+  );
+  assert.ok(
+    auditVault(loadVault(root), { registryPath: registry }).some(
+      (item) => item.code === "content-check.adapter-config",
+    ),
+  );
+  assert.equal(fs.existsSync(marker), false);
+});
+
+test("content checker rejects a root mismatch", (t) => {
+  const { root, registry } = contentCheckFixture(t, {
+    rawOutput: JSON.stringify({
+      status: "pass",
+      root: "/not/the/selected/vault",
+      validationDate: "2026-08-12",
+      findings: [],
+    }),
+  });
+  assert.ok(
+    auditVault(loadVault(root), { registryPath: registry }).some(
+      (item) => item.code === "content-check.root",
+    ),
+  );
+});
+
+test("content checker rejects findings outside the vault", (t) => {
+  const { root, registry } = contentCheckFixture(t, {
+    result: {
+      status: "fail",
+      validationDate: "2026-08-12",
+      findings: [
+        {
+          severity: "error",
+          code: "unsafe-path",
+          message: "outside",
+          path: "../outside.md",
+        },
+      ],
+    },
+    exitCode: 1,
+  });
+  assert.ok(
+    auditVault(loadVault(root), { registryPath: registry }).some(
+      (item) => item.code === "content-check.output",
+    ),
+  );
+});
+
+test("content checker timeout becomes an audit finding", (t) => {
+  const { root, registry, script } = contentCheckFixture(t, {
+    result: { status: "pass", validationDate: "2026-08-12", findings: [] },
+  });
+  fs.writeFileSync(script, "setTimeout(() => {}, 10_000);\n");
+  assert.ok(
+    runDeclaredContentCheck(loadVault(root), { registryPath: registry, timeoutMs: 20 }).some(
+      (item) => item.code === "content-check.execution" && /timed out/.test(item.message),
+    ),
+  );
 });
 
 test("metadata gap is reported", (t) => {

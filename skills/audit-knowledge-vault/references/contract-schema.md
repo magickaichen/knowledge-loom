@@ -66,6 +66,50 @@ patterns, focus views, and privacy patterns.
 Treat a boundary failure as an audit error before reading the target. Provider destinations and
 registry locations are configured outside these contract path fields.
 
+## Vault-specific content checks
+
+Declare one optional read-only content checker by its kebab-case adapter ID:
+
+```yaml
+content_checks:
+  adapter: example-content-check
+```
+
+The contract names the requirement but contains no executable command. Configure the adapter in
+the local user registry, outside the vault:
+
+```yaml
+content_check_adapters:
+  example-content-check:
+    executable: node
+    arguments:
+      - "{vault_root}/scripts/check-content.mjs"
+      - "--root={vault_root}"
+      - --json
+```
+
+`{vault_root}` expands to the selected canonical vault root and is the only supported placeholder.
+The runner starts the executable directly without a shell, from that root, with a 30-second timeout
+and a 1 MiB output limit. Register only trusted adapters whose interface is read-only.
+
+The checker writes one JSON object to stdout and uses exit `0` for `pass`, `1` for `fail`, or `2`
+for `error`:
+
+```json
+{
+  "status": "pass",
+  "root": "/absolute/canonical/vault",
+  "validationDate": "2026-08-12",
+  "findings": []
+}
+```
+
+Each finding requires `severity` (`error`, `warning`, or `info`), `code`, `message`, and a
+vault-relative `path` or `null`; `line` is an optional positive integer. The status, exit code,
+root, and findings must agree. Adapter absence, invalid configuration, unsafe paths, invalid JSON,
+timeout, and inconsistent results are audit errors. Built-in contract errors stop the checker from
+running.
+
 ## Privacy paths
 
 List paths that must never be tracked:

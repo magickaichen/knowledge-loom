@@ -1,10 +1,11 @@
 ---
 name: manage-current-focus
 description: Prioritize or update one declared current-focus view in a governed vault. Use to accept, complete, block, defer, or reorder commitments, or reconcile sourced status with current attention.
-compatibility: Requires Node.js 20+ and local file/command access.
 ---
 
 # Manage Current Focus
+
+Requires Node.js 20+ and local file/command access.
 
 Maintain one operational attention view without turning it into a full backlog or silently adding
 parallel work.

@@ -7369,9 +7369,9 @@ var require_dist = __commonJS({
 import path6 from "node:path";
 
 // src/knowledge-loom/audit.mjs
-import fs4 from "node:fs";
-import path3 from "node:path";
-import { spawnSync } from "node:child_process";
+import fs5 from "node:fs";
+import path4 from "node:path";
+import { spawnSync as spawnSync2 } from "node:child_process";
 
 // src/knowledge-loom/contract.mjs
 var import_yaml = __toESM(require_dist(), 1);
@@ -7580,6 +7580,18 @@ function validateContractData(contract) {
   if (backup.mode === "lifecycle-hook" && !backup.adapter) {
     findings.push(finding("error", "contract.backup-adapter", "lifecycle backup requires `adapter`"));
   }
+  if (Object.hasOwn(contract, "content_checks")) {
+    const contentChecks = mapping(contract, "content_checks", findings);
+    if (contract.content_checks && typeof contract.content_checks === "object" && !Array.isArray(contract.content_checks) && (typeof contentChecks.adapter !== "string" || !VAULT_ID_RE.test(contentChecks.adapter))) {
+      findings.push(
+        finding(
+          "error",
+          "contract.content-check-adapter",
+          "`content_checks.adapter` must be a kebab-case ID"
+        )
+      );
+    }
+  }
   validatePathValues(contract.instruction_roots, { field: "instruction_roots", findings });
   const navigation = mapping(contract, "navigation", findings);
   validatePathValues(navigation.entrypoints, { field: "navigation.entrypoints", findings, requireNonempty: true });
@@ -7633,8 +7645,409 @@ function validateContractData(contract) {
   return findings;
 }
 
-// src/knowledge-loom/focus.mjs
+// src/knowledge-loom/content-checks.mjs
+import { spawnSync } from "node:child_process";
+
+// src/knowledge-loom/registry.mjs
+var import_yaml2 = __toESM(require_dist(), 1);
+import crypto from "node:crypto";
 import fs3 from "node:fs";
+import os2 from "node:os";
+import path3 from "node:path";
+function defaultRegistryPath() {
+  return process.env.KNOWLEDGE_VAULT_REGISTRY ? path3.resolve(expandHome(process.env.KNOWLEDGE_VAULT_REGISTRY)) : path3.join(os2.homedir(), ".config", "knowledge-vault", "registry.yaml");
+}
+function loadRegistry(registryPath = defaultRegistryPath()) {
+  const resolved = path3.resolve(expandHome(String(registryPath)));
+  if (!fs3.existsSync(resolved)) return { schema_version: 1, vaults: {} };
+  let data;
+  try {
+    data = import_yaml2.default.parse(fs3.readFileSync(resolved, "utf8")) ?? {};
+  } catch (error) {
+    throw new ResolutionError(`${resolved}: invalid registry YAML: ${error.message}`, { cause: error });
+  }
+  if (!data || typeof data !== "object" || Array.isArray(data) || data.schema_version !== 1 || !data.vaults || typeof data.vaults !== "object" || Array.isArray(data.vaults)) {
+    throw new ResolutionError(`${resolved}: registry must have schema_version 1 and a vaults mapping`);
+  }
+  return data;
+}
+function renderRegistry(data) {
+  return import_yaml2.default.stringify(data, { lineWidth: 0 });
+}
+function atomicWriteText(targetPath, rendered, { rename = fs3.renameSync } = {}) {
+  fs3.mkdirSync(path3.dirname(targetPath), { recursive: true });
+  const temporary = path3.join(path3.dirname(targetPath), `.${path3.basename(targetPath)}.${crypto.randomBytes(8).toString("hex")}.tmp`);
+  let descriptor;
+  try {
+    const existing = fs3.statSync(targetPath, { throwIfNoEntry: false });
+    descriptor = fs3.openSync(temporary, "wx", existing?.mode & 511 || 384);
+    fs3.writeFileSync(descriptor, rendered, "utf8");
+    fs3.fsyncSync(descriptor);
+    fs3.closeSync(descriptor);
+    descriptor = void 0;
+    rename(temporary, targetPath);
+    try {
+      const directory = fs3.openSync(path3.dirname(targetPath), "r");
+      try {
+        fs3.fsyncSync(directory);
+      } finally {
+        fs3.closeSync(directory);
+      }
+    } catch {
+    }
+  } finally {
+    if (descriptor !== void 0) fs3.closeSync(descriptor);
+    fs3.rmSync(temporary, { force: true });
+  }
+}
+function findAncestorVault(start) {
+  let current = canonicalPath(start);
+  if (fs3.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path3.dirname(current);
+  while (true) {
+    if (fs3.statSync(path3.join(current, CONTRACT_NAME), { throwIfNoEntry: false })?.isFile()) return current;
+    const parent = path3.dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+function registeredCandidates(registry) {
+  const candidates = [];
+  for (const [vaultId, record] of Object.entries(registry.vaults ?? {})) {
+    if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.path !== "string") continue;
+    const root = canonicalPath(record.path);
+    if (fs3.statSync(path3.join(root, CONTRACT_NAME), { throwIfNoEntry: false })?.isFile()) candidates.push([vaultId, root]);
+  }
+  return candidates;
+}
+function registeredVault(vaultId, registry) {
+  const record = registry.vaults[vaultId];
+  if (!record) throw new ResolutionError(`unknown registered vault ID \`${vaultId}\``);
+  if (typeof record !== "object" || Array.isArray(record) || typeof record.path !== "string") {
+    throw new ResolutionError(`invalid registered vault record \`${vaultId}\``);
+  }
+  const vault = loadVault(record.path);
+  if (vault.contract.vault_id !== vaultId) {
+    throw new ResolutionError(`registered vault ID \`${vaultId}\` does not match contract ID \`${vault.contract.vault_id}\``);
+  }
+  return vault;
+}
+function requireProjectsMapping(projects) {
+  if (!projects || typeof projects !== "object" || Array.isArray(projects)) {
+    throw new ResolutionError("registry projects must be a mapping");
+  }
+  return projects;
+}
+function projectRecord(configuredRoot, record, { matching = false } = {}) {
+  if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.vault_id !== "string" || !record.vault_id) {
+    throw new ResolutionError(`${matching ? "matching " : ""}project association \`${configuredRoot}\` must contain a vault_id`);
+  }
+  return record;
+}
+function projectAssociation(start, registry) {
+  if (registry.projects === void 0) return null;
+  const projects = requireProjectsMapping(registry.projects);
+  let current = canonicalPath(start);
+  if (fs3.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path3.dirname(current);
+  const matches = [];
+  for (const [configuredRoot, record] of Object.entries(projects)) {
+    const expandedRoot = expandHome(configuredRoot);
+    if (!path3.isAbsolute(expandedRoot)) continue;
+    const root = canonicalPath(expandedRoot);
+    if (!isWithin(root, current)) continue;
+    const relative = path3.relative(root, current);
+    const distance = relative ? relative.split(path3.sep).length : 0;
+    matches.push({ configuredRoot, record, distance });
+  }
+  if (!matches.length) return null;
+  const nearestDistance = Math.min(...matches.map((match) => match.distance));
+  const nearest = matches.filter((match) => match.distance === nearestDistance);
+  const vaultIds = new Set(nearest.map((match) => projectRecord(match.configuredRoot, match.record, { matching: true }).vault_id));
+  if (vaultIds.size > 1) {
+    throw new ResolutionError(`project association is ambiguous at \`${current}\`; matching roots resolve to: ${[...vaultIds].sort().join(", ")}`);
+  }
+  return nearest[0];
+}
+function resolveVault(selector = null, { cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
+  if (selector !== null && selector !== void 0) {
+    const selectorPath = path3.resolve(expandHome(String(selector)));
+    if (fs3.existsSync(selectorPath)) {
+      const root = fs3.statSync(selectorPath).isDirectory() ? selectorPath : path3.dirname(selectorPath);
+      return loadVault(root);
+    }
+    const registry2 = loadRegistry(registryPath);
+    const record = registry2.vaults[String(selector)];
+    if (record && typeof record === "object" && !Array.isArray(record) && typeof record.path === "string") return loadVault(record.path);
+    throw new ResolutionError(`unknown vault selector: ${selector}`);
+  }
+  const ancestor = findAncestorVault(cwd);
+  if (ancestor) return loadVault(ancestor);
+  const registry = loadRegistry(registryPath);
+  const association = projectAssociation(cwd, registry);
+  if (association) return registeredVault(association.record.vault_id, registry);
+  const candidates = registeredCandidates(registry);
+  if (candidates.length === 1) return loadVault(candidates[0][1]);
+  if (!candidates.length) throw new ResolutionError("no vault selected, no ancestor contract found, and registry has no valid vaults");
+  throw new ResolutionError(`vault selection is ambiguous; choose one of: ${candidates.map(([vaultId]) => vaultId).join(", ")}`);
+}
+function registerVault(vaultId, root, { registryPath = defaultRegistryPath(), apply = false, rename = fs3.renameSync } = {}) {
+  const vault = loadVault(root);
+  const contractId = vault.contract.vault_id;
+  if (vaultId !== contractId) throw new ContractError(`registry ID \`${vaultId}\` does not match contract ID \`${contractId}\``);
+  const resolvedRegistryPath = path3.resolve(expandHome(String(registryPath)));
+  const data = loadRegistry(resolvedRegistryPath);
+  const existing = data.vaults[vaultId];
+  if (existing !== void 0) {
+    if (!existing || typeof existing !== "object" || Array.isArray(existing) || typeof existing.path !== "string") {
+      throw new ResolutionError(`registry ID \`${vaultId}\` already exists with an invalid record`);
+    }
+    const existingRoot = canonicalPath(existing.path);
+    if (existingRoot !== vault.root) {
+      throw new ResolutionError(`registry ID \`${vaultId}\` already points to \`${existingRoot}\`; refusing to replace it with \`${vault.root}\``);
+    }
+  }
+  data.vaults[vaultId] = { path: vault.root };
+  const rendered = renderRegistry(data);
+  if (apply) {
+    const current = fs3.existsSync(resolvedRegistryPath) ? fs3.readFileSync(resolvedRegistryPath, "utf8") : null;
+    if (current !== rendered) atomicWriteText(resolvedRegistryPath, rendered, { rename });
+  }
+  return [resolvedRegistryPath, rendered];
+}
+function associateProject(vaultId, projectRoot, {
+  registryPath = defaultRegistryPath(),
+  apply = false,
+  replace = false,
+  rename = fs3.renameSync
+} = {}) {
+  const normalizedVaultId = String(vaultId);
+  const resolvedRegistryPath = path3.resolve(expandHome(String(registryPath)));
+  const data = loadRegistry(resolvedRegistryPath);
+  registeredVault(normalizedVaultId, data);
+  const root = canonicalPath(projectRoot);
+  if (!fs3.statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new ResolutionError(`project path is not an existing directory: ${root}`);
+  }
+  data.projects ??= {};
+  const projects = requireProjectsMapping(data.projects);
+  for (const [configuredRoot, unvalidatedRecord] of Object.entries(projects)) {
+    const expandedRoot = expandHome(configuredRoot);
+    if (!path3.isAbsolute(expandedRoot)) {
+      throw new ResolutionError(`project association path must be absolute: ${configuredRoot}`);
+    }
+    const record = projectRecord(configuredRoot, unvalidatedRecord);
+    if (canonicalPath(expandedRoot) !== root) continue;
+    if (record.vault_id !== normalizedVaultId && !replace) {
+      throw new ResolutionError(`project \`${root}\` already points to \`${record.vault_id}\`; refusing to replace it with \`${normalizedVaultId}\``);
+    }
+    if (configuredRoot !== root) delete projects[configuredRoot];
+  }
+  projects[root] = { vault_id: normalizedVaultId };
+  const rendered = renderRegistry(data);
+  if (apply) {
+    const current = fs3.existsSync(resolvedRegistryPath) ? fs3.readFileSync(resolvedRegistryPath, "utf8") : null;
+    if (current !== rendered) atomicWriteText(resolvedRegistryPath, rendered, { rename });
+  }
+  return [resolvedRegistryPath, rendered, root];
+}
+
+// src/knowledge-loom/content-checks.mjs
+var ADAPTER_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+var VALIDATION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+var ALLOWED_SEVERITIES = /* @__PURE__ */ new Set(["error", "warning", "info"]);
+var STATUS_EXIT_CODES = { pass: 0, fail: 1, error: 2 };
+var ADAPTER_TIMEOUT_MS = 3e4;
+var ADAPTER_MAX_BUFFER = 1024 * 1024;
+function adapterFinding(adapterId, code, message, findingPath = null) {
+  return {
+    ...finding("error", `content-check.${code}`, message, findingPath),
+    source: adapterId ? `content-check:${adapterId}` : "content-check"
+  };
+}
+function passedFinding(adapterId, validationDate) {
+  return {
+    severity: "info",
+    code: `content-check.${adapterId}.passed`,
+    message: `content check passed (${validationDate})`,
+    path: null,
+    source: `content-check:${adapterId}`
+  };
+}
+function adapterConfiguration(registry, adapterId) {
+  const adapters = registry.content_check_adapters;
+  if (!adapters || typeof adapters !== "object" || Array.isArray(adapters)) return null;
+  return adapters[adapterId] ?? null;
+}
+function configurationError(adapterId, configuration) {
+  if (!configuration) {
+    return adapterFinding(
+      adapterId,
+      "adapter-missing",
+      `content check adapter \`${adapterId}\` is not configured in the local registry`
+    );
+  }
+  if (typeof configuration !== "object" || Array.isArray(configuration)) {
+    return adapterFinding(
+      adapterId,
+      "adapter-config",
+      `content check adapter \`${adapterId}\` must be a mapping`
+    );
+  }
+  if (typeof configuration.executable !== "string" || !configuration.executable.trim()) {
+    return adapterFinding(
+      adapterId,
+      "adapter-config",
+      `content check adapter \`${adapterId}\` requires a non-empty \`executable\``
+    );
+  }
+  if (!Array.isArray(configuration.arguments) || configuration.arguments.some((value) => typeof value !== "string")) {
+    return adapterFinding(
+      adapterId,
+      "adapter-config",
+      `content check adapter \`${adapterId}\` requires a string \`arguments\` list`
+    );
+  }
+  for (const value of [configuration.executable, ...configuration.arguments]) {
+    const placeholders = value.match(/\{[^}]+\}/g) ?? [];
+    if (placeholders.some((placeholder) => placeholder !== "{vault_root}")) {
+      return adapterFinding(
+        adapterId,
+        "adapter-config",
+        `content check adapter \`${adapterId}\` uses an unsupported placeholder`
+      );
+    }
+  }
+  return null;
+}
+function normalizedResult(adapterId, result, vaultRoot) {
+  const invalid = (message, code = "output") => ({
+    error: adapterFinding(adapterId, code, message)
+  });
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    return invalid("content checker output must be a JSON object");
+  }
+  if (!Object.hasOwn(STATUS_EXIT_CODES, result.status)) {
+    return invalid("content checker returned an unsupported status");
+  }
+  if (typeof result.root !== "string") {
+    return invalid("content checker output requires `root`");
+  }
+  let resultRoot;
+  try {
+    resultRoot = canonicalPath(result.root);
+  } catch {
+    return invalid("content checker returned an unreadable root", "root");
+  }
+  if (resultRoot !== canonicalPath(vaultRoot)) {
+    return invalid("content checker root does not match the selected vault", "root");
+  }
+  if (typeof result.validationDate !== "string" || !VALIDATION_DATE_RE.test(result.validationDate)) {
+    return invalid("content checker output requires `validationDate` in YYYY-MM-DD form");
+  }
+  if (!Array.isArray(result.findings)) {
+    return invalid("content checker output requires a `findings` list");
+  }
+  const findings = [];
+  for (const item of result.findings) {
+    if (!item || typeof item !== "object" || Array.isArray(item) || !ALLOWED_SEVERITIES.has(item.severity) || typeof item.code !== "string" || !item.code.trim() || typeof item.message !== "string" || !item.message.trim() || item.path !== null && item.path !== void 0 && (typeof item.path !== "string" || !isVaultRelativePath(item.path)) || item.line !== void 0 && (!Number.isInteger(item.line) || item.line < 1)) {
+      return invalid("content checker returned an invalid finding");
+    }
+    const normalized = {
+      severity: item.severity,
+      code: `content-check.${adapterId}.${item.code}`,
+      message: item.message,
+      path: item.path ?? null,
+      source: `content-check:${adapterId}`
+    };
+    if (item.line !== void 0) normalized.line = item.line;
+    findings.push(normalized);
+  }
+  const hasError = findings.some((item) => item.severity === "error");
+  if (result.status === "pass" && hasError || result.status !== "pass" && !hasError) {
+    return invalid("content checker status is inconsistent with its findings");
+  }
+  return { status: result.status, validationDate: result.validationDate, findings };
+}
+function runDeclaredContentCheck(vault, {
+  registryPath,
+  timeoutMs = ADAPTER_TIMEOUT_MS,
+  maxBuffer = ADAPTER_MAX_BUFFER
+} = {}) {
+  const adapterId = vault.contract.content_checks?.adapter;
+  if (!adapterId || !ADAPTER_ID_RE.test(adapterId)) return [];
+  let registry;
+  try {
+    registry = loadRegistry(registryPath);
+  } catch (error) {
+    return [
+      adapterFinding(
+        adapterId,
+        "registry",
+        `cannot load the local adapter registry: ${error.message}`
+      )
+    ];
+  }
+  const configuration = adapterConfiguration(registry, adapterId);
+  const invalidConfiguration = configurationError(adapterId, configuration);
+  if (invalidConfiguration) return [invalidConfiguration];
+  const substitute = (value) => value.replaceAll("{vault_root}", vault.root);
+  const completed = spawnSync(
+    substitute(configuration.executable),
+    configuration.arguments.map(substitute),
+    {
+      cwd: vault.root,
+      encoding: "utf8",
+      shell: false,
+      timeout: timeoutMs,
+      maxBuffer
+    }
+  );
+  if (completed.error) {
+    const reason = completed.error.code === "ETIMEDOUT" ? "timed out" : `could not start: ${completed.error.message}`;
+    return [
+      adapterFinding(
+        adapterId,
+        "execution",
+        `content check adapter \`${adapterId}\` ${reason}`
+      )
+    ];
+  }
+  if (completed.signal) {
+    return [
+      adapterFinding(
+        adapterId,
+        "execution",
+        `content check adapter \`${adapterId}\` ended with signal ${completed.signal}`
+      )
+    ];
+  }
+  let result;
+  try {
+    result = JSON.parse(completed.stdout);
+  } catch {
+    return [
+      adapterFinding(
+        adapterId,
+        "output",
+        `content check adapter \`${adapterId}\` did not return valid JSON`
+      )
+    ];
+  }
+  const normalized = normalizedResult(adapterId, result, vault.root);
+  if (normalized.error) return [normalized.error];
+  if (completed.status !== STATUS_EXIT_CODES[normalized.status]) {
+    return [
+      adapterFinding(
+        adapterId,
+        "exit-status",
+        `content check adapter \`${adapterId}\` exit status does not match its result`
+      )
+    ];
+  }
+  return normalized.status === "pass" ? [passedFinding(adapterId, normalized.validationDate), ...normalized.findings] : normalized.findings;
+}
+
+// src/knowledge-loom/focus.mjs
+import fs4 from "node:fs";
 var HEADING_RE = /^(#{2,3})\s+(.+?)\s*$/;
 function activeItems(text, sectionName) {
   let inSection = false;
@@ -7656,12 +8069,12 @@ function checkFocusView(root, name, view) {
   if (typeof relative !== "string") return [];
   const focusPath = resolveVaultPath(root, relative);
   if (focusPath === null) return [finding("error", "focus.boundary", `focus view \`${name}\` resolves outside the vault`, relative)];
-  if (!fs3.statSync(focusPath, { throwIfNoEntry: false })?.isFile()) {
+  if (!fs4.statSync(focusPath, { throwIfNoEntry: false })?.isFile()) {
     return [finding("error", "focus.missing", `focus view \`${name}\` file is missing`, relative)];
   }
   const section = view.active_section ?? "Top of mind";
   if (typeof section !== "string") return [];
-  const items = activeItems(fs3.readFileSync(focusPath, "utf8"), section);
+  const items = activeItems(fs4.readFileSync(focusPath, "utf8"), section);
   const maxTop = view.max_top ?? 3;
   const maxActive = view.max_active ?? maxTop;
   if (!Number.isInteger(maxTop) || !Number.isInteger(maxActive)) return [];
@@ -7742,7 +8155,7 @@ function matchesPath(pattern, candidate) {
   return globRegex(pattern).test(candidate);
 }
 function git(root, ...arguments_) {
-  return spawnSync("git", ["-C", root, ...arguments_], { encoding: "utf8" });
+  return spawnSync2("git", ["-C", root, ...arguments_], { encoding: "utf8" });
 }
 function auditDeclaredFiles(root, values, { boundaryCode, boundaryMessage, missingCode, missingMessage }) {
   if (!Array.isArray(values)) return [];
@@ -7751,7 +8164,7 @@ function auditDeclaredFiles(root, values, { boundaryCode, boundaryMessage, missi
     if (typeof relative !== "string" || !isVaultRelativePath(relative)) continue;
     const resolved = resolveVaultPath(root, relative);
     if (resolved === null) findings.push(finding("error", boundaryCode, boundaryMessage, relative));
-    else if (!fs4.statSync(resolved, { throwIfNoEntry: false })?.isFile()) findings.push(finding("error", missingCode, missingMessage, relative));
+    else if (!fs5.statSync(resolved, { throwIfNoEntry: false })?.isFile()) findings.push(finding("error", missingCode, missingMessage, relative));
   }
   return findings;
 }
@@ -7765,28 +8178,28 @@ function patternPrefix(patternValue) {
 }
 function walk(root) {
   const result = [];
-  if (!fs4.existsSync(root)) return result;
+  if (!fs5.existsSync(root)) return result;
   const visit = (current) => {
-    for (const entry of fs4.readdirSync(current, { withFileTypes: true })) {
-      const candidate = path3.join(current, entry.name);
+    for (const entry of fs5.readdirSync(current, { withFileTypes: true })) {
+      const candidate = path4.join(current, entry.name);
       result.push(candidate);
       if (entry.isDirectory() && !entry.isSymbolicLink()) visit(candidate);
     }
   };
-  if (fs4.lstatSync(root).isDirectory() && !fs4.lstatSync(root).isSymbolicLink()) visit(root);
+  if (fs5.lstatSync(root).isDirectory() && !fs5.lstatSync(root).isSymbolicLink()) visit(root);
   else result.push(root);
   return result;
 }
 function globPaths(root, patternValue) {
   if (!/[*?[]/.test(patternValue)) {
-    const candidate = path3.join(root, ...patternValue.split("/"));
-    return fs4.existsSync(candidate) ? [candidate] : [];
+    const candidate = path4.join(root, ...patternValue.split("/"));
+    return fs5.existsSync(candidate) ? [candidate] : [];
   }
   const prefix = patternPrefix(patternValue);
-  const searchRoot = path3.join(root, ...prefix);
+  const searchRoot = path4.join(root, ...prefix);
   return walk(searchRoot).filter((candidate) => matchesPath(patternValue, toPosixRelative(root, candidate)));
 }
-function auditVault(vault) {
+function auditVault(vault, { registryPath } = {}) {
   const findings = validateContractData(vault.contract);
   const { root, contract } = vault;
   findings.push(...auditDeclaredFiles(root, contract.instruction_roots ?? [], {
@@ -7830,7 +8243,7 @@ function auditVault(vault) {
           findings.push(finding("error", "path.metadata-boundary", `profile \`${profileName}\` matched a file outside the vault`, relative));
           continue;
         }
-        if (!fs4.statSync(candidate, { throwIfNoEntry: false })?.isFile() || path3.extname(candidate).toLocaleLowerCase() !== ".md") continue;
+        if (!fs5.statSync(candidate, { throwIfNoEntry: false })?.isFile() || path4.extname(candidate).toLocaleLowerCase() !== ".md") continue;
         const key = `${profileName}\0${relative}`;
         if (checked.has(key)) continue;
         checked.add(key);
@@ -7877,12 +8290,15 @@ function auditVault(vault) {
     if (!view || typeof view !== "object" || Array.isArray(view) || typeof view.path !== "string" || !isVaultRelativePath(view.path)) continue;
     findings.push(...checkFocusView(root, name, view));
   }
+  if (!findings.some((item) => item.severity === "error")) {
+    findings.push(...runDeclaredContentCheck(vault, { registryPath }));
+  }
   return findings;
 }
 
 // src/knowledge-loom/initializer.mjs
-import fs5 from "node:fs";
-import path4 from "node:path";
+import fs6 from "node:fs";
+import path5 from "node:path";
 var DEFAULT_BODY = `# Vault policy
 
 ## Purpose and boundary
@@ -7904,13 +8320,13 @@ Describe naming, linking, metadata, and archival conventions.
 `;
 function discoverInstructionRoots(root) {
   for (const candidate of ["AGENTS.md", "LLM_CONTEXT.md", "CLAUDE.md"]) {
-    if (fs5.statSync(path4.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
+    if (fs6.statSync(path5.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
   }
   return [];
 }
 function discoverEntrypoints(root) {
   for (const candidate of ["INDEX.md", "Home.md", "README.md"]) {
-    if (fs5.statSync(path4.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
+    if (fs6.statSync(path5.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
   }
   return ["INDEX.md"];
 }
@@ -7940,221 +8356,19 @@ function buildContract(root, { vaultId, title, subjects, writePolicy, currentSta
 }
 function initializeVault(root, { contract, adopt, apply }) {
   const rootPath = canonicalPath(root);
-  const contractPath = path4.join(rootPath, CONTRACT_NAME);
-  if (fs5.existsSync(contractPath)) throw new Error(`${contractPath} already exists`);
-  if (fs5.existsSync(rootPath) && fs5.readdirSync(rootPath).length && !adopt) {
+  const contractPath = path5.join(rootPath, CONTRACT_NAME);
+  if (fs6.existsSync(contractPath)) throw new Error(`${contractPath} already exists`);
+  if (fs6.existsSync(rootPath) && fs6.readdirSync(rootPath).length && !adopt) {
     throw new Error("target is not empty; use adoption mode for an existing vault");
   }
   const rendered = renderContract(contract, DEFAULT_BODY);
   if (apply) {
-    fs5.mkdirSync(rootPath, { recursive: true });
-    fs5.writeFileSync(contractPath, rendered, "utf8");
-    const indexPath = path4.join(rootPath, "INDEX.md");
-    if (!adopt && !fs5.existsSync(indexPath)) fs5.writeFileSync(indexPath, "# Index\n\n- Add vault entrypoints here.\n", "utf8");
+    fs6.mkdirSync(rootPath, { recursive: true });
+    fs6.writeFileSync(contractPath, rendered, "utf8");
+    const indexPath = path5.join(rootPath, "INDEX.md");
+    if (!adopt && !fs6.existsSync(indexPath)) fs6.writeFileSync(indexPath, "# Index\n\n- Add vault entrypoints here.\n", "utf8");
   }
   return [contractPath, rendered];
-}
-
-// src/knowledge-loom/registry.mjs
-var import_yaml2 = __toESM(require_dist(), 1);
-import crypto from "node:crypto";
-import fs6 from "node:fs";
-import os2 from "node:os";
-import path5 from "node:path";
-function defaultRegistryPath() {
-  return process.env.KNOWLEDGE_VAULT_REGISTRY ? path5.resolve(expandHome(process.env.KNOWLEDGE_VAULT_REGISTRY)) : path5.join(os2.homedir(), ".config", "knowledge-vault", "registry.yaml");
-}
-function loadRegistry(registryPath = defaultRegistryPath()) {
-  const resolved = path5.resolve(expandHome(String(registryPath)));
-  if (!fs6.existsSync(resolved)) return { schema_version: 1, vaults: {} };
-  let data;
-  try {
-    data = import_yaml2.default.parse(fs6.readFileSync(resolved, "utf8")) ?? {};
-  } catch (error) {
-    throw new ResolutionError(`${resolved}: invalid registry YAML: ${error.message}`, { cause: error });
-  }
-  if (!data || typeof data !== "object" || Array.isArray(data) || data.schema_version !== 1 || !data.vaults || typeof data.vaults !== "object" || Array.isArray(data.vaults)) {
-    throw new ResolutionError(`${resolved}: registry must have schema_version 1 and a vaults mapping`);
-  }
-  return data;
-}
-function renderRegistry(data) {
-  return import_yaml2.default.stringify(data, { lineWidth: 0 });
-}
-function atomicWriteText(targetPath, rendered, { rename = fs6.renameSync } = {}) {
-  fs6.mkdirSync(path5.dirname(targetPath), { recursive: true });
-  const temporary = path5.join(path5.dirname(targetPath), `.${path5.basename(targetPath)}.${crypto.randomBytes(8).toString("hex")}.tmp`);
-  let descriptor;
-  try {
-    const existing = fs6.statSync(targetPath, { throwIfNoEntry: false });
-    descriptor = fs6.openSync(temporary, "wx", existing?.mode & 511 || 384);
-    fs6.writeFileSync(descriptor, rendered, "utf8");
-    fs6.fsyncSync(descriptor);
-    fs6.closeSync(descriptor);
-    descriptor = void 0;
-    rename(temporary, targetPath);
-    try {
-      const directory = fs6.openSync(path5.dirname(targetPath), "r");
-      try {
-        fs6.fsyncSync(directory);
-      } finally {
-        fs6.closeSync(directory);
-      }
-    } catch {
-    }
-  } finally {
-    if (descriptor !== void 0) fs6.closeSync(descriptor);
-    fs6.rmSync(temporary, { force: true });
-  }
-}
-function findAncestorVault(start) {
-  let current = canonicalPath(start);
-  if (fs6.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path5.dirname(current);
-  while (true) {
-    if (fs6.statSync(path5.join(current, CONTRACT_NAME), { throwIfNoEntry: false })?.isFile()) return current;
-    const parent = path5.dirname(current);
-    if (parent === current) return null;
-    current = parent;
-  }
-}
-function registeredCandidates(registry) {
-  const candidates = [];
-  for (const [vaultId, record] of Object.entries(registry.vaults ?? {})) {
-    if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.path !== "string") continue;
-    const root = canonicalPath(record.path);
-    if (fs6.statSync(path5.join(root, CONTRACT_NAME), { throwIfNoEntry: false })?.isFile()) candidates.push([vaultId, root]);
-  }
-  return candidates;
-}
-function registeredVault(vaultId, registry) {
-  const record = registry.vaults[vaultId];
-  if (!record) throw new ResolutionError(`unknown registered vault ID \`${vaultId}\``);
-  if (typeof record !== "object" || Array.isArray(record) || typeof record.path !== "string") {
-    throw new ResolutionError(`invalid registered vault record \`${vaultId}\``);
-  }
-  const vault = loadVault(record.path);
-  if (vault.contract.vault_id !== vaultId) {
-    throw new ResolutionError(`registered vault ID \`${vaultId}\` does not match contract ID \`${vault.contract.vault_id}\``);
-  }
-  return vault;
-}
-function requireProjectsMapping(projects) {
-  if (!projects || typeof projects !== "object" || Array.isArray(projects)) {
-    throw new ResolutionError("registry projects must be a mapping");
-  }
-  return projects;
-}
-function projectRecord(configuredRoot, record, { matching = false } = {}) {
-  if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.vault_id !== "string" || !record.vault_id) {
-    throw new ResolutionError(`${matching ? "matching " : ""}project association \`${configuredRoot}\` must contain a vault_id`);
-  }
-  return record;
-}
-function projectAssociation(start, registry) {
-  if (registry.projects === void 0) return null;
-  const projects = requireProjectsMapping(registry.projects);
-  let current = canonicalPath(start);
-  if (fs6.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path5.dirname(current);
-  const matches = [];
-  for (const [configuredRoot, record] of Object.entries(projects)) {
-    const expandedRoot = expandHome(configuredRoot);
-    if (!path5.isAbsolute(expandedRoot)) continue;
-    const root = canonicalPath(expandedRoot);
-    if (!isWithin(root, current)) continue;
-    const relative = path5.relative(root, current);
-    const distance = relative ? relative.split(path5.sep).length : 0;
-    matches.push({ configuredRoot, record, distance });
-  }
-  if (!matches.length) return null;
-  const nearestDistance = Math.min(...matches.map((match) => match.distance));
-  const nearest = matches.filter((match) => match.distance === nearestDistance);
-  const vaultIds = new Set(nearest.map((match) => projectRecord(match.configuredRoot, match.record, { matching: true }).vault_id));
-  if (vaultIds.size > 1) {
-    throw new ResolutionError(`project association is ambiguous at \`${current}\`; matching roots resolve to: ${[...vaultIds].sort().join(", ")}`);
-  }
-  return nearest[0];
-}
-function resolveVault(selector = null, { cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
-  if (selector !== null && selector !== void 0) {
-    const selectorPath = path5.resolve(expandHome(String(selector)));
-    if (fs6.existsSync(selectorPath)) {
-      const root = fs6.statSync(selectorPath).isDirectory() ? selectorPath : path5.dirname(selectorPath);
-      return loadVault(root);
-    }
-    const registry2 = loadRegistry(registryPath);
-    const record = registry2.vaults[String(selector)];
-    if (record && typeof record === "object" && !Array.isArray(record) && typeof record.path === "string") return loadVault(record.path);
-    throw new ResolutionError(`unknown vault selector: ${selector}`);
-  }
-  const ancestor = findAncestorVault(cwd);
-  if (ancestor) return loadVault(ancestor);
-  const registry = loadRegistry(registryPath);
-  const association = projectAssociation(cwd, registry);
-  if (association) return registeredVault(association.record.vault_id, registry);
-  const candidates = registeredCandidates(registry);
-  if (candidates.length === 1) return loadVault(candidates[0][1]);
-  if (!candidates.length) throw new ResolutionError("no vault selected, no ancestor contract found, and registry has no valid vaults");
-  throw new ResolutionError(`vault selection is ambiguous; choose one of: ${candidates.map(([vaultId]) => vaultId).join(", ")}`);
-}
-function registerVault(vaultId, root, { registryPath = defaultRegistryPath(), apply = false, rename = fs6.renameSync } = {}) {
-  const vault = loadVault(root);
-  const contractId = vault.contract.vault_id;
-  if (vaultId !== contractId) throw new ContractError(`registry ID \`${vaultId}\` does not match contract ID \`${contractId}\``);
-  const resolvedRegistryPath = path5.resolve(expandHome(String(registryPath)));
-  const data = loadRegistry(resolvedRegistryPath);
-  const existing = data.vaults[vaultId];
-  if (existing !== void 0) {
-    if (!existing || typeof existing !== "object" || Array.isArray(existing) || typeof existing.path !== "string") {
-      throw new ResolutionError(`registry ID \`${vaultId}\` already exists with an invalid record`);
-    }
-    const existingRoot = canonicalPath(existing.path);
-    if (existingRoot !== vault.root) {
-      throw new ResolutionError(`registry ID \`${vaultId}\` already points to \`${existingRoot}\`; refusing to replace it with \`${vault.root}\``);
-    }
-  }
-  data.vaults[vaultId] = { path: vault.root };
-  const rendered = renderRegistry(data);
-  if (apply) {
-    const current = fs6.existsSync(resolvedRegistryPath) ? fs6.readFileSync(resolvedRegistryPath, "utf8") : null;
-    if (current !== rendered) atomicWriteText(resolvedRegistryPath, rendered, { rename });
-  }
-  return [resolvedRegistryPath, rendered];
-}
-function associateProject(vaultId, projectRoot, {
-  registryPath = defaultRegistryPath(),
-  apply = false,
-  replace = false,
-  rename = fs6.renameSync
-} = {}) {
-  const normalizedVaultId = String(vaultId);
-  const resolvedRegistryPath = path5.resolve(expandHome(String(registryPath)));
-  const data = loadRegistry(resolvedRegistryPath);
-  registeredVault(normalizedVaultId, data);
-  const root = canonicalPath(projectRoot);
-  if (!fs6.statSync(root, { throwIfNoEntry: false })?.isDirectory()) {
-    throw new ResolutionError(`project path is not an existing directory: ${root}`);
-  }
-  data.projects ??= {};
-  const projects = requireProjectsMapping(data.projects);
-  for (const [configuredRoot, unvalidatedRecord] of Object.entries(projects)) {
-    const expandedRoot = expandHome(configuredRoot);
-    if (!path5.isAbsolute(expandedRoot)) {
-      throw new ResolutionError(`project association path must be absolute: ${configuredRoot}`);
-    }
-    const record = projectRecord(configuredRoot, unvalidatedRecord);
-    if (canonicalPath(expandedRoot) !== root) continue;
-    if (record.vault_id !== normalizedVaultId && !replace) {
-      throw new ResolutionError(`project \`${root}\` already points to \`${record.vault_id}\`; refusing to replace it with \`${normalizedVaultId}\``);
-    }
-    if (configuredRoot !== root) delete projects[configuredRoot];
-  }
-  projects[root] = { vault_id: normalizedVaultId };
-  const rendered = renderRegistry(data);
-  if (apply) {
-    const current = fs6.existsSync(resolvedRegistryPath) ? fs6.readFileSync(resolvedRegistryPath, "utf8") : null;
-    if (current !== rendered) atomicWriteText(resolvedRegistryPath, rendered, { rename });
-  }
-  return [resolvedRegistryPath, rendered, root];
 }
 
 // src/knowledge-loom/cli.mjs
@@ -8211,7 +8425,7 @@ function formatFindings(findings, { json = false } = {}) {
   if (json) return `${JSON.stringify(findings, null, 2)}
 `;
   if (!findings.length) return "PASS no findings\n";
-  return `${findings.map((item) => `${item.severity.toLocaleUpperCase().padEnd(7)} ${item.code}${item.path ? ` [${item.path}]` : ""}: ${item.message}`).join("\n")}
+  return `${findings.map((item) => `${item.severity.toLocaleUpperCase().padEnd(7)} ${item.code}${item.path ? ` [${item.path}${item.line ? `:${item.line}` : ""}]` : ""}: ${item.message}`).join("\n")}
 `;
 }
 function requirePositionals(options, count, usage) {
@@ -8227,7 +8441,7 @@ function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(), stdou
     if (options.command === "audit") {
       if (options.positional.length > 1) throw new Error(COMMAND_HELP.audit.trim());
       const vault = resolveVault(options.positional[0] ?? null, { cwd, registryPath: options.registry });
-      const findings2 = auditVault(vault);
+      const findings2 = auditVault(vault, { registryPath: options.registry });
       stdout.write(formatFindings(findings2, { json: options.json === true }));
       return findings2.some((item) => item.severity === "error") ? 1 : 0;
     }

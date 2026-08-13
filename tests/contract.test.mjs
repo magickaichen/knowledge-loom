@@ -19,6 +19,22 @@ test("shared and single-subject write policies remain distinct", () => {
   assert.equal(single.write.current_state_policy, "maintain-after-material-change");
 });
 
+test("content checks accept one kebab-case adapter ID", () => {
+  const contract = structuredClone(loadVault(path.join(FIXTURES, "single-proactive")).contract);
+  contract.content_checks = { adapter: "fictional-content-check" };
+  assert.deepEqual(validateContractData(contract), []);
+});
+
+for (const contentChecks of [[], {}, { adapter: "Not Valid" }]) {
+  test(`content checks reject ${JSON.stringify(contentChecks)}`, () => {
+    const contract = structuredClone(loadVault(path.join(FIXTURES, "single-proactive")).contract);
+    contract.content_checks = contentChecks;
+    assert.ok(
+      validateContractData(contract).some((item) => item.code.startsWith("contract.content")),
+    );
+  });
+}
+
 for (const [field, value] of [
   ["instruction", "/etc/hosts"],
   ["navigation", "../INDEX.md"],

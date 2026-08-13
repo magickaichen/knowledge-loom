@@ -83,7 +83,9 @@ one subject's facts to another.
 Before a write, record repository status. Preserve unrelated changes and pre-existing target-file
 hunks. After a write:
 
-1. Validate the affected contract, metadata profile, links, privacy boundary, and focus invariants.
+1. Run the deterministic audit, including any read-only content checker declared by the contract
+   and configured in the local registry. Treat a missing or failed declared checker as incomplete
+   validation; do not run it separately from the audit.
 2. Review the diff.
 3. Stage only task-owned paths or hunks.
 4. Commit only when the contract requires it.
@@ -103,4 +105,6 @@ by the contract.
 - If selection is ambiguous, stop vault work and ask.
 - If a target file has unrelated uncommitted changes that cannot be isolated safely, leave the new
   capture uncommitted and report the conflict.
+- If a declared content checker is missing, invalid, timed out, or failed, preserve the write and
+  report it as saved but not validated.
 - Never imply that retrieval, validation, commit, sync, or backup succeeded when it did not.

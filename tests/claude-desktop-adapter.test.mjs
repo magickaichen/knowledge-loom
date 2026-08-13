@@ -15,6 +15,8 @@ test("Desktop skill metadata states its capability boundary", () => {
   assert.match(metadata.description, /Cowork/);
   assert.match(body, /regular Chat/);
   assert.match(body, /Do not modify the vault/);
+  assert.match(body, /combined audit incomplete/);
+  assert.match(body, /cannot execute the locally registered checker/);
   assert.doesNotMatch(body, /\/Users\//);
 });
 

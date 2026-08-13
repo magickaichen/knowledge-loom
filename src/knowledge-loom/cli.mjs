@@ -70,7 +70,7 @@ function parseArguments(arguments_) {
 export function formatFindings(findings, { json = false } = {}) {
   if (json) return `${JSON.stringify(findings, null, 2)}\n`;
   if (!findings.length) return "PASS no findings\n";
-  return `${findings.map((item) => `${item.severity.toLocaleUpperCase().padEnd(7)} ${item.code}${item.path ? ` [${item.path}]` : ""}: ${item.message}`).join("\n")}\n`;
+  return `${findings.map((item) => `${item.severity.toLocaleUpperCase().padEnd(7)} ${item.code}${item.path ? ` [${item.path}${item.line ? `:${item.line}` : ""}]` : ""}: ${item.message}`).join("\n")}\n`;
 }
 
 function requirePositionals(options, count, usage) {
@@ -88,7 +88,7 @@ export function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd()
     if (options.command === "audit") {
       if (options.positional.length > 1) throw new Error(COMMAND_HELP.audit.trim());
       const vault = resolveVault(options.positional[0] ?? null, { cwd, registryPath: options.registry });
-      const findings = auditVault(vault);
+      const findings = auditVault(vault, { registryPath: options.registry });
       stdout.write(formatFindings(findings, { json: options.json === true }));
       return findings.some((item) => item.severity === "error") ? 1 : 0;
     }

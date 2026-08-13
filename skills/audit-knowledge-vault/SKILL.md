@@ -1,10 +1,11 @@
 ---
 name: audit-knowledge-vault
-description: Audit one governed Markdown vault without modifying it. Use for contract, registry, metadata, subject, focus, privacy, Git, link, or lifecycle validation.
-compatibility: Requires Node.js 20+ and local file/command access.
+description: Audit one governed Markdown vault without modifying it. Use for contract, registry, metadata, subject, focus, privacy, Git, content-check, link, or lifecycle validation.
 ---
 
 # Audit Knowledge Vault
+
+Requires Node.js 20+ and local file/command access.
 
 Inspect one vault without changing files, Git state, registry state, external systems, or lifecycle
 destinations.
@@ -18,14 +19,17 @@ directory containing that canonical file. Read `<skill-root>/references/contract
 selector only when one was supplied. Treat its returned canonical root as the only selected vault;
 any resolution error ends the audit before a vault is inspected.
 
-## Run deterministic audit
+## Run one deterministic audit
 
 Use `node "<skill-root>/scripts/knowledge-loom.mjs" audit --help` as the command source, then audit
 the selected path or ID with that runner. Use `--json` only when another tool will consume the
-result. Treat the command output and exit status as the source of truth for deterministic coverage
-rather than restating its implementation here.
+result. Pass the same non-default registry path used during resolution. The runner performs the
+built-in checks and any read-only content checker declared by the contract and configured in the
+local registry. Treat its combined output and exit status as the source of truth; do not locate or
+invoke the checker separately.
 
-A dirty tree is operational context for later writes, not an audit failure by itself.
+A missing, invalid, timed-out, or failed declared checker is an audit error. A dirty tree is
+operational context for later writes, not an audit failure by itself.
 
 ## Inspect semantic risks
 
