@@ -8,7 +8,7 @@ import { canonicalPath, isVaultRelativePath, isWithin } from "./pathing.mjs";
 export { ContractError } from "./errors.mjs";
 
 export const CONTRACT_NAME = "KNOWLEDGE_VAULT.md";
-const VAULT_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const KEBAB_CASE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function finding(severity, code, message, findingPath = null) {
   return { severity, code, message, path: findingPath };
@@ -92,7 +92,7 @@ export function validateContractData(contract) {
   if (contract.schema_version !== 1) findings.push(finding("error", "contract.schema-version", "`schema_version` must equal 1"));
 
   const vaultId = contract.vault_id;
-  if (typeof vaultId !== "string" || !VAULT_ID_RE.test(vaultId)) {
+  if (typeof vaultId !== "string" || !KEBAB_CASE_ID_RE.test(vaultId)) {
     findings.push(finding("error", "contract.vault-id", "`vault_id` must be stable kebab-case"));
   }
   if (typeof contract.title !== "string" || !contract.title.trim()) {
@@ -158,7 +158,10 @@ export function validateContractData(contract) {
       contract.content_checks
       && typeof contract.content_checks === "object"
       && !Array.isArray(contract.content_checks)
-      && (typeof contentChecks.adapter !== "string" || !VAULT_ID_RE.test(contentChecks.adapter))
+      && (
+        typeof contentChecks.adapter !== "string"
+        || !KEBAB_CASE_ID_RE.test(contentChecks.adapter)
+      )
     ) {
       findings.push(
         finding(

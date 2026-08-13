@@ -7449,7 +7449,7 @@ function toPosixRelative(root, candidate) {
 
 // src/knowledge-loom/contract.mjs
 var CONTRACT_NAME = "KNOWLEDGE_VAULT.md";
-var VAULT_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+var KEBAB_CASE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function finding(severity, code, message, findingPath = null) {
   return { severity, code, message, path: findingPath };
 }
@@ -7527,7 +7527,7 @@ function validateContractData(contract) {
   const findings = [];
   if (contract.schema_version !== 1) findings.push(finding("error", "contract.schema-version", "`schema_version` must equal 1"));
   const vaultId = contract.vault_id;
-  if (typeof vaultId !== "string" || !VAULT_ID_RE.test(vaultId)) {
+  if (typeof vaultId !== "string" || !KEBAB_CASE_ID_RE.test(vaultId)) {
     findings.push(finding("error", "contract.vault-id", "`vault_id` must be stable kebab-case"));
   }
   if (typeof contract.title !== "string" || !contract.title.trim()) {
@@ -7582,7 +7582,7 @@ function validateContractData(contract) {
   }
   if (Object.hasOwn(contract, "content_checks")) {
     const contentChecks = mapping(contract, "content_checks", findings);
-    if (contract.content_checks && typeof contract.content_checks === "object" && !Array.isArray(contract.content_checks) && (typeof contentChecks.adapter !== "string" || !VAULT_ID_RE.test(contentChecks.adapter))) {
+    if (contract.content_checks && typeof contract.content_checks === "object" && !Array.isArray(contract.content_checks) && (typeof contentChecks.adapter !== "string" || !KEBAB_CASE_ID_RE.test(contentChecks.adapter))) {
       findings.push(
         finding(
           "error",
@@ -7851,7 +7851,6 @@ function associateProject(vaultId, projectRoot, {
 }
 
 // src/knowledge-loom/content-checks.mjs
-var ADAPTER_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 var VALIDATION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 var ALLOWED_SEVERITIES = /* @__PURE__ */ new Set(["error", "warning", "info"]);
 var STATUS_EXIT_CODES = { pass: 0, fail: 1, error: 2 };
@@ -7948,7 +7947,7 @@ function normalizedResult(adapterId, result, vaultRoot) {
   }
   const findings = [];
   for (const item of result.findings) {
-    if (!item || typeof item !== "object" || Array.isArray(item) || !ALLOWED_SEVERITIES.has(item.severity) || typeof item.code !== "string" || !item.code.trim() || typeof item.message !== "string" || !item.message.trim() || item.path !== null && item.path !== void 0 && (typeof item.path !== "string" || !isVaultRelativePath(item.path)) || item.line !== void 0 && (!Number.isInteger(item.line) || item.line < 1)) {
+    if (!item || typeof item !== "object" || Array.isArray(item) || !ALLOWED_SEVERITIES.has(item.severity) || typeof item.code !== "string" || !item.code.trim() || typeof item.message !== "string" || !item.message.trim() || item.path !== null && item.path !== void 0 && (typeof item.path !== "string" || !isVaultRelativePath(item.path) || !resolveVaultPath(vaultRoot, item.path)) || item.line !== void 0 && (!Number.isInteger(item.line) || item.line < 1)) {
       return invalid("content checker returned an invalid finding");
     }
     const normalized = {
@@ -7969,11 +7968,10 @@ function normalizedResult(adapterId, result, vaultRoot) {
 }
 function runDeclaredContentCheck(vault, {
   registryPath,
-  timeoutMs = ADAPTER_TIMEOUT_MS,
-  maxBuffer = ADAPTER_MAX_BUFFER
+  timeoutMs = ADAPTER_TIMEOUT_MS
 } = {}) {
   const adapterId = vault.contract.content_checks?.adapter;
-  if (!adapterId || !ADAPTER_ID_RE.test(adapterId)) return [];
+  if (!adapterId || !KEBAB_CASE_ID_RE.test(adapterId)) return [];
   let registry;
   try {
     registry = loadRegistry(registryPath);
@@ -7998,7 +7996,7 @@ function runDeclaredContentCheck(vault, {
       encoding: "utf8",
       shell: false,
       timeout: timeoutMs,
-      maxBuffer
+      maxBuffer: ADAPTER_MAX_BUFFER
     }
   );
   if (completed.error) {

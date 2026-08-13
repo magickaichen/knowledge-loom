@@ -9,7 +9,13 @@ import { runDeclaredContentCheck } from "../src/knowledge-loom/content-checks.mj
 import { loadVault, renderContract } from "../src/knowledge-loom/contract.mjs";
 import { copyFixture, FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
-function contentCheckFixture(t, { result, exitCode = 0, rawOutput = null, arguments_ = null } = {}) {
+function contentCheckFixture(t, {
+  result,
+  exitCode = 0,
+  rawOutput = null,
+  arguments_ = null,
+  executable = process.execPath,
+} = {}) {
   const temporary = temporaryDirectory(t);
   const root = copyFixture("single-proactive", path.join(temporary, "vault"));
   const vault = loadVault(root);
@@ -34,7 +40,7 @@ function contentCheckFixture(t, { result, exitCode = 0, rawOutput = null, argume
       vaults: {},
       content_check_adapters: {
         "fictional-content-check": {
-          executable: process.execPath,
+          executable,
           arguments: arguments_ ?? [script, "{vault_root}"],
         },
       },
@@ -202,6 +208,31 @@ test("content checker rejects findings outside the vault", (t) => {
   );
 });
 
+test("content checker rejects a finding through a symlink outside the vault", (t) => {
+  const { root, registry } = contentCheckFixture(t, {
+    result: {
+      status: "fail",
+      validationDate: "2026-08-12",
+      findings: [
+        {
+          severity: "error",
+          code: "unsafe-symlink",
+          message: "outside",
+          path: "linked/outside.md",
+        },
+      ],
+    },
+    exitCode: 1,
+  });
+  const outside = temporaryDirectory(t);
+  fs.symlinkSync(outside, path.join(root, "linked"), "dir");
+  assert.ok(
+    auditVault(loadVault(root), { registryPath: registry }).some(
+      (item) => item.code === "content-check.output",
+    ),
+  );
+});
+
 test("content checker timeout becomes an audit finding", (t) => {
   const { root, registry, script } = contentCheckFixture(t, {
     result: { status: "pass", validationDate: "2026-08-12", findings: [] },
@@ -210,6 +241,29 @@ test("content checker timeout becomes an audit finding", (t) => {
   assert.ok(
     runDeclaredContentCheck(loadVault(root), { registryPath: registry, timeoutMs: 20 }).some(
       (item) => item.code === "content-check.execution" && /timed out/.test(item.message),
+    ),
+  );
+});
+
+test("content checker launch failure becomes an audit finding", (t) => {
+  const { root, registry } = contentCheckFixture(t, {
+    result: { status: "pass", validationDate: "2026-08-12", findings: [] },
+    executable: path.join(temporaryDirectory(t), "missing-executable"),
+  });
+  assert.ok(
+    auditVault(loadVault(root), { registryPath: registry }).some(
+      (item) => item.code === "content-check.execution" && /could not start/.test(item.message),
+    ),
+  );
+});
+
+test("content checker output limit becomes an audit finding", (t) => {
+  const { root, registry } = contentCheckFixture(t, {
+    rawOutput: "x".repeat(1024 * 1024 + 1),
+  });
+  assert.ok(
+    auditVault(loadVault(root), { registryPath: registry }).some(
+      (item) => item.code === "content-check.execution",
     ),
   );
 });

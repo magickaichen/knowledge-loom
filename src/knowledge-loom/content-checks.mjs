@@ -1,10 +1,9 @@
 import { spawnSync } from "node:child_process";
 
-import { finding } from "./contract.mjs";
-import { canonicalPath, isVaultRelativePath } from "./pathing.mjs";
+import { finding, KEBAB_CASE_ID_RE } from "./contract.mjs";
+import { canonicalPath, isVaultRelativePath, resolveVaultPath } from "./pathing.mjs";
 import { loadRegistry } from "./registry.mjs";
 
-const ADAPTER_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VALIDATION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_SEVERITIES = new Set(["error", "warning", "info"]);
 const STATUS_EXIT_CODES = { pass: 0, fail: 1, error: 2 };
@@ -126,7 +125,11 @@ function normalizedResult(adapterId, result, vaultRoot) {
       || (
         item.path !== null
         && item.path !== undefined
-        && (typeof item.path !== "string" || !isVaultRelativePath(item.path))
+        && (
+          typeof item.path !== "string"
+          || !isVaultRelativePath(item.path)
+          || !resolveVaultPath(vaultRoot, item.path)
+        )
       )
       || (item.line !== undefined && (!Number.isInteger(item.line) || item.line < 1))
     ) {
@@ -155,11 +158,10 @@ export function runDeclaredContentCheck(
   {
     registryPath,
     timeoutMs = ADAPTER_TIMEOUT_MS,
-    maxBuffer = ADAPTER_MAX_BUFFER,
   } = {},
 ) {
   const adapterId = vault.contract.content_checks?.adapter;
-  if (!adapterId || !ADAPTER_ID_RE.test(adapterId)) return [];
+  if (!adapterId || !KEBAB_CASE_ID_RE.test(adapterId)) return [];
 
   let registry;
   try {
@@ -187,7 +189,7 @@ export function runDeclaredContentCheck(
       encoding: "utf8",
       shell: false,
       timeout: timeoutMs,
-      maxBuffer,
+      maxBuffer: ADAPTER_MAX_BUFFER,
     },
   );
 
