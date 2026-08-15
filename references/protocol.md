@@ -45,11 +45,17 @@ or backup authority.
 4. **Route before ranking.** A request can trigger more than one route; carry every triggered
    route's mandatory evidence into the result:
    - **Current attention:** read the declared focus view first, then follow its cited project or
-     decision notes for rationale. The focus view owns attention; linked notes own history.
+     decision notes for rationale. For a prioritization question about a named project, both the
+     focus view and that project's note are mandatory. The focus view owns attention; linked notes
+     own history.
    - **Governance or protected data:** for vault behavior, credentials, privacy, or disclosure,
-     treat the contract and instruction roots as mandatory policy evidence before topic notes.
+     treat the contract and every instruction root as mandatory policy evidence before topic
+     notes. Include those governing files in the returned evidence packet; consulting them
+     silently does not satisfy the route.
    - **Lifecycle:** for replacement, deletion, or authority questions, retrieve the governing
-     lifecycle rules plus both the earlier note and its named replacement when they exist.
+     contract and instruction roots, the applicable lifecycle rules, and both the earlier note and
+     its named replacement when they exist. Include the governing files in the returned evidence
+     packet.
 5. When the request language or wording differs from the vault, derive a compact search expansion
    in the vault's stable terminology. Search the original and the expansion; preserve exact names,
    IDs, dates, and quoted text. Treat isolated cross-language token matches as leads rather than
@@ -64,9 +70,13 @@ or backup authority.
    confidence when the configured profile uses them. Surface conflicts instead of silently choosing
    one source.
 9. Verify time-sensitive facts in their authoritative source when the conclusion depends on them.
-10. Complete retrieval only when each decisive claim has supporting evidence, or the result states
-    that the required evidence is missing, conflicting, stale, or unavailable. Unsupported
-    conclusions become an explicit abstention.
+10. Return a bounded evidence packet whose citations include every source marked mandatory by a
+    triggered route and every matched context-pointer note that materially constrains the answer.
+    Order decisive sources before supplemental context. Do not omit governing or routing evidence
+    merely because a topic note is sufficient to draft a plausible answer.
+11. Complete retrieval only when each decisive claim has supporting evidence, or the result states
+    that the required evidence is missing, conflicting, stale, or unavailable. If mandatory route
+    evidence is absent, say what is missing and abstain from the unsupported conclusion.
 
 ## Write authorization
 
