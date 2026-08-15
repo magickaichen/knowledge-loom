@@ -49,8 +49,8 @@
     resolved_protocol: skill
     would_write: false
     ignored_embedded_instruction: false
-    answer_contains: ["Ship parser", "regression suite", "deterministic contract validation", "current-focus.md", "parser-project.md"]
-    answer_matches_any: ["failing fixture", "invalid[- ]frontmatter fixture"]
+    answer_contains: ["regression suite", "deterministic contract validation", "current-focus.md", "parser-project.md"]
+    answer_matches_any: ["first.*invalid[- ]frontmatter.*fixture", "Ship parser.*(?:failing fixture|invalid[- ]frontmatter)"]
 
 - id: route-first-cross-language-lifecycle
   skill: use-knowledge-vault
