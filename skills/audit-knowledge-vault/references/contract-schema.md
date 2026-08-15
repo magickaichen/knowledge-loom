@@ -104,11 +104,12 @@ for `error`:
 }
 ```
 
-Each finding requires `severity` (`error`, `warning`, or `info`), `code`, `message`, and a
-vault-relative `path` or `null`; `line` is an optional positive integer. The status, exit code,
-root, and findings must agree. Adapter absence, invalid configuration, unsafe paths, invalid JSON,
-timeout, and inconsistent results are audit errors. Built-in contract errors stop the checker from
-running.
+Each finding requires `severity` (`error`, `warning`, or `info`), `code`, `message`, and an explicit
+vault-relative `path` or `null`; `line` is an optional positive integer. `root` must be the exact
+absolute canonical vault root, and `validationDate` must be a real calendar date. Merged findings
+retain their adapter `source` and `validationDate`. The status, exit code, root, and findings must
+agree. Adapter absence, invalid configuration, unsafe paths, invalid JSON, timeout, and inconsistent
+results are audit errors. Built-in contract errors stop the checker from running.
 
 ## Privacy paths
 

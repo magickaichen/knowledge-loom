@@ -125,7 +125,7 @@ function globPaths(root, patternValue) {
   return walk(searchRoot).filter((candidate) => matchesPath(patternValue, toPosixRelative(root, candidate)));
 }
 
-export function auditVault(vault, { registryPath } = {}) {
+export async function auditVault(vault, { registryPath } = {}) {
   const findings = validateContractData(vault.contract);
   const { root, contract } = vault;
 
@@ -224,7 +224,7 @@ export function auditVault(vault, { registryPath } = {}) {
     findings.push(...checkFocusView(root, name, view));
   }
   if (!findings.some((item) => item.severity === "error")) {
-    findings.push(...runDeclaredContentCheck(vault, { registryPath }));
+    findings.push(...await runDeclaredContentCheck(vault, { registryPath }));
   }
   return findings;
 }

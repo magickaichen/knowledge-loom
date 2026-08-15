@@ -77,7 +77,7 @@ function requirePositionals(options, count, usage) {
   if (options.positional.length !== count) throw new Error(usage.trim());
 }
 
-export function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr } = {}) {
+export async function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr } = {}) {
   try {
     const options = parseArguments(arguments_);
     if (options.help) {
@@ -88,7 +88,7 @@ export function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd()
     if (options.command === "audit") {
       if (options.positional.length > 1) throw new Error(COMMAND_HELP.audit.trim());
       const vault = resolveVault(options.positional[0] ?? null, { cwd, registryPath: options.registry });
-      const findings = auditVault(vault, { registryPath: options.registry });
+      const findings = await auditVault(vault, { registryPath: options.registry });
       stdout.write(formatFindings(findings, { json: options.json === true }));
       return findings.some((item) => item.severity === "error") ? 1 : 0;
     }

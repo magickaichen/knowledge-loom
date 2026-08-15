@@ -1,4 +1,5 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
+import path from "node:path";
 
 import { finding, KEBAB_CASE_ID_RE } from "./contract.mjs";
 import { canonicalPath, isVaultRelativePath, resolveVaultPath } from "./pathing.mjs";
@@ -24,7 +25,14 @@ function passedFinding(adapterId, validationDate) {
     message: `content check passed (${validationDate})`,
     path: null,
     source: `content-check:${adapterId}`,
+    validationDate,
   };
+}
+
+function validValidationDate(value) {
+  if (typeof value !== "string" || !VALIDATION_DATE_RE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
 function adapterConfiguration(registry, adapterId) {
@@ -92,19 +100,10 @@ function normalizedResult(adapterId, result, vaultRoot) {
     return invalid("content checker output requires `root`");
   }
 
-  let resultRoot;
-  try {
-    resultRoot = canonicalPath(result.root);
-  } catch {
-    return invalid("content checker returned an unreadable root", "root");
-  }
-  if (resultRoot !== canonicalPath(vaultRoot)) {
+  if (!path.isAbsolute(result.root) || result.root !== canonicalPath(vaultRoot)) {
     return invalid("content checker root does not match the selected vault", "root");
   }
-  if (
-    typeof result.validationDate !== "string"
-    || !VALIDATION_DATE_RE.test(result.validationDate)
-  ) {
+  if (!validValidationDate(result.validationDate)) {
     return invalid("content checker output requires `validationDate` in YYYY-MM-DD form");
   }
   if (!Array.isArray(result.findings)) {
@@ -122,9 +121,9 @@ function normalizedResult(adapterId, result, vaultRoot) {
       || !item.code.trim()
       || typeof item.message !== "string"
       || !item.message.trim()
+      || !Object.hasOwn(item, "path")
       || (
         item.path !== null
-        && item.path !== undefined
         && (
           typeof item.path !== "string"
           || !isVaultRelativePath(item.path)
@@ -141,6 +140,7 @@ function normalizedResult(adapterId, result, vaultRoot) {
       message: item.message,
       path: item.path ?? null,
       source: `content-check:${adapterId}`,
+      validationDate: result.validationDate,
     };
     if (item.line !== undefined) normalized.line = item.line;
     findings.push(normalized);
@@ -153,7 +153,84 @@ function normalizedResult(adapterId, result, vaultRoot) {
   return { status: result.status, validationDate: result.validationDate, findings };
 }
 
-export function runDeclaredContentCheck(
+function killProcessTree(child) {
+  if (!child.pid) return;
+  if (process.platform === "win32") {
+    const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    killer.once("error", () => {
+      try { child.kill("SIGKILL"); } catch { /* The process already exited. */ }
+    });
+    killer.unref();
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    try { child.kill("SIGKILL"); } catch { /* The process already exited. */ }
+  }
+}
+
+function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
+  return new Promise((resolve) => {
+    let child;
+    try {
+      child = spawn(executable, arguments_, {
+        cwd,
+        shell: false,
+        detached: process.platform !== "win32",
+        stdio: ["ignore", "pipe", "pipe"],
+        windowsHide: true,
+      });
+    } catch (error) {
+      resolve({ error });
+      return;
+    }
+
+    let settled = false;
+    let timer;
+    let stdout = "";
+    let outputBytes = 0;
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(result);
+    };
+    const terminate = (error) => {
+      killProcessTree(child);
+      child.stdout.destroy();
+      child.stderr.destroy();
+      finish({ error });
+    };
+    const collect = (chunk, { capture = false } = {}) => {
+      outputBytes += Buffer.byteLength(chunk, "utf8");
+      if (outputBytes > ADAPTER_MAX_BUFFER) {
+        const error = new Error("output exceeded the 1 MiB limit");
+        error.code = "ENOBUFS";
+        terminate(error);
+        return;
+      }
+      if (capture) stdout += chunk;
+    };
+
+    child.once("error", (error) => finish({ error }));
+    child.stdout.on("data", (chunk) => collect(chunk, { capture: true }));
+    child.stderr.on("data", (chunk) => collect(chunk));
+    child.once("close", (status, signal) => finish({ stdout, status, signal }));
+    timer = setTimeout(() => {
+      const error = new Error("timed out");
+      error.code = "ETIMEDOUT";
+      terminate(error);
+    }, timeoutMs);
+  });
+}
+
+export async function runDeclaredContentCheck(
   vault,
   {
     registryPath,
@@ -181,22 +258,21 @@ export function runDeclaredContentCheck(
   if (invalidConfiguration) return [invalidConfiguration];
 
   const substitute = (value) => value.replaceAll("{vault_root}", vault.root);
-  const completed = spawnSync(
+  const completed = await executeAdapter(
     substitute(configuration.executable),
     configuration.arguments.map(substitute),
     {
       cwd: vault.root,
-      encoding: "utf8",
-      shell: false,
-      timeout: timeoutMs,
-      maxBuffer: ADAPTER_MAX_BUFFER,
+      timeoutMs,
     },
   );
 
   if (completed.error) {
     const reason = completed.error.code === "ETIMEDOUT"
       ? "timed out"
-      : `could not start: ${completed.error.message}`;
+      : completed.error.code === "ENOBUFS"
+        ? "exceeded the 1 MiB output limit"
+        : `could not start: ${completed.error.message}`;
     return [
       adapterFinding(
         adapterId,
