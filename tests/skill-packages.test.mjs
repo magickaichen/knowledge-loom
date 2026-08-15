@@ -41,11 +41,11 @@ test("unmanaged runtime files are treated as package drift", (t) => {
 test("skill frontmatter and plugin manifests match the distribution", () => {
   const skillNames = new Set(Object.keys(SKILL_REFERENCES));
   for (const skillName of skillNames) {
-    const [metadata] = splitFrontmatter(fs.readFileSync(path.join(PACKAGE_ROOT, "skills", skillName, "SKILL.md"), "utf8"), { source: skillName });
-    assert.deepEqual(new Set(Object.keys(metadata)), new Set(["name", "description", "compatibility"]));
+    const [metadata, body] = splitFrontmatter(fs.readFileSync(path.join(PACKAGE_ROOT, "skills", skillName, "SKILL.md"), "utf8"), { source: skillName });
+    assert.deepEqual(new Set(Object.keys(metadata)), new Set(["name", "description"]));
     assert.equal(metadata.name, skillName);
     assert.ok(metadata.description.trim());
-    assert.match(metadata.compatibility, /Node\.js 20\+/);
+    assert.match(body, /Requires Node\.js 20\+/);
     assert.ok(fs.statSync(path.join(PACKAGE_ROOT, "skills", skillName, "licenses", "yaml.txt")).isFile());
   }
   const codex = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, ".codex-plugin", "plugin.json"), "utf8"));

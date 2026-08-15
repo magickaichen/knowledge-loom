@@ -188,6 +188,38 @@ the nearest `KNOWLEDGE_VAULT.md` wins. Otherwise, the nearest project associatio
 projects can deliberately override a parent association. A broken association stops resolution
 instead of silently choosing another vault.
 
+### Optional vault-specific content checks
+
+The normal audit can also run one trusted, read-only checker for rules that belong to a particular
+vault, such as its date or summary conventions. There is no second validation command: both the
+skill and CLI still use `knowledge-loom audit` and return one combined report.
+
+Name the checker in `KNOWLEDGE_VAULT.md`:
+
+```yaml
+content_checks:
+  adapter: example-content-check
+```
+
+Keep its executable configuration in the local registry rather than the vault:
+
+```yaml
+content_check_adapters:
+  example-content-check:
+    executable: node
+    arguments:
+      - "{vault_root}/scripts/check-content.mjs"
+      - "--root={vault_root}"
+      - --json
+```
+
+The runner executes this argument list directly without a shell. Register only a checker you trust
+to remain read-only. A missing, invalid, timed-out, or failed declared checker makes the audit fail
+instead of being silently skipped. See the [contract schema](references/contract-schema.md) for its
+JSON result interface. Custom checkers require a command-capable runtime such as Codex, Claude Code,
+or the CLI. The instruction-only Claude Desktop adapter reports the combined audit as incomplete
+when a checker is declared; it never pretends the checker ran.
+
 ## Why this exists
 
 An agent with access to your notes is useful only when its boundaries are clear. Knowledge Loom
@@ -211,7 +243,8 @@ provider, and backup provider still have their own access and privacy rules.
 - [`init-knowledge-vault`](skills/init-knowledge-vault/SKILL.md) previews and initializes a new
   vault, or carefully adopts an existing folder.
 - [`audit-knowledge-vault`](skills/audit-knowledge-vault/SKILL.md) checks the rules file, metadata,
-  privacy paths, Git state, and focus views without modifying the vault.
+  privacy paths, Git state, focus views, and any locally configured content checker without
+  modifying the vault.
 - [`use-knowledge-vault`](skills/use-knowledge-vault/SKILL.md) retrieves the smallest useful set of
   notes and handles approved updates.
 - [`manage-current-focus`](skills/manage-current-focus/SKILL.md) maintains one short list of what
@@ -239,7 +272,9 @@ To use local notes, start a Cowork session and connect exactly one folder contai
 
 Regular Claude Chat cannot read an unconnected local folder. The Desktop adapter refuses local
 vault claims without a connected Cowork folder and refuses writes when the session cannot complete
-the lifecycle steps required by the vault.
+the lifecycle steps required by the vault. If a vault declares a custom content checker, the
+Desktop adapter can report its manual checks but requires Codex, Claude Code, or the CLI to complete
+the combined audit.
 
 ## Use the CLI from a checkout
 
@@ -296,8 +331,9 @@ npm run cli -- resolve example
 ## How it works
 
 The rules file is a versioned `KNOWLEDGE_VAULT.md` contract. It declares the vault identity,
-subjects, write rules, metadata profiles, focus views, Git history, sync, backup, and paths that
-must never be tracked. Every installation route uses the same runtime-neutral protocol.
+subjects, write rules, metadata profiles, focus views, Git history, sync, backup, optional content
+checker, and paths that must never be tracked. Every installation route uses the same
+runtime-neutral protocol.
 
 Read the [protocol](references/protocol.md) and
 [contract schema](references/contract-schema.md) when you need the exact rules.

@@ -1,4 +1,4 @@
 interface:
   display_name: "Audit Knowledge Vault"
-  short_description: "Audit vault policy, structure, and Git safety"
+  short_description: "Audit vault rules and custom content checks"
   default_prompt: "Use $audit-knowledge-vault to run a read-only audit of this vault."

@@ -1,10 +1,11 @@
 ---
 name: use-knowledge-vault
 description: Retrieve targeted context from one governed Markdown vault and perform authorized durable capture. Use when a vault contract or wrapper is in scope, or the user asks to consult, remember, update, or sync vault knowledge.
-compatibility: Requires Node.js 20+ and local file/command access.
 ---
 
 # Use Knowledge Vault
+
+Requires Node.js 20+ and local file/command access.
 
 Execute the Knowledge Vault Protocol for one selected vault while keeping the primary task first.
 Limit actions to the primary task and contract-authorized vault operations.
@@ -33,8 +34,11 @@ policy, lifecycle, and failure behavior.
    node "<skill-root>/scripts/knowledge-loom.mjs" audit <vault-path>
    ```
 
-   The write branch is complete only after the audit result and every required Git, sync, and backup
-   state are known. Preserve a valid partial result when a later lifecycle step fails.
+   This single audit includes any read-only content checker declared by the contract and configured
+   in the local registry; do not invoke that checker separately. Pass the same non-default registry
+   path used during resolution. The write branch is complete only after the combined audit result
+   and every required Git, sync, and backup state are known. Preserve a valid partial result when a
+   later lifecycle step fails.
 
 ## Report
 

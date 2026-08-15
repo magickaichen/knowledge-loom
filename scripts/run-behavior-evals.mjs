@@ -7,6 +7,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 
+import { loadVault, renderContract } from "../src/knowledge-loom/contract.mjs";
+
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 export function treeDigest(root) {
@@ -57,11 +59,12 @@ function runCodex(packageRoot, workspace, prompt, schema, model) {
   return JSON.parse(fs.readFileSync(output, "utf8"));
 }
 
-function runClaude(packageRoot, workspace, prompt, schema, model, maxBudgetUsd) {
+function runClaude(packageRoot, workspace, prompt, schema, model, maxBudgetUsd, commandAccess) {
   const command = [
     "--print", "--no-session-persistence", "--setting-sources", "project", "--system-prompt",
     "You are evaluating local knowledge-vault skill routing or execution. Follow the evaluation prompt, use read-only tools, and return the requested JSON.",
-    "--plugin-dir", packageRoot, "--add-dir", packageRoot, "--permission-mode", "dontAsk", "--tools", "Read,Glob,Grep",
+    "--plugin-dir", packageRoot, "--add-dir", packageRoot, "--permission-mode", "dontAsk", "--tools",
+    commandAccess ? "Read,Glob,Grep,Bash" : "Read,Glob,Grep",
     "--output-format", "json", "--json-schema", fs.readFileSync(schema, "utf8"), "--max-budget-usd", String(maxBudgetUsd),
     "--effort", "low", "--model", model ?? "haiku", prompt,
   ];
@@ -156,7 +159,27 @@ export function main(arguments_ = process.argv.slice(2)) {
           const vaultId = readFrontmatter(path.join(destination, "KNOWLEDGE_VAULT.md")).vault_id;
           registry.vaults[vaultId] = { path: destination };
         }
-        if (Object.keys(registry.vaults).length) {
+        if (case_.content_check) {
+          if (!case_.fixture) throw new Error(`${case_.id}: content_check requires one fixture`);
+          const vault = loadVault(workspace);
+          const contract = structuredClone(vault.contract);
+          contract.content_checks = { adapter: case_.content_check.adapter };
+          fs.writeFileSync(vault.contractPath, renderContract(contract, vault.body));
+          const checkerPath = path.join(workspace, ".behavior-content-check.mjs");
+          const result = case_.content_check.result;
+          const exitCodes = { pass: 0, fail: 1, error: 2 };
+          fs.writeFileSync(
+            checkerPath,
+            `process.stdout.write(JSON.stringify({ ...${JSON.stringify(result)}, root: process.argv[2] })); process.exitCode = ${exitCodes[result.status]};\n`,
+          );
+          registry.content_check_adapters = {
+            [case_.content_check.adapter]: {
+              executable: process.execPath,
+              arguments: [checkerPath, "{vault_root}"],
+            },
+          };
+        }
+        if (Object.keys(registry.vaults).length || registry.content_check_adapters) {
           const registryPath = path.join(workspace, "registry.yaml");
           fs.writeFileSync(registryPath, YAML.stringify(registry));
           variables.registry = registryPath;
@@ -192,7 +215,15 @@ export function main(arguments_ = process.argv.slice(2)) {
         }
         const result = runtime === "codex"
           ? runCodex(PACKAGE_ROOT, workspace, prompt, schema, options.model)
-          : runClaude(PACKAGE_ROOT, workspace, prompt, schema, options.model, options.claudeMaxBudgetUsd);
+          : runClaude(
+            PACKAGE_ROOT,
+            workspace,
+            prompt,
+            schema,
+            options.model,
+            options.claudeMaxBudgetUsd,
+            case_.command_access === true,
+          );
         const errors = validateCase(case_, result, PACKAGE_ROOT);
         if (treeDigest(workspace) !== before) errors.push("read-only behavior case modified the fixture");
         if (errors.length) {

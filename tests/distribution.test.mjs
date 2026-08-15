@@ -89,6 +89,9 @@ test("README leads with the outcome and explains the no-install runner", () => {
   assert.match(readme, /\/knowledge-loom:use-knowledge-vault/);
   assert.match(readme, /~\/\.config\/knowledge-vault\/registry\.yaml/);
   assert.match(readme, /associate example ~\/code\/example-project --apply/);
+  assert.match(readme, /There is no second validation command/);
+  assert.match(readme, /instruction-only Claude Desktop adapter reports the combined audit as incomplete/);
+  assert.match(readme, /content_check_adapters:/);
   assert.match(readme, /Node\.js 20\+/);
   assert.match(readme, /does not run `npm install`/);
   assert.match(readme, /Claude Desktop custom skills use a ZIP upload/);

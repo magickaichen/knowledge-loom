@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { finding, loadNoteFrontmatter, validateContractData } from "./contract.mjs";
+import { runDeclaredContentCheck } from "./content-checks.mjs";
 import { checkFocusView } from "./focus.mjs";
 import {
   canonicalPath,
@@ -124,7 +125,7 @@ function globPaths(root, patternValue) {
   return walk(searchRoot).filter((candidate) => matchesPath(patternValue, toPosixRelative(root, candidate)));
 }
 
-export function auditVault(vault) {
+export async function auditVault(vault, { registryPath } = {}) {
   const findings = validateContractData(vault.contract);
   const { root, contract } = vault;
 
@@ -221,6 +222,9 @@ export function auditVault(vault) {
   for (const [name, view] of Object.entries(focusViews)) {
     if (!view || typeof view !== "object" || Array.isArray(view) || typeof view.path !== "string" || !isVaultRelativePath(view.path)) continue;
     findings.push(...checkFocusView(root, name, view));
+  }
+  if (!findings.some((item) => item.severity === "error")) {
+    findings.push(...await runDeclaredContentCheck(vault, { registryPath }));
   }
   return findings;
 }

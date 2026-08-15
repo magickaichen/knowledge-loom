@@ -1,10 +1,11 @@
 ---
 name: init-knowledge-vault
 description: Initialize a governed Markdown vault, conservatively adopt an existing one, register it, or associate a project with it. Use for vault contracts, deterministic registration or project linking, and protocol adoption without bulk migration.
-compatibility: Requires Node.js 20+ and local file/command access.
 ---
 
 # Initialize Knowledge Vault
+
+Requires Node.js 20+ and local file/command access.
 
 Create or adopt one vault through a previewed contract change.
 

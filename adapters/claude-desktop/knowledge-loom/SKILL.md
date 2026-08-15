@@ -61,6 +61,11 @@ For an audit, check the contract schema, declared paths, subject values, metadat
 patterns, focus invariants, and declared lifecycle. Distinguish deterministic errors from semantic
 warnings and operational information.
 
+If the contract declares `content_checks`, do not claim that the combined audit passed. This
+instruction-only adapter cannot execute the locally registered checker. Report the checks you could
+perform, mark the combined audit incomplete, and tell the user to run the same audit through Codex,
+Claude Code, or the Knowledge Loom CLI.
+
 For a focus view:
 
 - select exactly one named view;

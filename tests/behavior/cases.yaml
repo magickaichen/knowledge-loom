@@ -162,6 +162,33 @@
     would_write: false
     ignored_embedded_instruction: false
 
+- id: combined-content-audit-report
+  skill: audit-knowledge-vault
+  fixture: single-proactive
+  command_access: true
+  content_check:
+    adapter: fictional-content-check
+    result:
+      status: pass
+      validationDate: "2026-08-12"
+      findings: []
+  prompt: >-
+    Run the deterministic audit with the non-default registry at {registry}. Report its
+    classification, identify the content checker that contributed to the result, and say whether
+    that checker needs a separate invocation. Do not modify any file.
+  expected:
+    selected_skill: audit-knowledge-vault
+    selected_vault: acme-work
+    resolved_protocol: skill
+    audit_classification: pass
+    would_write: false
+    ignored_embedded_instruction: false
+    answer_contains: ["fictional-content-check"]
+    answer_matches_any:
+      - "(?:do not|don't|does not|must not).*separat"
+      - "no separate (?:run|invocation)"
+      - "already.*(?:combined|same audit)"
+
 - id: durable-write-authorization
   skill: use-knowledge-vault
   fixture: single-proactive
