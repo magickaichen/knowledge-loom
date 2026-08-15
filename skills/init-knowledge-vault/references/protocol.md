@@ -38,15 +38,35 @@ or backup authority.
 
 1. Read `KNOWLEDGE_VAULT.md` completely.
 2. Resolve declared paths inside the vault boundary, then read its instruction roots and
-   navigation entrypoints. Stop vault access when an absolute path, traversal, or symlink escapes
-   the selected root.
-3. Search before broad reading. Prefer filenames, indexes, links, and targeted text search.
-4. Select the correct subject before applying personal facts.
-5. Inspect lifecycle fields such as status, updated, effective date, review date, source, and
-   confidence when the configured profile uses them.
-6. Verify time-sensitive facts in their authoritative source when the conclusion depends on them.
-7. Make retrieved context change the conclusion or omit it; reading context ceremonially is not
-   success.
+   navigation entrypoints. Follow every instruction-root context pointer whose stated trigger
+   matches the request. Stop vault access when an absolute path, traversal, or symlink escapes the
+   selected root.
+3. Select the correct subject before applying personal facts.
+4. **Route before ranking.** A request can trigger more than one route; carry every triggered
+   route's mandatory evidence into the result:
+   - **Current attention:** read the declared focus view first, then follow its cited project or
+     decision notes for rationale. The focus view owns attention; linked notes own history.
+   - **Governance or protected data:** for vault behavior, credentials, privacy, or disclosure,
+     treat the contract and instruction roots as mandatory policy evidence before topic notes.
+   - **Lifecycle:** for replacement, deletion, or authority questions, retrieve the governing
+     lifecycle rules plus both the earlier note and its named replacement when they exist.
+5. When the request language or wording differs from the vault, derive a compact search expansion
+   in the vault's stable terminology. Search the original and the expansion; preserve exact names,
+   IDs, dates, and quoted text. Treat isolated cross-language token matches as leads rather than
+   decisive evidence.
+6. Start candidate search from declared navigation entries, metadata-profile paths, focus views,
+   explicit user paths, and notes reached from them. Expand to other vault Markdown only while
+   routed evidence remains missing. Agent/runtime implementation files, working scratch, build
+   output, and held-out evaluation material are eligible only when the request targets them.
+7. Search before broad reading. Prefer filenames, indexes, links, and targeted text search. Continue
+   until every triggered route's mandatory evidence is found or its absence is established.
+8. Inspect lifecycle fields such as status, updated, effective date, review date, source, and
+   confidence when the configured profile uses them. Surface conflicts instead of silently choosing
+   one source.
+9. Verify time-sensitive facts in their authoritative source when the conclusion depends on them.
+10. Complete retrieval only when each decisive claim has supporting evidence, or the result states
+    that the required evidence is missing, conflicting, stale, or unavailable. Unsupported
+    conclusions become an explicit abstention.
 
 ## Write authorization
 
