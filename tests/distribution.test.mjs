@@ -61,7 +61,7 @@ test("repository runtime is JavaScript-only", () => {
   const forbidden = [];
   const visit = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-      if ([".git", "node_modules", "dist"].includes(entry.name)) continue;
+      if ([".git", ".venv", "node_modules", "dist"].includes(entry.name)) continue;
       const candidate = path.join(directory, entry.name);
       if (entry.isDirectory()) visit(candidate);
       else if (entry.name.endsWith(".py") || entry.name === "pyproject.toml" || entry.name === "uv.lock") forbidden.push(path.relative(PACKAGE_ROOT, candidate));

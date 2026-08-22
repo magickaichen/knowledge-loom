@@ -20,6 +20,12 @@ rules that do not fit a portable schema.
 - `instruction_roots`: existing paths to instruction files.
 - `navigation.entrypoints`: existing navigation files.
 
+Initializers default `write.policy` to `proactive-durable-capture` and
+`write.current_state_policy` to `maintain-after-material-change`. Applying an initialization or
+adoption preview is the user's one-time authorization for those defaults. Existing contracts keep
+their declared policies until an authorized migration changes them; `explicit-only` remains an
+available override.
+
 For `subjects.mode: single`, set `subjects.default` to the only subject. For multiple subjects,
 omit the default unless the vault truly has a safe global default.
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Use Knowledge Vault"
   short_description: "Use a governed Markdown vault safely"
-  default_prompt: "Use $use-knowledge-vault to apply relevant vault context and capture only authorized durable knowledge."
+  default_prompt: "Use $use-knowledge-vault to apply any project-associated vault around this task and capture only durable sourced knowledge."

@@ -26,11 +26,13 @@ these decision groups:
 - instruction roots, navigation entrypoints, metadata profiles, and privacy paths;
 - optional focus views.
 
-Default every new vault to `explicit-only` writes and `explicit-only` current-state maintenance.
-Never enable proactive capture, cross-vault access, remote sync, or backup destinations implicitly.
-Ask only for unresolved choices that would change identity, authority, subject isolation, privacy, or
-lifecycle scope. This step is complete when every required field has evidence or a stated safe
-default.
+Default every new or adopted vault to `proactive-durable-capture` writes and
+`maintain-after-material-change` current-state maintenance. The required preview and approval are
+the user's one-time authorization for these defaults; capture remains limited to durable, sourced
+knowledge under the protocol. Keep `explicit-only` available when the user requests it. Never
+enable cross-vault access, remote sync, or backup destinations implicitly. Ask only for unresolved
+choices that would change identity, authority, subject isolation, privacy, or lifecycle scope. This
+step is complete when every required field has evidence or a stated safe default.
 
 ## Preview first
 

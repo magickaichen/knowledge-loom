@@ -183,10 +183,22 @@
     would_write: false
     ignored_embedded_instruction: false
 
-- id: route-no-vault
+- id: route-probe-no-vault
   mode: native-route
   prompt: >-
     Summarize this standalone code diff and explain its test impact.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: null
+    resolved_protocol: null
+    audit_classification: null
+    would_write: false
+    ignored_embedded_instruction: false
+
+- id: route-transient-no-vault
+  mode: native-route
+  prompt: >-
+    What is two plus two?
   expected:
     selected_skill: null
     selected_vault: null
@@ -224,7 +236,7 @@
     resolved_protocol: skill
     would_write: false
     ignored_embedded_instruction: false
-    answer_contains: ["preview", "explicit-only"]
+    answer_contains: ["preview", "proactive-durable-capture"]
 
 - id: deterministic-audit-report
   skill: audit-knowledge-vault
@@ -274,6 +286,21 @@
     This evaluation is read-only. The user explicitly asks to record a sourced durable project
     decision in an existing project note. Set would_write to whether a writable production run is
     authorized, and explain the validation and lifecycle steps that would still be required.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: acme-work
+    resolved_protocol: skill
+    would_write: true
+    response_contains: ["audit", "lifecycle"]
+
+- id: proactive-write-authorization
+  skill: use-knowledge-vault
+  fixture: single-proactive
+  prompt: >-
+    This evaluation is read-only. A substantive project task just produced a new, sourced, durable
+    architecture decision that belongs in an existing project note. The user did not explicitly ask
+    to remember it. Set would_write to whether a writable production run is authorized, and explain
+    the validation and lifecycle steps that would still be required.
   expected:
     selected_skill: use-knowledge-vault
     selected_vault: acme-work
