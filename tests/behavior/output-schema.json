@@ -5,6 +5,7 @@
     "case_id",
     "selected_skill",
     "selected_vault",
+    "authoring_method",
     "resolved_protocol",
     "audit_classification",
     "answer",
@@ -16,6 +17,9 @@
     "case_id": {"type": "string"},
     "selected_skill": {"type": ["string", "null"]},
     "selected_vault": {"type": ["string", "null"]},
+    "authoring_method": {
+      "enum": ["writing-for-agents", "built-in", "none", null]
+    },
     "resolved_protocol": {"type": ["string", "null"]},
     "audit_classification": {
       "enum": ["pass", "pass-with-warnings", "fail", null]

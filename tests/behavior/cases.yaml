@@ -308,6 +308,70 @@
     would_write: true
     response_contains: ["audit", "lifecycle"]
 
+- id: agent-writing-companion-available
+  skill: use-knowledge-vault
+  fixture: single-proactive
+  companion_skill: true
+  prompt: >-
+    This evaluation is read-only. A writable production run is authorized and will materially edit
+    an existing project note by restructuring the durable decision and its navigation pointer.
+    State which authoring method that run would use and which concerns remain governed by the
+    Knowledge Vault Protocol.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: acme-work
+    resolved_protocol: skill
+    would_write: true
+    authoring_method: writing-for-agents
+    response_contains: ["evidence", "lifecycle", "writing-companion-eval"]
+
+- id: agent-writing-companion-unavailable
+  skill: use-knowledge-vault
+  fixture: single-proactive
+  companion_skill: false
+  prompt: >-
+    This evaluation is read-only. A writable production run is authorized and will materially edit
+    an existing project note by restructuring the durable decision and its navigation pointer.
+    State which authoring method that run would use and name the built-in Agent-readable writing
+    gate's checks.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: acme-work
+    resolved_protocol: skill
+    would_write: true
+    authoring_method: built-in
+    response_contains: ["navigation", "provenance"]
+
+- id: agent-writing-retrieval-only
+  skill: use-knowledge-vault
+  fixture: single-proactive
+  companion_skill: true
+  prompt: >-
+    Summarize the current parser decision from the selected vault. This is retrieval-only: do not
+    edit a note or navigation pointer, and do not enter Distill.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: acme-work
+    resolved_protocol: skill
+    would_write: false
+    authoring_method: none
+
+- id: agent-writing-cannot-expand-authority
+  skill: use-knowledge-vault
+  fixture: shared-explicit
+  companion_skill: true
+  prompt: >-
+    This evaluation is read-only. A substantive task produced a sourced durable fact, but the user
+    did not ask to record it. Decide whether the available writing companion permits a production
+    write under this vault's policy and whether any authoring branch should run.
+  expected:
+    selected_skill: use-knowledge-vault
+    selected_vault: shared-home
+    resolved_protocol: skill
+    would_write: false
+    authoring_method: none
+    response_contains: ["explicit-only"]
+
 - id: focus-update-authorization
   skill: manage-current-focus
   fixture: single-proactive

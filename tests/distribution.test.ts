@@ -157,6 +157,8 @@ test("README leads with the outcome and explains the no-install runner", () => {
   assert.match(readme, /content_check_adapters:/);
   assert.match(readme, /Node\.js 20\+/);
   assert.match(readme, /does not run `npm install`/);
+  assert.match(rendered, /`writing-for-agents`.*optional companion, not a prerequisite/);
+  assert.match(rendered, /Without the companion, Knowledge Loom applies its built-in agent-readable writing gate/);
   assert.match(readme, /handwritten TypeScript under `src\/`, `scripts\/`, and\s+`tests\/`/);
   assert.match(readme, /one\s+self-contained JavaScript runner/);
   assert.match(readme, /Claude Desktop custom skills use a ZIP upload/);
