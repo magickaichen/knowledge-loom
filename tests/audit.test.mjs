@@ -350,6 +350,19 @@ test("focus limits are reported", async (t) => {
   assert.ok(findings.some((item) => item.code === "focus.max-active"));
 });
 
+test("malformed optional focus settings do not hide limit findings", async (t) => {
+  const root = copyFixture("single-proactive", path.join(temporaryDirectory(t), "single"));
+  const vault = loadVault(root);
+  const contract = structuredClone(vault.contract);
+  contract.focus_views.work.require_start_here = "not-a-boolean";
+  fs.writeFileSync(vault.contractPath, renderContract(contract, vault.body));
+  const focus = path.join(root, "Projects", "current-focus.md");
+  fs.writeFileSync(focus, fs.readFileSync(focus, "utf8").replace("\n## Waiting\n", "\n### 3. Hidden parallel task\n\n- **Next action:** Start another stream.\n\n## Waiting\n"));
+  const findings = await auditVault(loadVault(root));
+  assert.ok(findings.some((item) => item.code === "focus.max-top"));
+  assert.ok(findings.some((item) => item.code === "focus.max-active"));
+});
+
 test("double-star patterns match zero or more directories", () => {
   assert.equal(matchesPath("Health/**/*.md", "Health/alex.md"), true);
   assert.equal(matchesPath("Health/**/*.md", "Health/history/alex.md"), true);

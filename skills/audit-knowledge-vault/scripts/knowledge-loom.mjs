@@ -8188,16 +8188,19 @@ function activeItems(text, sectionName) {
   return items;
 }
 function parseFocusView(value) {
-  if (!isUnknownRecord(value) || typeof value.path !== "string" || typeof value.subject !== "string" || typeof value.max_active !== "number" || !Number.isInteger(value.max_active) || value.max_active < 1 || typeof value.max_top !== "number" || !Number.isInteger(value.max_top) || value.max_top < 1 || value.active_section !== void 0 && typeof value.active_section !== "string" || value.require_start_here !== void 0 && typeof value.require_start_here !== "boolean") {
-    return null;
-  }
+  if (!isUnknownRecord(value) || typeof value.path !== "string") return null;
+  const activeSection = value.active_section ?? void 0;
+  if (activeSection !== void 0 && typeof activeSection !== "string") return null;
+  const maxTop = value.max_top ?? 3;
+  const maxActive = value.max_active ?? maxTop;
+  if (typeof maxTop !== "number" || typeof maxActive !== "number" || !Number.isInteger(maxTop) || !Number.isInteger(maxActive)) return null;
   return {
     path: value.path,
-    subject: value.subject,
-    max_active: value.max_active,
-    max_top: value.max_top,
-    ...value.active_section === void 0 ? {} : { active_section: value.active_section },
-    ...value.require_start_here === void 0 ? {} : { require_start_here: value.require_start_here }
+    subject: typeof value.subject === "string" ? value.subject : "",
+    max_active: maxActive,
+    max_top: maxTop,
+    ...activeSection === void 0 ? {} : { active_section: activeSection },
+    ...value.require_start_here === true ? { require_start_here: true } : {}
   };
 }
 function checkFocusView(root, name, view) {

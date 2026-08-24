@@ -24,28 +24,20 @@ function activeItems(text: string, sectionName: string): string[] {
 }
 
 export function parseFocusView(value: unknown): FocusView | null {
-  if (
-    !isUnknownRecord(value)
-    || typeof value.path !== "string"
-    || typeof value.subject !== "string"
-    || typeof value.max_active !== "number"
-    || !Number.isInteger(value.max_active)
-    || value.max_active < 1
-    || typeof value.max_top !== "number"
-    || !Number.isInteger(value.max_top)
-    || value.max_top < 1
-    || (value.active_section !== undefined && typeof value.active_section !== "string")
-    || (value.require_start_here !== undefined && typeof value.require_start_here !== "boolean")
-  ) {
-    return null;
-  }
+  // Contract validation reports invalid fields; this decoder preserves focus-check defaults.
+  if (!isUnknownRecord(value) || typeof value.path !== "string") return null;
+  const activeSection = value.active_section ?? undefined;
+  if (activeSection !== undefined && typeof activeSection !== "string") return null;
+  const maxTop = value.max_top ?? 3;
+  const maxActive = value.max_active ?? maxTop;
+  if (typeof maxTop !== "number" || typeof maxActive !== "number" || !Number.isInteger(maxTop) || !Number.isInteger(maxActive)) return null;
   return {
     path: value.path,
-    subject: value.subject,
-    max_active: value.max_active,
-    max_top: value.max_top,
-    ...(value.active_section === undefined ? {} : { active_section: value.active_section }),
-    ...(value.require_start_here === undefined ? {} : { require_start_here: value.require_start_here }),
+    subject: typeof value.subject === "string" ? value.subject : "",
+    max_active: maxActive,
+    max_top: maxTop,
+    ...(activeSection === undefined ? {} : { active_section: activeSection }),
+    ...(value.require_start_here === true ? { require_start_here: true } : {}),
   };
 }
 
