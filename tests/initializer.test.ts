@@ -5,9 +5,10 @@ import test from "node:test";
 
 import { loadVault } from "../src/knowledge-loom/contract.ts";
 import { buildContract, initializeVault } from "../src/knowledge-loom/initializer.ts";
-import { temporaryDirectory } from "./helpers.mjs";
+import type { BuildContractOptions, VaultContract } from "../src/knowledge-loom/types.ts";
+import { asRecord, temporaryDirectory } from "./helpers.ts";
 
-function contractFor(root, overrides = {}) {
+function contractFor(root: string, overrides: Partial<BuildContractOptions> = {}): VaultContract {
   return buildContract(root, {
     vaultId: "new-vault",
     title: "New Vault",
@@ -26,8 +27,9 @@ test("new vault uses proactive policies and preview does not write", (t) => {
   const [contractPath] = initializeVault(root, { contract, adopt: false, apply: false });
   assert.equal(fs.existsSync(contractPath), false);
   initializeVault(root, { contract, adopt: false, apply: true });
-  assert.equal(loadVault(root).contract.write.policy, "proactive-durable-capture");
-  assert.equal(loadVault(root).contract.write.current_state_policy, "maintain-after-material-change");
+  const write = asRecord(loadVault(root).contract.write, "write");
+  assert.equal(write.policy, "proactive-durable-capture");
+  assert.equal(write.current_state_policy, "maintain-after-material-change");
   assert.ok(fs.statSync(path.join(root, "INDEX.md")).isFile());
 });
 
@@ -38,7 +40,7 @@ test("new vault can explicitly opt out of proactive policies", (t) => {
     currentStatePolicy: "explicit-only",
   });
   initializeVault(root, { contract, adopt: false, apply: true });
-  assert.deepEqual(loadVault(root).contract.write, {
+  assert.deepEqual(asRecord(loadVault(root).contract.write, "write"), {
     policy: "explicit-only",
     current_state_policy: "explicit-only",
   });

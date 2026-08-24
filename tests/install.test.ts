@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-import { install, SKILLS } from "../scripts/install.mjs";
-import { PACKAGE_ROOT, temporaryDirectory } from "./helpers.mjs";
+import { install, SKILLS } from "../scripts/install.ts";
+import { PACKAGE_ROOT, temporaryDirectory } from "./helpers.ts";
 
 test("installer creates idempotent links in both runtime directories", (t) => {
   const temporary = temporaryDirectory(t);
@@ -25,7 +25,9 @@ test("installer preflight refuses collision before creating any link", (t) => {
   const temporary = temporaryDirectory(t);
   const first = path.join(temporary, "first");
   const second = path.join(temporary, "second");
-  fs.mkdirSync(path.join(second, SKILLS.at(-1)), { recursive: true });
+  const lastSkill = SKILLS.at(-1);
+  assert.ok(lastSkill);
+  fs.mkdirSync(path.join(second, lastSkill), { recursive: true });
   assert.throws(() => install(PACKAGE_ROOT, [first, second], { apply: true, log: () => {} }), /refusing to replace/);
   assert.equal(fs.existsSync(first), false);
 });

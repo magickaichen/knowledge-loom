@@ -1,9 +1,11 @@
-#!/usr/bin/env node
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+
+import { isUnknownRecord } from "../src/knowledge-loom/contract.ts";
+import { errorMessage } from "../src/knowledge-loom/errors.ts";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SKILLS_CLI = process.env.KNOWLEDGE_LOOM_SKILLS_CLI ?? "skills@1.5.22";
@@ -11,31 +13,39 @@ const SKILL_NAMES = new Set(["audit-knowledge-vault", "init-knowledge-vault", "m
 const RUNNER_CHECK_ROOTS = [path.join(".agents", "skills"), path.join(".claude", "skills")];
 const INTERACTIVE_GROUP_PROMPT = "Select all 4 skills in Knowledge Loom.";
 
-function commandPath(name) {
+interface RunOptions {
+  cwd?: string;
+  capture?: boolean;
+}
+
+function commandPath(name: string): string | null {
   const completed = spawnSync(process.platform === "win32" ? "where" : "which", [name], { encoding: "utf8" });
-  return completed.status === 0 ? completed.stdout.split(/\r?\n/)[0].trim() : null;
+  const first = completed.stdout.split(/\r?\n/)[0];
+  return completed.status === 0 && first ? first.trim() : null;
 }
 
-function environment() {
-  return Object.fromEntries(Object.entries({ ...process.env, DISABLE_TELEMETRY: "1" }).filter(([key]) => !key.startsWith("CODEX_")));
+function environment(): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = { ...process.env, DISABLE_TELEMETRY: "1" };
+  for (const key of Object.keys(result)) if (key.startsWith("CODEX_")) delete result[key];
+  return result;
 }
 
-function run(command, arguments_, { cwd, capture = false } = {}) {
+function run(command: string, arguments_: string[], { cwd, capture = false }: RunOptions = {}): string {
   const completed = spawnSync(command, arguments_, { cwd, env: environment(), encoding: "utf8", stdio: capture ? "pipe" : "inherit" });
   if (completed.status !== 0) throw new Error(`${[command, ...arguments_].join(" ")} exited with status ${completed.status}:\n${completed.stderr ?? ""}`);
   return completed.stdout ?? "";
 }
 
-function shellQuote(value) {
+function shellQuote(value: string): string {
   return `'${String(value).replaceAll("'", `'\\''`)}'`;
 }
 
-async function assertInteractiveGroup(npx, workspace) {
+async function assertInteractiveGroup(npx: string, workspace: string): Promise<void> {
   if (process.platform === "win32") throw new Error("interactive npx discovery test requires a POSIX pseudo-terminal");
   const command = [npx, "--yes", SKILLS_CLI, "add", PACKAGE_ROOT];
   let terminalCommand;
   let arguments_;
-  let inputMode;
+  let inputMode: "ignore" | "pipe";
   const terminalEnvironment = environment();
   if (process.platform === "darwin") {
     terminalCommand = commandPath("expect");
@@ -57,16 +67,18 @@ async function assertInteractiveGroup(npx, workspace) {
     inputMode = "pipe";
   }
 
-  await new Promise((resolve, reject) => {
-    const child = spawn(terminalCommand, arguments_, { cwd: workspace, env: terminalEnvironment, detached: true, stdio: [inputMode, "pipe", "pipe"] });
+  await new Promise<void>((resolve, reject) => {
+    const child = inputMode === "ignore"
+      ? spawn(terminalCommand, arguments_, { cwd: workspace, env: terminalEnvironment, detached: true, stdio: ["ignore", "pipe", "pipe"] })
+      : spawn(terminalCommand, arguments_, { cwd: workspace, env: terminalEnvironment, detached: true, stdio: ["pipe", "pipe", "pipe"] });
     let output = "";
     let found = false;
     let timeoutError = false;
     const stop = () => {
-      try { process.kill(-child.pid, "SIGTERM"); } catch {}
+      try { if (child.pid) process.kill(-child.pid, "SIGTERM"); } catch {}
     };
     const timer = setTimeout(() => { timeoutError = true; stop(); }, 30_000);
-    const inspect = (chunk) => {
+    const inspect = (chunk: Buffer | string): void => {
       output += chunk.toString();
       if (!found && output.includes(INTERACTIVE_GROUP_PROMPT)) {
         found = true;
@@ -84,17 +96,17 @@ async function assertInteractiveGroup(npx, workspace) {
   });
 }
 
-function findInstalledRoots(workspace) {
-  const roots = new Map();
-  const visit = (directory) => {
+function findInstalledRoots(workspace: string): Map<string, Set<string>> {
+  const roots = new Map<string, Set<string>>();
+  const visit = (directory: string): void => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const candidate = path.join(directory, entry.name);
       if (!entry.isDirectory()) continue;
       if (entry.name === "node_modules") continue;
       if (SKILL_NAMES.has(entry.name) && fs.statSync(path.join(candidate, "SKILL.md"), { throwIfNoEntry: false })?.isFile()) {
         const root = path.dirname(candidate);
-        if (!roots.has(root)) roots.set(root, new Set());
-        roots.get(root).add(entry.name);
+        if (!roots.has(root)) roots.set(root, new Set<string>());
+        roots.get(root)!.add(entry.name);
       } else visit(candidate);
     }
   };
@@ -102,7 +114,15 @@ function findInstalledRoots(workspace) {
   return roots;
 }
 
-export async function main() {
+function installedSkillNames(output: string): Set<string> {
+  const installed: unknown = JSON.parse(output);
+  if (!Array.isArray(installed) || installed.some((record) => !isUnknownRecord(record) || typeof record.name !== "string")) {
+    throw new Error("skills list returned an invalid JSON payload");
+  }
+  return new Set(installed.map((record) => record.name as string));
+}
+
+export async function main(): Promise<number> {
   const npx = commandPath("npx");
   if (!npx) throw new Error("missing required command: npx");
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "knowledge-loom-npx-"));
@@ -126,8 +146,7 @@ export async function main() {
         run(process.execPath, [runner, "audit", path.join(PACKAGE_ROOT, "tests", "fixtures", "single-proactive")], { cwd: workspace });
       }
     }
-    const installed = JSON.parse(run(npx, ["--yes", SKILLS_CLI, "list", "--json"], { cwd: workspace, capture: true }));
-    const names = new Set(installed.map((record) => record.name));
+    const names = installedSkillNames(run(npx, ["--yes", SKILLS_CLI, "list", "--json"], { cwd: workspace, capture: true }));
     if (names.size !== SKILL_NAMES.size || [...SKILL_NAMES].some((name) => !names.has(name))) throw new Error(`installed skill mismatch: ${[...names].sort().join(", ")}`);
     console.log(`PASS npx ${SKILLS_CLI} offered one interactive Knowledge Loom group and installed all four skills for every supported agent across ${installedRoots.size} distinct roots; Codex and Claude Code runners passed`);
     return 0;
@@ -137,5 +156,5 @@ export async function main() {
 }
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
-  main().then((status) => { process.exitCode = status; }).catch((error) => { console.error(`ERROR ${error.message}`); process.exitCode = 1; });
+  main().then((status) => { process.exitCode = status; }).catch((error) => { console.error(`ERROR ${errorMessage(error)}`); process.exitCode = 1; });
 }

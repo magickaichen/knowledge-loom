@@ -2,16 +2,18 @@
 
 ## v0.6.0
 
-The contributor runtime now uses strict TypeScript while every installation route continues to
-ship one self-contained JavaScript runner.
+All handwritten contributor code now uses strict TypeScript while every installation route
+continues to ship one self-contained JavaScript runner.
 
 ### Changed
 
 - Migrated deterministic parsing, resolution, initialization, audit, content-check, and CLI source
   modules to strict TypeScript.
+- Migrated build, installation, release, validation, behavior-evaluation, and test code to strict
+  TypeScript.
 - Added explicit internal types for contracts, registries, findings, vaults, CLI options, and
   content-check results while keeping YAML and JSON inputs runtime-validated from `unknown`.
-- Added TypeScript checking to the standard validation path on Node.js 20, 22, and 24.
+- Added all handwritten code to the standard TypeScript validation path on Node.js 20, 22, and 24.
 
 ### Compatibility
 

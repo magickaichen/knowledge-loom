@@ -19,12 +19,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: >-
-          node scripts/check-release-version.mjs "$GITHUB_REF_NAME"
+          node --import tsx scripts/check-release-version.ts "$GITHUB_REF_NAME"
           --notes-output "dist/release-notes.md"
       - run: npm run validate
       - name: Build versioned Claude Desktop skill
         run: >-
-          node scripts/build-claude-desktop-skill.mjs
+          node --import tsx scripts/build-claude-desktop-skill.ts
           --output "dist/knowledge-loom-claude-desktop-${GITHUB_REF_NAME}.zip"
       - name: Publish GitHub Release
         run: >-

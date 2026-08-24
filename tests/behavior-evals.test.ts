@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validateCase } from "../scripts/run-behavior-evals.mjs";
-import { PACKAGE_ROOT } from "./helpers.mjs";
+import { validateCase } from "../scripts/run-behavior-evals.ts";
+import { PACKAGE_ROOT } from "./helpers.ts";
 
 test("behavior validator rejects negated audit pass text through structured classification", () => {
   const case_ = {

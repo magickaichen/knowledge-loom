@@ -1,8 +1,9 @@
-#!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
+
+import { errorMessage } from "../src/knowledge-loom/errors.ts";
 
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SKILL_REFERENCES = {
@@ -10,9 +11,11 @@ export const SKILL_REFERENCES = {
   "init-knowledge-vault": ["protocol.md", "contract-schema.md"],
   "audit-knowledge-vault": ["protocol.md", "contract-schema.md"],
   "manage-current-focus": ["protocol.md"],
-};
+} as const;
 
-async function bundledRunner(packageRoot) {
+export type SkillName = keyof typeof SKILL_REFERENCES;
+
+async function bundledRunner(packageRoot: string): Promise<Uint8Array> {
   const result = await build({
     absWorkingDir: packageRoot,
     entryPoints: ["src/knowledge-loom/runner.ts"],
@@ -31,11 +34,13 @@ async function bundledRunner(packageRoot) {
       ].join("\n"),
     },
   });
-  return result.outputFiles[0].contents;
+  const output = result.outputFiles[0];
+  if (!output) throw new Error("esbuild did not produce a runner");
+  return output.contents;
 }
 
-export async function expectedFiles(packageRoot, skillName) {
-  const expected = new Map();
+export async function expectedFiles(packageRoot: string, skillName: SkillName): Promise<Map<string, Uint8Array>> {
+  const expected = new Map<string, Uint8Array>();
   for (const name of SKILL_REFERENCES[skillName]) {
     expected.set(path.join("references", name), fs.readFileSync(path.join(packageRoot, "references", name)));
   }
@@ -44,9 +49,9 @@ export async function expectedFiles(packageRoot, skillName) {
   return expected;
 }
 
-export function managedFiles(skillRoot) {
-  const files = new Set();
-  const visit = (root) => {
+export function managedFiles(skillRoot: string): Set<string> {
+  const files = new Set<string>();
+  const visit = (root: string): void => {
     if (!fs.existsSync(root)) return;
     for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
       const candidate = path.join(root, entry.name);
@@ -58,10 +63,10 @@ export function managedFiles(skillRoot) {
   return files;
 }
 
-export async function checkSkill(packageRoot, skillName) {
+export async function checkSkill(packageRoot: string, skillName: SkillName): Promise<string[]> {
   const skillRoot = path.join(packageRoot, "skills", skillName);
   const expected = await expectedFiles(packageRoot, skillName);
-  const errors = [];
+  const errors: string[] = [];
   for (const [relative, contents] of expected) {
     const target = path.join(skillRoot, relative);
     if (!fs.statSync(target, { throwIfNoEntry: false })?.isFile()) errors.push(`missing ${target}`);
@@ -73,7 +78,7 @@ export async function checkSkill(packageRoot, skillName) {
   return errors;
 }
 
-export async function buildSkill(packageRoot, skillName) {
+export async function buildSkill(packageRoot: string, skillName: SkillName): Promise<void> {
   const skillRoot = path.join(packageRoot, "skills", skillName);
   for (const directory of ["references", "scripts", "licenses"]) {
     fs.rmSync(path.join(skillRoot, directory), { recursive: true, force: true });
@@ -86,12 +91,12 @@ export async function buildSkill(packageRoot, skillName) {
   }
 }
 
-export async function main(arguments_ = process.argv.slice(2)) {
+export async function main(arguments_: string[] = process.argv.slice(2)): Promise<number> {
   const check = arguments_.includes("--check");
   if (arguments_.some((argument) => argument !== "--check")) throw new Error(`unknown argument: ${arguments_.find((argument) => argument !== "--check")}`);
   if (check) {
     const errors = [];
-    for (const skillName of Object.keys(SKILL_REFERENCES)) errors.push(...await checkSkill(PACKAGE_ROOT, skillName));
+    for (const skillName of Object.keys(SKILL_REFERENCES) as SkillName[]) errors.push(...await checkSkill(PACKAGE_ROOT, skillName));
     if (errors.length) {
       for (const error of errors) console.error(`ERROR ${error}`);
       return 1;
@@ -99,7 +104,7 @@ export async function main(arguments_ = process.argv.slice(2)) {
     console.log("PASS self-contained skill packages are current");
     return 0;
   }
-  for (const skillName of Object.keys(SKILL_REFERENCES)) {
+  for (const skillName of Object.keys(SKILL_REFERENCES) as SkillName[]) {
     await buildSkill(PACKAGE_ROOT, skillName);
     console.log(`BUILT skills/${skillName}`);
   }
@@ -108,7 +113,7 @@ export async function main(arguments_ = process.argv.slice(2)) {
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
   main().then((status) => { process.exitCode = status; }).catch((error) => {
-    console.error(`ERROR ${error.message}`);
+    console.error(`ERROR ${errorMessage(error)}`);
     process.exitCode = 1;
   });
 }

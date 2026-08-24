@@ -13,11 +13,12 @@ npm run build
 npm run validate:npx
 ```
 
-Edit the top-level protocol, schema, and strict TypeScript modules rather than their generated copies
-inside `skills/*/references` and `skills/*/scripts`. `npm run typecheck` checks the source without
-emitting files; `npm run build` bundles it into the self-contained JavaScript runners that users
-install. Include tests for behavioral or safety changes. Never place credentials or real personal,
-company, health, family, or private-vault content in issues, fixtures, logs, or pull requests.
+Edit the top-level protocol, schema, and handwritten TypeScript under `src/`, `scripts/`, and
+`tests/` rather than their generated copies inside `skills/*/references` and `skills/*/scripts`.
+`npm run typecheck` checks all handwritten code without emitting files; `npm run build` bundles the
+runtime into the self-contained JavaScript runners that users install. Include tests for behavioral
+or safety changes. Never place credentials or real personal, company, health, family, or
+private-vault content in issues, fixtures, logs, or pull requests.
 
 ## Distribution metadata
 
@@ -29,7 +30,7 @@ reference. The `plugin-creator` scaffold's `./plugins/<name>` local path applies
 contains nested plugin directories; do not introduce that duplicate layout here.
 
 Keep `package.json`, both plugin manifests, and the Claude marketplace on the same version,
-repository URL, and license. `tests/distribution.test.mjs` enforces those required copies.
+repository URL, and license. `tests/distribution.test.ts` enforces those required copies.
 
 ## Release
 

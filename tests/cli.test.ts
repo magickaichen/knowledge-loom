@@ -6,12 +6,12 @@ import test from "node:test";
 import YAML from "yaml";
 
 import { runCli } from "../src/knowledge-loom/cli.ts";
-import { FIXTURES, temporaryDirectory } from "./helpers.mjs";
+import { FIXTURES, temporaryDirectory } from "./helpers.ts";
 
 function memoryStream() {
   let contents = "";
   return {
-    write(value) { contents += value; },
+    write(value: string) { contents += value; },
     toString() { return contents; },
   };
 }
