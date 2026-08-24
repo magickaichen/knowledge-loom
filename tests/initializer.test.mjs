@@ -3,8 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-import { loadVault } from "../src/knowledge-loom/contract.mjs";
-import { buildContract, initializeVault } from "../src/knowledge-loom/initializer.mjs";
+import { loadVault } from "../src/knowledge-loom/contract.ts";
+import { buildContract, initializeVault } from "../src/knowledge-loom/initializer.ts";
 import { temporaryDirectory } from "./helpers.mjs";
 
 function contractFor(root, overrides = {}) {

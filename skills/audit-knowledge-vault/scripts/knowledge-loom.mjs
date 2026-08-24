@@ -7365,34 +7365,37 @@ var require_dist = __commonJS({
   }
 });
 
-// src/knowledge-loom/cli.mjs
+// src/knowledge-loom/cli.ts
 import path7 from "node:path";
 
-// src/knowledge-loom/audit.mjs
+// src/knowledge-loom/audit.ts
 import fs5 from "node:fs";
 import path5 from "node:path";
 import { spawnSync } from "node:child_process";
 
-// src/knowledge-loom/contract.mjs
+// src/knowledge-loom/contract.ts
 var import_yaml = __toESM(require_dist(), 1);
 import fs2 from "node:fs";
 import path2 from "node:path";
 
-// src/knowledge-loom/errors.mjs
+// src/knowledge-loom/errors.ts
 var ContractError = class extends Error {
-  constructor(message) {
-    super(message);
+  constructor(message, options) {
+    super(message, options);
     this.name = "ContractError";
   }
 };
 var ResolutionError = class extends Error {
-  constructor(message) {
-    super(message);
+  constructor(message, options) {
+    super(message, options);
     this.name = "ResolutionError";
   }
 };
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
 
-// src/knowledge-loom/pathing.mjs
+// src/knowledge-loom/pathing.ts
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7447,9 +7450,26 @@ function toPosixRelative(root, candidate) {
   return path.relative(root, candidate).split(path.sep).join("/");
 }
 
-// src/knowledge-loom/contract.mjs
+// src/knowledge-loom/types.ts
+var WRITE_POLICIES = ["explicit-only", "proactive-durable-capture"];
+var CURRENT_STATE_POLICIES = ["explicit-only", "maintain-after-material-change"];
+var HISTORY_TYPES = ["git", "none"];
+function isWritePolicy(value) {
+  return typeof value === "string" && WRITE_POLICIES.some((policy) => policy === value);
+}
+function isCurrentStatePolicy(value) {
+  return typeof value === "string" && CURRENT_STATE_POLICIES.some((policy) => policy === value);
+}
+function isHistoryType(value) {
+  return typeof value === "string" && HISTORY_TYPES.some((type) => type === value);
+}
+
+// src/knowledge-loom/contract.ts
 var CONTRACT_NAME = "KNOWLEDGE_VAULT.md";
 var KEBAB_CASE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+function isUnknownRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 function finding(severity, code, message, findingPath = null) {
   return { severity, code, message, path: findingPath };
 }
@@ -7465,9 +7485,9 @@ function splitFrontmatter(text, { source = "<text>" } = {}) {
   try {
     data = import_yaml.default.parse(raw) ?? {};
   } catch (error) {
-    throw new ContractError(`${source}: invalid YAML frontmatter: ${error.message}`, { cause: error });
+    throw new ContractError(`${source}: invalid YAML frontmatter: ${errorMessage(error)}`, { cause: error });
   }
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
+  if (!isUnknownRecord(data)) {
     throw new ContractError(`${source}: frontmatter must be a mapping`);
   }
   return [data, lines.slice(end + 1).join("")];
@@ -7503,7 +7523,7 @@ ${body.trim()}
 }
 function mapping(contract, key, findings) {
   const value = contract[key];
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!isUnknownRecord(value)) {
     findings.push(finding("error", `contract.${key}`, `\`${key}\` must be a mapping`));
     return {};
   }
@@ -7511,7 +7531,7 @@ function mapping(contract, key, findings) {
 }
 function validatePathValue(value, description, findings) {
   if (!isVaultRelativePath(value)) {
-    findings.push(finding("error", "contract.path-boundary", `${description} must stay within the vault root`, value));
+    findings.push(finding("error", "contract.path-boundary", `${description} must stay within the vault root`, typeof value === "string" ? value : null));
   }
 }
 function validatePathValues(values, { field, findings, requireNonempty = false }) {
@@ -7525,6 +7545,9 @@ function validatePathValues(values, { field, findings, requireNonempty = false }
 }
 function validateContractData(contract) {
   const findings = [];
+  if (!isUnknownRecord(contract)) {
+    return [finding("error", "contract.mapping", "contract frontmatter must be a mapping")];
+  }
   if (contract.schema_version !== 1) findings.push(finding("error", "contract.schema-version", "`schema_version` must equal 1"));
   const vaultId = contract.vault_id;
   if (typeof vaultId !== "string" || !KEBAB_CASE_ID_RE.test(vaultId)) {
@@ -7539,11 +7562,11 @@ function validateContractData(contract) {
   }
   const subjects = mapping(contract, "subjects", findings);
   const mode = subjects.mode;
-  let values = subjects.values;
-  if (!(/* @__PURE__ */ new Set(["single", "multiple"])).has(mode)) {
+  let values = Array.isArray(subjects.values) ? subjects.values.filter((item) => typeof item === "string") : [];
+  if (mode !== "single" && mode !== "multiple") {
     findings.push(finding("error", "contract.subject-mode", "`subjects.mode` must be `single` or `multiple`"));
   }
-  if (!Array.isArray(values) || !values.length || values.some((item) => typeof item !== "string")) {
+  if (!Array.isArray(subjects.values) || !subjects.values.length || subjects.values.some((item) => typeof item !== "string")) {
     findings.push(finding("error", "contract.subject-values", "`subjects.values` must be a non-empty string list"));
     values = [];
   } else if (new Set(values).size !== values.length) {
@@ -7556,25 +7579,25 @@ function validateContractData(contract) {
     }
   }
   const write = mapping(contract, "write", findings);
-  if (Object.keys(write).length && !(/* @__PURE__ */ new Set(["explicit-only", "proactive-durable-capture"])).has(write.policy)) {
+  if (Object.keys(write).length && !isWritePolicy(write.policy)) {
     findings.push(finding("error", "contract.write-policy", "unsupported `write.policy`"));
   }
-  if (Object.keys(write).length && !(/* @__PURE__ */ new Set(["explicit-only", "maintain-after-material-change"])).has(write.current_state_policy)) {
+  if (Object.keys(write).length && !isCurrentStatePolicy(write.current_state_policy)) {
     findings.push(finding("error", "contract.current-state-policy", "unsupported current-state policy"));
   }
   const history = mapping(contract, "history", findings);
-  if (Object.keys(history).length && !(/* @__PURE__ */ new Set(["git", "none"])).has(history.type)) {
+  if (Object.keys(history).length && !isHistoryType(history.type)) {
     findings.push(finding("error", "contract.history", "`history.type` must be `git` or `none`"));
   }
   const sync = mapping(contract, "sync", findings);
-  if (Object.keys(sync).length && !(/* @__PURE__ */ new Set(["none", "git-remote-push", "lifecycle-hook"])).has(sync.mode)) {
+  if (Object.keys(sync).length && sync.mode !== "none" && sync.mode !== "git-remote-push" && sync.mode !== "lifecycle-hook") {
     findings.push(finding("error", "contract.sync", "unsupported `sync.mode`"));
   }
   if (sync.mode === "lifecycle-hook" && !sync.adapter) {
     findings.push(finding("error", "contract.sync-adapter", "lifecycle sync requires `adapter`"));
   }
   const backup = mapping(contract, "backup", findings);
-  if (Object.keys(backup).length && !(/* @__PURE__ */ new Set(["none", "lifecycle-hook"])).has(backup.mode)) {
+  if (Object.keys(backup).length && backup.mode !== "none" && backup.mode !== "lifecycle-hook") {
     findings.push(finding("error", "contract.backup", "unsupported `backup.mode`"));
   }
   if (backup.mode === "lifecycle-hook" && !backup.adapter) {
@@ -7600,7 +7623,7 @@ function validateContractData(contract) {
     findings.push(finding("error", "contract.metadata-profiles", "`metadata_profiles` must be a mapping"));
   } else {
     for (const [name, profile] of Object.entries(profiles)) {
-      if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+      if (!isUnknownRecord(profile)) {
         findings.push(finding("error", "contract.metadata-profile", `profile \`${name}\` must be a mapping`));
         continue;
       }
@@ -7610,7 +7633,7 @@ function validateContractData(contract) {
         for (const profilePath of profile.paths) validatePathValue(profilePath, `metadata profile \`${name}\` path`, findings);
       }
       if (!Array.isArray(profile.required)) findings.push(finding("error", "contract.metadata-required", `profile \`${name}\` requires a field list`));
-      if (!(/* @__PURE__ */ new Set(["error", "warning"])).has(profile.severity ?? "error")) {
+      if (profile.severity !== void 0 && profile.severity !== "error" && profile.severity !== "warning") {
         findings.push(finding("error", "contract.metadata-severity", `profile \`${name}\` has invalid severity`));
       }
     }
@@ -7621,23 +7644,24 @@ function validateContractData(contract) {
   } else {
     const subjectValues = new Set(values);
     for (const [name, view] of Object.entries(focusViews)) {
-      if (!view || typeof view !== "object" || Array.isArray(view)) {
+      if (!isUnknownRecord(view)) {
         findings.push(finding("error", "contract.focus-view", `focus view \`${name}\` must be a mapping`));
         continue;
       }
       if (typeof view.path !== "string") findings.push(finding("error", "contract.focus-path", `focus view \`${name}\` requires \`path\``));
       else validatePathValue(view.path, `focus view \`${name}\` path`, findings);
-      if (!subjectValues.has(view.subject)) findings.push(finding("error", "contract.focus-subject", `focus view \`${name}\` has unknown subject`));
+      if (typeof view.subject !== "string" || !subjectValues.has(view.subject)) findings.push(finding("error", "contract.focus-subject", `focus view \`${name}\` has unknown subject`));
       for (const key of ["max_active", "max_top"]) {
-        if (!Number.isInteger(view[key]) || view[key] < 1) findings.push(finding("error", `contract.focus-${key}`, `focus view \`${name}\` requires positive \`${key}\``));
+        const value = view[key];
+        if (typeof value !== "number" || !Number.isInteger(value) || value < 1) findings.push(finding("error", `contract.focus-${key}`, `focus view \`${name}\` requires positive \`${key}\``));
       }
-      if (Number.isInteger(view.max_active) && Number.isInteger(view.max_top) && view.max_active > view.max_top) {
+      if (typeof view.max_active === "number" && typeof view.max_top === "number" && Number.isInteger(view.max_active) && Number.isInteger(view.max_top) && view.max_active > view.max_top) {
         findings.push(finding("error", "contract.focus-limits", `focus view \`${name}\` has max_active > max_top`));
       }
     }
   }
   const privacy = contract.privacy ?? {};
-  if (!privacy || typeof privacy !== "object" || Array.isArray(privacy)) {
+  if (!isUnknownRecord(privacy)) {
     findings.push(finding("error", "contract.privacy", "`privacy.never_track` must be a string list"));
   } else {
     validatePathValues(privacy.never_track ?? [], { field: "privacy.never_track", findings });
@@ -7645,11 +7669,11 @@ function validateContractData(contract) {
   return findings;
 }
 
-// src/knowledge-loom/content-checks.mjs
+// src/knowledge-loom/content-checks.ts
 import { spawn } from "node:child_process";
 import path4 from "node:path";
 
-// src/knowledge-loom/registry.mjs
+// src/knowledge-loom/registry.ts
 var import_yaml2 = __toESM(require_dist(), 1);
 import crypto from "node:crypto";
 import fs3 from "node:fs";
@@ -7665,12 +7689,12 @@ function loadRegistry(registryPath = defaultRegistryPath()) {
   try {
     data = import_yaml2.default.parse(fs3.readFileSync(resolved, "utf8")) ?? {};
   } catch (error) {
-    throw new ResolutionError(`${resolved}: invalid registry YAML: ${error.message}`, { cause: error });
+    throw new ResolutionError(`${resolved}: invalid registry YAML: ${errorMessage(error)}`, { cause: error });
   }
-  if (!data || typeof data !== "object" || Array.isArray(data) || data.schema_version !== 1 || !data.vaults || typeof data.vaults !== "object" || Array.isArray(data.vaults)) {
+  if (!isUnknownRecord(data) || data.schema_version !== 1 || !isUnknownRecord(data.vaults)) {
     throw new ResolutionError(`${resolved}: registry must have schema_version 1 and a vaults mapping`);
   }
-  return data;
+  return { ...data, schema_version: 1, vaults: data.vaults };
 }
 function renderRegistry(data) {
   return import_yaml2.default.stringify(data, { lineWidth: 0 });
@@ -7681,7 +7705,7 @@ function atomicWriteText(targetPath, rendered, { rename = fs3.renameSync } = {})
   let descriptor;
   try {
     const existing = fs3.statSync(targetPath, { throwIfNoEntry: false });
-    descriptor = fs3.openSync(temporary, "wx", existing?.mode & 511 || 384);
+    descriptor = fs3.openSync(temporary, "wx", existing ? existing.mode & 511 : 384);
     fs3.writeFileSync(descriptor, rendered, "utf8");
     fs3.fsyncSync(descriptor);
     fs3.closeSync(descriptor);
@@ -7714,7 +7738,7 @@ function findAncestorVault(start) {
 function registeredCandidates(registry) {
   const candidates = [];
   for (const [vaultId, record] of Object.entries(registry.vaults ?? {})) {
-    if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.path !== "string") continue;
+    if (!isUnknownRecord(record) || typeof record.path !== "string") continue;
     const root = canonicalPath(record.path);
     if (fs3.statSync(path3.join(root, CONTRACT_NAME), { throwIfNoEntry: false })?.isFile()) candidates.push([vaultId, root]);
   }
@@ -7723,7 +7747,7 @@ function registeredCandidates(registry) {
 function registeredVault(vaultId, registry) {
   const record = registry.vaults[vaultId];
   if (!record) throw new ResolutionError(`unknown registered vault ID \`${vaultId}\``);
-  if (typeof record !== "object" || Array.isArray(record) || typeof record.path !== "string") {
+  if (!isUnknownRecord(record) || typeof record.path !== "string") {
     throw new ResolutionError(`invalid registered vault record \`${vaultId}\``);
   }
   const vault = loadVault(record.path);
@@ -7733,16 +7757,16 @@ function registeredVault(vaultId, registry) {
   return vault;
 }
 function requireProjectsMapping(projects) {
-  if (!projects || typeof projects !== "object" || Array.isArray(projects)) {
+  if (!isUnknownRecord(projects)) {
     throw new ResolutionError("registry projects must be a mapping");
   }
   return projects;
 }
 function projectRecord(configuredRoot, record, { matching = false } = {}) {
-  if (!record || typeof record !== "object" || Array.isArray(record) || typeof record.vault_id !== "string" || !record.vault_id) {
+  if (!isUnknownRecord(record) || typeof record.vault_id !== "string" || !record.vault_id) {
     throw new ResolutionError(`${matching ? "matching " : ""}project association \`${configuredRoot}\` must contain a vault_id`);
   }
-  return record;
+  return { ...record, vault_id: record.vault_id };
 }
 function projectAssociation(start, registry) {
   if (registry.projects === void 0) return null;
@@ -7766,14 +7790,14 @@ function projectAssociation(start, registry) {
   if (vaultIds.size > 1) {
     throw new ResolutionError(`project association is ambiguous at \`${current}\`; matching roots resolve to: ${[...vaultIds].sort().join(", ")}`);
   }
-  return nearest[0];
+  return nearest[0] ?? null;
 }
 function applicableVaultContext(cwd, registryPath) {
   const ancestor = findAncestorVault(cwd);
   if (ancestor) return { vault: loadVault(ancestor), registry: null };
   const registry = loadRegistry(registryPath);
   const association = projectAssociation(cwd, registry);
-  const vault = association ? registeredVault(association.record.vault_id, registry) : null;
+  const vault = association ? registeredVault(projectRecord(association.configuredRoot, association.record).vault_id, registry) : null;
   return { vault, registry };
 }
 function resolveVault(selector = null, { cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
@@ -7785,11 +7809,12 @@ function resolveVault(selector = null, { cwd = process.cwd(), registryPath = def
     }
     const registry2 = loadRegistry(registryPath);
     const record = registry2.vaults[String(selector)];
-    if (record && typeof record === "object" && !Array.isArray(record) && typeof record.path === "string") return loadVault(record.path);
+    if (isUnknownRecord(record) && typeof record.path === "string") return loadVault(record.path);
     throw new ResolutionError(`unknown vault selector: ${selector}`);
   }
   const { vault, registry } = applicableVaultContext(cwd, registryPath);
   if (vault) return vault;
+  if (!registry) throw new ResolutionError("internal error: registry unavailable after vault resolution");
   const candidates = registeredCandidates(registry);
   if (candidates.length === 1) return loadVault(candidates[0][1]);
   if (!candidates.length) throw new ResolutionError("no vault selected, no ancestor contract found, and registry has no valid vaults");
@@ -7806,7 +7831,7 @@ function registerVault(vaultId, root, { registryPath = defaultRegistryPath(), ap
   const data = loadRegistry(resolvedRegistryPath);
   const existing = data.vaults[vaultId];
   if (existing !== void 0) {
-    if (!existing || typeof existing !== "object" || Array.isArray(existing) || typeof existing.path !== "string") {
+    if (!isUnknownRecord(existing) || typeof existing.path !== "string") {
       throw new ResolutionError(`registry ID \`${vaultId}\` already exists with an invalid record`);
     }
     const existingRoot = canonicalPath(existing.path);
@@ -7859,12 +7884,15 @@ function associateProject(vaultId, projectRoot, {
   return [resolvedRegistryPath, rendered, root];
 }
 
-// src/knowledge-loom/content-checks.mjs
+// src/knowledge-loom/content-checks.ts
 var VALIDATION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 var ALLOWED_SEVERITIES = /* @__PURE__ */ new Set(["error", "warning", "info"]);
 var STATUS_EXIT_CODES = { pass: 0, fail: 1, error: 2 };
 var ADAPTER_TIMEOUT_MS = 3e4;
 var ADAPTER_MAX_BUFFER = 1024 * 1024;
+function asCodedError(error) {
+  return error instanceof Error ? error : new Error(String(error));
+}
 function adapterFinding(adapterId, code, message, findingPath = null) {
   return {
     ...finding("error", `content-check.${code}`, message, findingPath),
@@ -7891,55 +7919,63 @@ function adapterConfiguration(registry, adapterId) {
   if (!adapters || typeof adapters !== "object" || Array.isArray(adapters)) return null;
   return adapters[adapterId] ?? null;
 }
-function configurationError(adapterId, configuration) {
+function parseConfiguration(adapterId, configuration) {
   if (!configuration) {
-    return adapterFinding(
+    return { ok: false, error: adapterFinding(
       adapterId,
       "adapter-missing",
       `content check adapter \`${adapterId}\` is not configured in the local registry`
-    );
+    ) };
   }
-  if (typeof configuration !== "object" || Array.isArray(configuration)) {
-    return adapterFinding(
+  if (!isUnknownRecord(configuration)) {
+    return { ok: false, error: adapterFinding(
       adapterId,
       "adapter-config",
       `content check adapter \`${adapterId}\` must be a mapping`
-    );
+    ) };
   }
   if (typeof configuration.executable !== "string" || !configuration.executable.trim()) {
-    return adapterFinding(
+    return { ok: false, error: adapterFinding(
       adapterId,
       "adapter-config",
       `content check adapter \`${adapterId}\` requires a non-empty \`executable\``
-    );
+    ) };
   }
   if (!Array.isArray(configuration.arguments) || configuration.arguments.some((value) => typeof value !== "string")) {
-    return adapterFinding(
+    return { ok: false, error: adapterFinding(
       adapterId,
       "adapter-config",
       `content check adapter \`${adapterId}\` requires a string \`arguments\` list`
-    );
+    ) };
   }
-  for (const value of [configuration.executable, ...configuration.arguments]) {
+  const arguments_ = configuration.arguments.filter((value) => typeof value === "string");
+  for (const value of [configuration.executable, ...arguments_]) {
     const placeholders = value.match(/\{[^}]+\}/g) ?? [];
     if (placeholders.some((placeholder) => placeholder !== "{vault_root}")) {
-      return adapterFinding(
+      return { ok: false, error: adapterFinding(
         adapterId,
         "adapter-config",
         `content check adapter \`${adapterId}\` uses an unsupported placeholder`
-      );
+      ) };
     }
   }
-  return null;
+  return { ok: true, value: { executable: configuration.executable, arguments: arguments_ } };
+}
+function isContentCheckStatus(value) {
+  return typeof value === "string" && Object.hasOwn(STATUS_EXIT_CODES, value);
+}
+function isFindingSeverity(value) {
+  return typeof value === "string" && ALLOWED_SEVERITIES.has(value);
 }
 function normalizedResult(adapterId, result, vaultRoot) {
   const invalid = (message, code = "output") => ({
+    ok: false,
     error: adapterFinding(adapterId, code, message)
   });
-  if (!result || typeof result !== "object" || Array.isArray(result)) {
+  if (!isUnknownRecord(result)) {
     return invalid("content checker output must be a JSON object");
   }
-  if (!Object.hasOwn(STATUS_EXIT_CODES, result.status)) {
+  if (!isContentCheckStatus(result.status)) {
     return invalid("content checker returned an unsupported status");
   }
   if (typeof result.root !== "string") {
@@ -7956,25 +7992,26 @@ function normalizedResult(adapterId, result, vaultRoot) {
   }
   const findings = [];
   for (const item of result.findings) {
-    if (!item || typeof item !== "object" || Array.isArray(item) || !ALLOWED_SEVERITIES.has(item.severity) || typeof item.code !== "string" || !item.code.trim() || typeof item.message !== "string" || !item.message.trim() || !Object.hasOwn(item, "path") || item.path !== null && (typeof item.path !== "string" || !isVaultRelativePath(item.path) || !resolveVaultPath(vaultRoot, item.path)) || item.line !== void 0 && (!Number.isInteger(item.line) || item.line < 1)) {
+    if (!isUnknownRecord(item) || !isFindingSeverity(item.severity) || typeof item.code !== "string" || !item.code.trim() || typeof item.message !== "string" || !item.message.trim() || !Object.hasOwn(item, "path") || item.path !== null && (typeof item.path !== "string" || !isVaultRelativePath(item.path) || !resolveVaultPath(vaultRoot, item.path)) || item.line !== void 0 && (typeof item.line !== "number" || !Number.isInteger(item.line) || item.line < 1)) {
       return invalid("content checker returned an invalid finding");
     }
+    const normalizedPath = item.path === null ? null : item.path;
     const normalized = {
       severity: item.severity,
       code: `content-check.${adapterId}.${item.code}`,
       message: item.message,
-      path: item.path ?? null,
+      path: normalizedPath,
       source: `content-check:${adapterId}`,
       validationDate: result.validationDate
     };
-    if (item.line !== void 0) normalized.line = item.line;
+    if (typeof item.line === "number") normalized.line = item.line;
     findings.push(normalized);
   }
   const hasError = findings.some((item) => item.severity === "error");
   if (result.status === "pass" && hasError || result.status !== "pass" && !hasError) {
     return invalid("content checker status is inconsistent with its findings");
   }
-  return { status: result.status, validationDate: result.validationDate, findings };
+  return { ok: true, status: result.status, validationDate: result.validationDate, findings };
 }
 function killProcessTree(child) {
   if (!child.pid) return;
@@ -8013,7 +8050,7 @@ function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
         windowsHide: true
       });
     } catch (error) {
-      resolve({ error });
+      resolve({ ok: false, error: asCodedError(error) });
       return;
     }
     let settled = false;
@@ -8025,14 +8062,14 @@ function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
     const finish = (result) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (timer !== void 0) clearTimeout(timer);
       resolve(result);
     };
     const terminate = (error) => {
       killProcessTree(child);
       child.stdout.destroy();
       child.stderr.destroy();
-      finish({ error });
+      finish({ ok: false, error });
     };
     const collect = (chunk, { capture = false } = {}) => {
       outputBytes += Buffer.byteLength(chunk, "utf8");
@@ -8044,10 +8081,10 @@ function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
       }
       if (capture) stdout += chunk;
     };
-    child.once("error", (error) => finish({ error }));
+    child.once("error", (error) => finish({ ok: false, error: asCodedError(error) }));
     child.stdout.on("data", (chunk) => collect(chunk, { capture: true }));
     child.stderr.on("data", (chunk) => collect(chunk));
-    child.once("close", (status, signal) => finish({ stdout, status, signal }));
+    child.once("close", (status, signal) => finish({ ok: true, stdout, status, signal }));
     timer = setTimeout(() => {
       const error = new Error("timed out");
       error.code = "ETIMEDOUT";
@@ -8059,8 +8096,9 @@ async function runDeclaredContentCheck(vault, {
   registryPath,
   timeoutMs = ADAPTER_TIMEOUT_MS
 } = {}) {
-  const adapterId = vault.contract.content_checks?.adapter;
-  if (!adapterId || !KEBAB_CASE_ID_RE.test(adapterId)) return [];
+  const contentChecks = isUnknownRecord(vault.contract.content_checks) ? vault.contract.content_checks : {};
+  const adapterId = contentChecks.adapter;
+  if (typeof adapterId !== "string" || !KEBAB_CASE_ID_RE.test(adapterId)) return [];
   let registry;
   try {
     registry = loadRegistry(registryPath);
@@ -8069,13 +8107,13 @@ async function runDeclaredContentCheck(vault, {
       adapterFinding(
         adapterId,
         "registry",
-        `cannot load the local adapter registry: ${error.message}`
+        `cannot load the local adapter registry: ${errorMessage(error)}`
       )
     ];
   }
-  const configuration = adapterConfiguration(registry, adapterId);
-  const invalidConfiguration = configurationError(adapterId, configuration);
-  if (invalidConfiguration) return [invalidConfiguration];
+  const parsedConfiguration = parseConfiguration(adapterId, adapterConfiguration(registry, adapterId));
+  if (!parsedConfiguration.ok) return [parsedConfiguration.error];
+  const configuration = parsedConfiguration.value;
   const substitute = (value) => value.replaceAll("{vault_root}", vault.root);
   const completed = await executeAdapter(
     substitute(configuration.executable),
@@ -8085,7 +8123,7 @@ async function runDeclaredContentCheck(vault, {
       timeoutMs
     }
   );
-  if (completed.error) {
+  if (!completed.ok) {
     const reason = completed.error.code === "ETIMEDOUT" ? "timed out" : completed.error.code === "ENOBUFS" ? "exceeded the 1 MiB output limit" : `could not start: ${completed.error.message}`;
     return [
       adapterFinding(
@@ -8117,7 +8155,7 @@ async function runDeclaredContentCheck(vault, {
     ];
   }
   const normalized = normalizedResult(adapterId, result, vault.root);
-  if (normalized.error) return [normalized.error];
+  if (!normalized.ok) return [normalized.error];
   if (completed.status !== STATUS_EXIT_CODES[normalized.status]) {
     return [
       adapterFinding(
@@ -8130,7 +8168,7 @@ async function runDeclaredContentCheck(vault, {
   return normalized.status === "pass" ? [passedFinding(adapterId, normalized.validationDate), ...normalized.findings] : normalized.findings;
 }
 
-// src/knowledge-loom/focus.mjs
+// src/knowledge-loom/focus.ts
 import fs4 from "node:fs";
 var HEADING_RE = /^(#{2,3})\s+(.+?)\s*$/;
 function activeItems(text, sectionName) {
@@ -8140,6 +8178,7 @@ function activeItems(text, sectionName) {
     const match = line.match(HEADING_RE);
     if (!match) continue;
     const [, level, title] = match;
+    if (!level || !title) continue;
     if (level === "##") {
       inSection = title.trim().toLocaleLowerCase() === sectionName.trim().toLocaleLowerCase();
     } else if (inSection) {
@@ -8148,20 +8187,33 @@ function activeItems(text, sectionName) {
   }
   return items;
 }
+function parseFocusView(value) {
+  if (!isUnknownRecord(value) || typeof value.path !== "string") return null;
+  const activeSection = value.active_section ?? void 0;
+  if (activeSection !== void 0 && typeof activeSection !== "string") return null;
+  const maxTop = value.max_top ?? 3;
+  const maxActive = value.max_active ?? maxTop;
+  if (typeof maxTop !== "number" || typeof maxActive !== "number" || !Number.isInteger(maxTop) || !Number.isInteger(maxActive)) return null;
+  return {
+    path: value.path,
+    subject: typeof value.subject === "string" ? value.subject : "",
+    max_active: maxActive,
+    max_top: maxTop,
+    ...activeSection === void 0 ? {} : { active_section: activeSection },
+    ...value.require_start_here === true ? { require_start_here: true } : {}
+  };
+}
 function checkFocusView(root, name, view) {
   const relative = view.path;
-  if (typeof relative !== "string") return [];
   const focusPath = resolveVaultPath(root, relative);
   if (focusPath === null) return [finding("error", "focus.boundary", `focus view \`${name}\` resolves outside the vault`, relative)];
   if (!fs4.statSync(focusPath, { throwIfNoEntry: false })?.isFile()) {
     return [finding("error", "focus.missing", `focus view \`${name}\` file is missing`, relative)];
   }
   const section = view.active_section ?? "Top of mind";
-  if (typeof section !== "string") return [];
   const items = activeItems(fs4.readFileSync(focusPath, "utf8"), section);
-  const maxTop = view.max_top ?? 3;
-  const maxActive = view.max_active ?? maxTop;
-  if (!Number.isInteger(maxTop) || !Number.isInteger(maxActive)) return [];
+  const maxTop = view.max_top;
+  const maxActive = view.max_active;
   const findings = [];
   if (items.length > maxTop) {
     findings.push(finding("error", "focus.max-top", `focus view \`${name}\` has ${items.length} items; maximum is ${maxTop}`, relative));
@@ -8179,7 +8231,7 @@ function checkFocusView(root, name, view) {
   return findings;
 }
 
-// src/knowledge-loom/audit.mjs
+// src/knowledge-loom/audit.ts
 function escapeRegex(character) {
   return /[\\^$.*+?()[\]{}|]/.test(character) ? `\\${character}` : character;
 }
@@ -8204,7 +8256,7 @@ function globRegex(pattern, { characterClasses = true } = {}) {
       result += "[^/]";
     } else if (character === "[" && characterClasses) {
       let close = index + 1;
-      if (["!", "^"].includes(pattern[close])) close += 1;
+      if (["!", "^"].includes(pattern[close] ?? "")) close += 1;
       if (pattern[close] === "]") close += 1;
       close = pattern.indexOf("]", close);
       if (close < 0) {
@@ -8241,7 +8293,12 @@ function matchesPath(pattern, candidate) {
 function git(root, ...arguments_) {
   return spawnSync("git", ["-C", root, ...arguments_], { encoding: "utf8" });
 }
-function auditDeclaredFiles(root, values, { boundaryCode, boundaryMessage, missingCode, missingMessage }) {
+function auditDeclaredFiles(root, values, {
+  boundaryCode,
+  boundaryMessage,
+  missingCode,
+  missingMessage
+}) {
   if (!Array.isArray(values)) return [];
   const findings = [];
   for (const relative of values) {
@@ -8292,21 +8349,22 @@ async function auditVault(vault, { registryPath } = {}) {
     missingCode: "path.instruction-root",
     missingMessage: "instruction root is missing"
   }));
-  const navigation = contract.navigation && typeof contract.navigation === "object" && !Array.isArray(contract.navigation) ? contract.navigation : {};
+  const navigation = isUnknownRecord(contract.navigation) ? contract.navigation : {};
   findings.push(...auditDeclaredFiles(root, navigation.entrypoints ?? [], {
     boundaryCode: "path.navigation-boundary",
     boundaryMessage: "navigation entrypoint resolves outside the vault",
     missingCode: "path.navigation",
     missingMessage: "navigation entrypoint is missing"
   }));
-  const subjectConfig = contract.subjects && typeof contract.subjects === "object" && !Array.isArray(contract.subjects) ? contract.subjects : {};
-  const subjects = new Set(Array.isArray(subjectConfig.values) ? subjectConfig.values : []);
-  const profiles = contract.metadata_profiles && typeof contract.metadata_profiles === "object" && !Array.isArray(contract.metadata_profiles) ? contract.metadata_profiles : {};
+  const subjectConfig = isUnknownRecord(contract.subjects) ? contract.subjects : {};
+  const subjectValues = Array.isArray(subjectConfig.values) ? subjectConfig.values.filter((value) => typeof value === "string") : [];
+  const subjects = new Set(subjectValues);
+  const profiles = isUnknownRecord(contract.metadata_profiles) ? contract.metadata_profiles : {};
   const checked = /* @__PURE__ */ new Set();
   for (const [profileName, profile] of Object.entries(profiles)) {
-    if (!profile || typeof profile !== "object" || Array.isArray(profile)) continue;
-    const severity = profile.severity ?? "error";
-    const required = Array.isArray(profile.required) ? profile.required : [];
+    if (!isUnknownRecord(profile)) continue;
+    const severity = profile.severity === "warning" ? "warning" : "error";
+    const required = Array.isArray(profile.required) ? profile.required.filter((value) => typeof value === "string") : [];
     const patterns = Array.isArray(profile.paths) ? profile.paths : [];
     for (const patternValue of patterns) {
       if (typeof patternValue !== "string" || !isVaultRelativePath(patternValue)) continue;
@@ -8318,7 +8376,7 @@ async function auditVault(vault, { registryPath } = {}) {
       try {
         paths = globPaths(root, patternValue);
       } catch (error) {
-        findings.push(finding("error", "metadata.pattern", `profile \`${profileName}\` has an unusable path pattern: ${error.message}`, patternValue));
+        findings.push(finding("error", "metadata.pattern", `profile \`${profileName}\` has an unusable path pattern: ${errorMessage(error)}`, patternValue));
         continue;
       }
       for (const candidate of paths) {
@@ -8336,13 +8394,14 @@ async function auditVault(vault, { registryPath } = {}) {
           if (!Object.hasOwn(metadata, field)) findings.push(finding(severity, "metadata.missing", `profile \`${profileName}\` requires \`${field}\``, relative));
         }
         const subjectKey = Object.hasOwn(metadata, "owner") ? "owner" : Object.hasOwn(metadata, "subject") ? "subject" : null;
-        if (subjectConfig.mode === "multiple" && subjectKey && !subjects.has(metadata[subjectKey])) {
+        const metadataSubject = subjectKey ? metadata[subjectKey] : void 0;
+        if (subjectConfig.mode === "multiple" && subjectKey && (typeof metadataSubject !== "string" || !subjects.has(metadataSubject))) {
           findings.push(finding("error", "metadata.subject", `\`${subjectKey}\` is not declared in contract subjects`, relative));
         }
       }
     }
   }
-  const privacy = contract.privacy && typeof contract.privacy === "object" && !Array.isArray(contract.privacy) ? contract.privacy : {};
+  const privacy = isUnknownRecord(contract.privacy) ? contract.privacy : {};
   const neverTrack = Array.isArray(privacy.never_track) ? privacy.never_track : [];
   const validNeverTrack = [];
   for (const patternValue of neverTrack) {
@@ -8353,7 +8412,7 @@ async function auditVault(vault, { registryPath } = {}) {
     }
     validNeverTrack.push(patternValue);
   }
-  const history = contract.history && typeof contract.history === "object" && !Array.isArray(contract.history) ? contract.history : {};
+  const history = isUnknownRecord(contract.history) ? contract.history : {};
   const gitCheck = git(root, "rev-parse", "--show-toplevel");
   const gitRoot = gitCheck.status === 0 ? gitCheck.stdout.trim() : "";
   const isGit = Boolean(gitRoot) && canonicalPath(gitRoot) === canonicalPath(root);
@@ -8369,9 +8428,10 @@ async function auditVault(vault, { registryPath } = {}) {
       }
     }
   }
-  const focusViews = contract.focus_views && typeof contract.focus_views === "object" && !Array.isArray(contract.focus_views) ? contract.focus_views : {};
-  for (const [name, view] of Object.entries(focusViews)) {
-    if (!view || typeof view !== "object" || Array.isArray(view) || typeof view.path !== "string" || !isVaultRelativePath(view.path)) continue;
+  const focusViews = isUnknownRecord(contract.focus_views) ? contract.focus_views : {};
+  for (const [name, value] of Object.entries(focusViews)) {
+    const view = parseFocusView(value);
+    if (!view || !isVaultRelativePath(view.path)) continue;
     findings.push(...checkFocusView(root, name, view));
   }
   if (!findings.some((item) => item.severity === "error")) {
@@ -8380,7 +8440,7 @@ async function auditVault(vault, { registryPath } = {}) {
   return findings;
 }
 
-// src/knowledge-loom/initializer.mjs
+// src/knowledge-loom/initializer.ts
 import fs6 from "node:fs";
 import path6 from "node:path";
 var DEFAULT_BODY = `# Vault policy
@@ -8414,7 +8474,15 @@ function discoverEntrypoints(root) {
   }
   return ["INDEX.md"];
 }
-function buildContract(root, { vaultId, title, subjects, writePolicy, currentStatePolicy, historyType, adopt }) {
+function buildContract(root, {
+  vaultId,
+  title,
+  subjects,
+  writePolicy,
+  currentStatePolicy,
+  historyType,
+  adopt
+}) {
   const subjectValues = [...new Set(subjects)];
   const subjectBlock = {
     mode: subjectValues.length === 1 ? "single" : "multiple",
@@ -8455,7 +8523,7 @@ function initializeVault(root, { contract, adopt, apply }) {
   return [contractPath, rendered];
 }
 
-// src/knowledge-loom/cli.mjs
+// src/knowledge-loom/cli.ts
 var HELP = `usage: knowledge-loom {audit,probe,resolve,register,associate,init} ...
 
 commands:
@@ -8474,13 +8542,26 @@ var COMMAND_HELP = {
   associate: "usage: knowledge-loom associate vault_id project_path [--registry PATH] [--replace] [--apply]\n",
   init: "usage: knowledge-loom init path --vault-id ID --title TITLE --subject SUBJECT [--subject SUBJECT ...] [--write-policy POLICY] [--current-state-policy POLICY] [--history TYPE] [--adopt] [--apply]\n"
 };
+function isCommand(value) {
+  return Object.hasOwn(COMMAND_HELP, value);
+}
 function parseArguments(arguments_) {
   if (!arguments_.length) throw new Error(HELP.trim());
-  if (arguments_.includes("-h") || arguments_[0] === "--help") return { help: true, command: arguments_[0] && !arguments_[0].startsWith("-") ? arguments_[0] : null };
-  const command = arguments_[0];
-  if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`unknown command: ${command}`);
-  if (arguments_.slice(1).includes("--help") || arguments_.slice(1).includes("-h")) return { help: true, command };
-  const options = { command, positional: [], subject: [] };
+  const first = arguments_[0];
+  if (arguments_.includes("-h") || first === "--help") {
+    return {
+      help: true,
+      command: isCommand(first) ? first : null,
+      positional: [],
+      subject: []
+    };
+  }
+  if (!isCommand(first)) throw new Error(`unknown command: ${first}`);
+  const command = first;
+  if (arguments_.slice(1).includes("--help") || arguments_.slice(1).includes("-h")) {
+    return { help: true, command, positional: [], subject: [] };
+  }
+  const options = { help: false, command, positional: [], subject: [] };
   const flags = new Set(command === "audit" ? ["--json"] : command === "init" ? ["--adopt", "--apply"] : command === "register" ? ["--apply"] : command === "associate" ? ["--replace", "--apply"] : []);
   const valueOptions = /* @__PURE__ */ new Set(["--registry"]);
   if (command === "init") {
@@ -8488,8 +8569,12 @@ function parseArguments(arguments_) {
   }
   for (let index = 1; index < arguments_.length; index += 1) {
     const token = arguments_[index];
+    if (token === void 0) continue;
     if (flags.has(token)) {
-      options[token.slice(2).replaceAll("-", "_")] = true;
+      if (token === "--json") options.json = true;
+      else if (token === "--adopt") options.adopt = true;
+      else if (token === "--apply") options.apply = true;
+      else if (token === "--replace") options.replace = true;
       continue;
     }
     const equals = token.startsWith("--") ? token.indexOf("=") : -1;
@@ -8499,7 +8584,12 @@ function parseArguments(arguments_) {
       if (value === void 0 || value.startsWith("--")) throw new Error(`${name} requires a value`);
       const key = name.slice(2).replaceAll("-", "_");
       if (key === "subject") options.subject.push(value);
-      else options[key] = value;
+      else if (key === "registry") options.registry = value;
+      else if (key === "vault_id") options.vault_id = value;
+      else if (key === "title") options.title = value;
+      else if (key === "write_policy") options.write_policy = value;
+      else if (key === "current_state_policy") options.current_state_policy = value;
+      else if (key === "history") options.history = value;
       continue;
     }
     if (token.startsWith("-")) throw new Error(`unrecognized argument: ${token}`);
@@ -8521,7 +8611,7 @@ async function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(),
   try {
     const options = parseArguments(arguments_);
     if (options.help) {
-      stdout.write(options.command && COMMAND_HELP[options.command] ? COMMAND_HELP[options.command] : HELP);
+      stdout.write(options.command ? COMMAND_HELP[options.command] : HELP);
       return 0;
     }
     if (options.command === "audit") {
@@ -8546,8 +8636,10 @@ async function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(),
     }
     if (options.command === "register") {
       requirePositionals(options, 2, COMMAND_HELP.register);
-      const [registryPath, rendered2] = registerVault(options.positional[0], options.positional[1], { registryPath: options.registry, apply: options.apply === true });
-      if (options.apply) stdout.write(`registered ${options.positional[0]} in ${registryPath}
+      const vaultId = options.positional[0];
+      const vaultPath = options.positional[1];
+      const [registryPath, rendered2] = registerVault(vaultId, vaultPath, { registryPath: options.registry, apply: options.apply === true });
+      if (options.apply) stdout.write(`registered ${vaultId} in ${registryPath}
 `);
       else stdout.write(`DRY RUN would write ${registryPath}
 
@@ -8556,27 +8648,30 @@ ${rendered2}`);
     }
     if (options.command === "associate") {
       requirePositionals(options, 2, COMMAND_HELP.associate);
-      const [registryPath, rendered2, projectRoot] = associateProject(options.positional[0], options.positional[1], {
+      const vaultId = options.positional[0];
+      const projectPath = options.positional[1];
+      const [registryPath, rendered2, projectRoot] = associateProject(vaultId, projectPath, {
         registryPath: options.registry,
         apply: options.apply === true,
         replace: options.replace === true
       });
-      if (options.apply) stdout.write(`associated ${projectRoot} with ${options.positional[0]} in ${registryPath}
+      if (options.apply) stdout.write(`associated ${projectRoot} with ${vaultId} in ${registryPath}
 `);
-      else stdout.write(`DRY RUN would associate ${projectRoot} with ${options.positional[0]} in ${registryPath}
+      else stdout.write(`DRY RUN would associate ${projectRoot} with ${vaultId} in ${registryPath}
 
 ${rendered2}`);
       return 0;
     }
     requirePositionals(options, 1, COMMAND_HELP.init);
-    for (const required of ["vault_id", "title"]) if (!options[required]) throw new Error(`--${required.replaceAll("_", "-")} is required`);
+    if (!options.vault_id) throw new Error("--vault-id is required");
+    if (!options.title) throw new Error("--title is required");
     if (!options.subject.length) throw new Error("--subject is required");
     const writePolicy = options.write_policy ?? "proactive-durable-capture";
     const currentStatePolicy = options.current_state_policy ?? "maintain-after-material-change";
     const historyType = options.history ?? "none";
-    if (!(/* @__PURE__ */ new Set(["explicit-only", "proactive-durable-capture"])).has(writePolicy)) throw new Error(`unsupported write policy: ${writePolicy}`);
-    if (!(/* @__PURE__ */ new Set(["explicit-only", "maintain-after-material-change"])).has(currentStatePolicy)) throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);
-    if (!(/* @__PURE__ */ new Set(["git", "none"])).has(historyType)) throw new Error(`unsupported history type: ${historyType}`);
+    if (!isWritePolicy(writePolicy)) throw new Error(`unsupported write policy: ${writePolicy}`);
+    if (!isCurrentStatePolicy(currentStatePolicy)) throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);
+    if (!isHistoryType(historyType)) throw new Error(`unsupported history type: ${historyType}`);
     const root = path7.resolve(expandHome(options.positional[0]));
     const contract = buildContract(root, {
       vaultId: options.vault_id,
@@ -8600,11 +8695,11 @@ ${rendered2}`);
 ${rendered}`);
     return 0;
   } catch (error) {
-    stderr.write(`ERROR ${error.message}
+    stderr.write(`ERROR ${errorMessage(error)}
 `);
     return 2;
   }
 }
 
-// src/knowledge-loom/runner.mjs
+// src/knowledge-loom/runner.ts
 process.exitCode = await runCli();

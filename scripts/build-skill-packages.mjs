@@ -15,7 +15,7 @@ export const SKILL_REFERENCES = {
 async function bundledRunner(packageRoot) {
   const result = await build({
     absWorkingDir: packageRoot,
-    entryPoints: ["src/knowledge-loom/runner.mjs"],
+    entryPoints: ["src/knowledge-loom/runner.ts"],
     bundle: true,
     format: "esm",
     platform: "node",

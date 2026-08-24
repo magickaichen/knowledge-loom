@@ -2,9 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { finding, loadNoteFrontmatter, validateContractData } from "./contract.mjs";
-import { runDeclaredContentCheck } from "./content-checks.mjs";
-import { checkFocusView } from "./focus.mjs";
+import { finding, isUnknownRecord, loadNoteFrontmatter, validateContractData } from "./contract.js";
+import { runDeclaredContentCheck } from "./content-checks.js";
+import { errorMessage } from "./errors.js";
+import { checkFocusView, parseFocusView } from "./focus.js";
 import {
   canonicalPath,
   isVaultRelativePath,
@@ -12,17 +13,18 @@ import {
   resolveVaultPath,
   resolveVaultPatternPrefix,
   toPosixRelative,
-} from "./pathing.mjs";
+} from "./pathing.js";
+import type { Finding, FindingSeverity, LoadedVault } from "./types.js";
 
-function escapeRegex(character) {
+function escapeRegex(character: string): string {
   return /[\\^$.*+?()[\]{}|]/.test(character) ? `\\${character}` : character;
 }
 
-function globRegex(pattern, { characterClasses = true } = {}) {
+function globRegex(pattern: string, { characterClasses = true }: { characterClasses?: boolean } = {}): RegExp {
   let index = 0;
   let result = "^";
   while (index < pattern.length) {
-    const character = pattern[index];
+    const character = pattern[index]!;
     if (character === "*") {
       if (pattern[index + 1] === "*") {
         index += 2;
@@ -39,7 +41,7 @@ function globRegex(pattern, { characterClasses = true } = {}) {
       result += "[^/]";
     } else if (character === "[" && characterClasses) {
       let close = index + 1;
-      if (["!", "^"].includes(pattern[close])) close += 1;
+      if (["!", "^"].includes(pattern[close] ?? "")) close += 1;
       if (pattern[close] === "]") close += 1;
       close = pattern.indexOf("]", close);
       if (close < 0) {
@@ -71,17 +73,29 @@ function globRegex(pattern, { characterClasses = true } = {}) {
   }
 }
 
-export function matchesPath(pattern, candidate) {
+export function matchesPath(pattern: string, candidate: string): boolean {
   return globRegex(pattern).test(candidate);
 }
 
-function git(root, ...arguments_) {
+function git(root: string, ...arguments_: string[]) {
   return spawnSync("git", ["-C", root, ...arguments_], { encoding: "utf8" });
 }
 
-function auditDeclaredFiles(root, values, { boundaryCode, boundaryMessage, missingCode, missingMessage }) {
+interface DeclaredFilesOptions {
+  boundaryCode: string;
+  boundaryMessage: string;
+  missingCode: string;
+  missingMessage: string;
+}
+
+function auditDeclaredFiles(root: string, values: unknown, {
+  boundaryCode,
+  boundaryMessage,
+  missingCode,
+  missingMessage,
+}: DeclaredFilesOptions): Finding[] {
   if (!Array.isArray(values)) return [];
-  const findings = [];
+  const findings: Finding[] = [];
   for (const relative of values) {
     if (typeof relative !== "string" || !isVaultRelativePath(relative)) continue;
     const resolved = resolveVaultPath(root, relative);
@@ -91,8 +105,8 @@ function auditDeclaredFiles(root, values, { boundaryCode, boundaryMessage, missi
   return findings;
 }
 
-function patternPrefix(patternValue) {
-  const parts = [];
+function patternPrefix(patternValue: string): string[] {
+  const parts: string[] = [];
   for (const part of patternValue.split("/")) {
     if (/[*?[\]]/.test(part)) break;
     parts.push(part);
@@ -100,10 +114,10 @@ function patternPrefix(patternValue) {
   return parts;
 }
 
-function walk(root) {
-  const result = [];
+function walk(root: string): string[] {
+  const result: string[] = [];
   if (!fs.existsSync(root)) return result;
-  const visit = (current) => {
+  const visit = (current: string): void => {
     for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
       const candidate = path.join(current, entry.name);
       result.push(candidate);
@@ -115,7 +129,7 @@ function walk(root) {
   return result;
 }
 
-function globPaths(root, patternValue) {
+function globPaths(root: string, patternValue: string): string[] {
   if (!/[*?[]/.test(patternValue)) {
     const candidate = path.join(root, ...patternValue.split("/"));
     return fs.existsSync(candidate) ? [candidate] : [];
@@ -125,7 +139,10 @@ function globPaths(root, patternValue) {
   return walk(searchRoot).filter((candidate) => matchesPath(patternValue, toPosixRelative(root, candidate)));
 }
 
-export async function auditVault(vault, { registryPath } = {}) {
+export async function auditVault(
+  vault: LoadedVault,
+  { registryPath }: { registryPath?: string | undefined } = {},
+): Promise<Finding[]> {
   const findings = validateContractData(vault.contract);
   const { root, contract } = vault;
 
@@ -136,7 +153,7 @@ export async function auditVault(vault, { registryPath } = {}) {
     missingMessage: "instruction root is missing",
   }));
 
-  const navigation = contract.navigation && typeof contract.navigation === "object" && !Array.isArray(contract.navigation) ? contract.navigation : {};
+  const navigation = isUnknownRecord(contract.navigation) ? contract.navigation : {};
   findings.push(...auditDeclaredFiles(root, navigation.entrypoints ?? [], {
     boundaryCode: "path.navigation-boundary",
     boundaryMessage: "navigation entrypoint resolves outside the vault",
@@ -144,14 +161,19 @@ export async function auditVault(vault, { registryPath } = {}) {
     missingMessage: "navigation entrypoint is missing",
   }));
 
-  const subjectConfig = contract.subjects && typeof contract.subjects === "object" && !Array.isArray(contract.subjects) ? contract.subjects : {};
-  const subjects = new Set(Array.isArray(subjectConfig.values) ? subjectConfig.values : []);
-  const profiles = contract.metadata_profiles && typeof contract.metadata_profiles === "object" && !Array.isArray(contract.metadata_profiles) ? contract.metadata_profiles : {};
-  const checked = new Set();
+  const subjectConfig = isUnknownRecord(contract.subjects) ? contract.subjects : {};
+  const subjectValues = Array.isArray(subjectConfig.values)
+    ? subjectConfig.values.filter((value): value is string => typeof value === "string")
+    : [];
+  const subjects = new Set(subjectValues);
+  const profiles = isUnknownRecord(contract.metadata_profiles) ? contract.metadata_profiles : {};
+  const checked = new Set<string>();
   for (const [profileName, profile] of Object.entries(profiles)) {
-    if (!profile || typeof profile !== "object" || Array.isArray(profile)) continue;
-    const severity = profile.severity ?? "error";
-    const required = Array.isArray(profile.required) ? profile.required : [];
+    if (!isUnknownRecord(profile)) continue;
+    const severity: FindingSeverity = profile.severity === "warning" ? "warning" : "error";
+    const required = Array.isArray(profile.required)
+      ? profile.required.filter((value): value is string => typeof value === "string")
+      : [];
     const patterns = Array.isArray(profile.paths) ? profile.paths : [];
     for (const patternValue of patterns) {
       if (typeof patternValue !== "string" || !isVaultRelativePath(patternValue)) continue;
@@ -163,7 +185,7 @@ export async function auditVault(vault, { registryPath } = {}) {
       try {
         paths = globPaths(root, patternValue);
       } catch (error) {
-        findings.push(finding("error", "metadata.pattern", `profile \`${profileName}\` has an unusable path pattern: ${error.message}`, patternValue));
+        findings.push(finding("error", "metadata.pattern", `profile \`${profileName}\` has an unusable path pattern: ${errorMessage(error)}`, patternValue));
         continue;
       }
       for (const candidate of paths) {
@@ -181,16 +203,17 @@ export async function auditVault(vault, { registryPath } = {}) {
           if (!Object.hasOwn(metadata, field)) findings.push(finding(severity, "metadata.missing", `profile \`${profileName}\` requires \`${field}\``, relative));
         }
         const subjectKey = Object.hasOwn(metadata, "owner") ? "owner" : Object.hasOwn(metadata, "subject") ? "subject" : null;
-        if (subjectConfig.mode === "multiple" && subjectKey && !subjects.has(metadata[subjectKey])) {
+        const metadataSubject = subjectKey ? metadata[subjectKey] : undefined;
+        if (subjectConfig.mode === "multiple" && subjectKey && (typeof metadataSubject !== "string" || !subjects.has(metadataSubject))) {
           findings.push(finding("error", "metadata.subject", `\`${subjectKey}\` is not declared in contract subjects`, relative));
         }
       }
     }
   }
 
-  const privacy = contract.privacy && typeof contract.privacy === "object" && !Array.isArray(contract.privacy) ? contract.privacy : {};
+  const privacy = isUnknownRecord(contract.privacy) ? contract.privacy : {};
   const neverTrack = Array.isArray(privacy.never_track) ? privacy.never_track : [];
-  const validNeverTrack = [];
+  const validNeverTrack: string[] = [];
   for (const patternValue of neverTrack) {
     if (typeof patternValue !== "string" || !isVaultRelativePath(patternValue)) continue;
     if (resolveVaultPatternPrefix(root, patternValue) === null) {
@@ -200,7 +223,7 @@ export async function auditVault(vault, { registryPath } = {}) {
     validNeverTrack.push(patternValue);
   }
 
-  const history = contract.history && typeof contract.history === "object" && !Array.isArray(contract.history) ? contract.history : {};
+  const history = isUnknownRecord(contract.history) ? contract.history : {};
   const gitCheck = git(root, "rev-parse", "--show-toplevel");
   const gitRoot = gitCheck.status === 0 ? gitCheck.stdout.trim() : "";
   const isGit = Boolean(gitRoot) && canonicalPath(gitRoot) === canonicalPath(root);
@@ -218,9 +241,10 @@ export async function auditVault(vault, { registryPath } = {}) {
     }
   }
 
-  const focusViews = contract.focus_views && typeof contract.focus_views === "object" && !Array.isArray(contract.focus_views) ? contract.focus_views : {};
-  for (const [name, view] of Object.entries(focusViews)) {
-    if (!view || typeof view !== "object" || Array.isArray(view) || typeof view.path !== "string" || !isVaultRelativePath(view.path)) continue;
+  const focusViews = isUnknownRecord(contract.focus_views) ? contract.focus_views : {};
+  for (const [name, value] of Object.entries(focusViews)) {
+    const view = parseFocusView(value);
+    if (!view || !isVaultRelativePath(view.path)) continue;
     findings.push(...checkFocusView(root, name, view));
   }
   if (!findings.some((item) => item.severity === "error")) {

@@ -13,10 +13,13 @@ function run(...arguments_) {
 export function main(arguments_ = process.argv.slice(2)) {
   const includeNpx = arguments_.includes("--npx");
   if (arguments_.some((argument) => argument !== "--npx")) throw new Error(`unknown argument: ${arguments_.find((argument) => argument !== "--npx")}`);
+  run("node_modules/typescript/bin/tsc", "--noEmit");
   run("scripts/build-skill-packages.mjs", "--check");
   run("scripts/run-tests.mjs");
-  for (const fixture of ["single-proactive", "shared-explicit"]) run("src/knowledge-loom/runner.mjs", "audit", `tests/fixtures/${fixture}`);
-  run("scripts/run-behavior-evals.mjs");
+  for (const fixture of ["single-proactive", "shared-explicit"]) {
+    run("--import", "tsx", "src/knowledge-loom/runner.ts", "audit", `tests/fixtures/${fixture}`);
+  }
+  run("--import", "tsx", "scripts/run-behavior-evals.mjs");
   run("scripts/build-claude-desktop-skill.mjs");
   if (includeNpx) run("scripts/test-npx-install.mjs");
   return 0;

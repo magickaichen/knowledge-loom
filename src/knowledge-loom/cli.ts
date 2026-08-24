@@ -1,10 +1,13 @@
 import path from "node:path";
 
-import { auditVault } from "./audit.mjs";
-import { validateContractData } from "./contract.mjs";
-import { buildContract, initializeVault } from "./initializer.mjs";
-import { expandHome } from "./pathing.mjs";
-import { associateProject, registerVault, resolveApplicableVault, resolveVault } from "./registry.mjs";
+import { auditVault } from "./audit.js";
+import { validateContractData } from "./contract.js";
+import { buildContract, initializeVault } from "./initializer.js";
+import { expandHome } from "./pathing.js";
+import { associateProject, registerVault, resolveApplicableVault, resolveVault } from "./registry.js";
+import { errorMessage } from "./errors.js";
+import { isCurrentStatePolicy, isHistoryType, isWritePolicy } from "./types.js";
+import type { CliIo, Finding } from "./types.js";
 
 const HELP = `usage: knowledge-loom {audit,probe,resolve,register,associate,init} ...
 
@@ -24,16 +27,49 @@ const COMMAND_HELP = {
   register: "usage: knowledge-loom register vault_id path [--registry PATH] [--apply]\n",
   associate: "usage: knowledge-loom associate vault_id project_path [--registry PATH] [--replace] [--apply]\n",
   init: "usage: knowledge-loom init path --vault-id ID --title TITLE --subject SUBJECT [--subject SUBJECT ...] [--write-policy POLICY] [--current-state-policy POLICY] [--history TYPE] [--adopt] [--apply]\n",
-};
+} as const;
 
-function parseArguments(arguments_) {
+type Command = keyof typeof COMMAND_HELP;
+
+interface ParsedOptions {
+  help: boolean;
+  command: Command | null;
+  positional: string[];
+  subject: string[];
+  registry?: string;
+  json?: boolean;
+  adopt?: boolean;
+  apply?: boolean;
+  replace?: boolean;
+  vault_id?: string;
+  title?: string;
+  write_policy?: string;
+  current_state_policy?: string;
+  history?: string;
+}
+
+function isCommand(value: string): value is Command {
+  return Object.hasOwn(COMMAND_HELP, value);
+}
+
+function parseArguments(arguments_: string[]): ParsedOptions {
   if (!arguments_.length) throw new Error(HELP.trim());
-  if (arguments_.includes("-h") || arguments_[0] === "--help") return { help: true, command: arguments_[0] && !arguments_[0].startsWith("-") ? arguments_[0] : null };
-  const command = arguments_[0];
-  if (!Object.hasOwn(COMMAND_HELP, command)) throw new Error(`unknown command: ${command}`);
-  if (arguments_.slice(1).includes("--help") || arguments_.slice(1).includes("-h")) return { help: true, command };
+  const first = arguments_[0]!;
+  if (arguments_.includes("-h") || first === "--help") {
+    return {
+      help: true,
+      command: isCommand(first) ? first : null,
+      positional: [],
+      subject: [],
+    };
+  }
+  if (!isCommand(first)) throw new Error(`unknown command: ${first}`);
+  const command = first;
+  if (arguments_.slice(1).includes("--help") || arguments_.slice(1).includes("-h")) {
+    return { help: true, command, positional: [], subject: [] };
+  }
 
-  const options = { command, positional: [], subject: [] };
+  const options: ParsedOptions = { help: false, command, positional: [], subject: [] };
   const flags = new Set(command === "audit"
     ? ["--json"]
     : command === "init"
@@ -49,8 +85,12 @@ function parseArguments(arguments_) {
   }
   for (let index = 1; index < arguments_.length; index += 1) {
     const token = arguments_[index];
+    if (token === undefined) continue;
     if (flags.has(token)) {
-      options[token.slice(2).replaceAll("-", "_")] = true;
+      if (token === "--json") options.json = true;
+      else if (token === "--adopt") options.adopt = true;
+      else if (token === "--apply") options.apply = true;
+      else if (token === "--replace") options.replace = true;
       continue;
     }
     const equals = token.startsWith("--") ? token.indexOf("=") : -1;
@@ -60,7 +100,12 @@ function parseArguments(arguments_) {
       if (value === undefined || value.startsWith("--")) throw new Error(`${name} requires a value`);
       const key = name.slice(2).replaceAll("-", "_");
       if (key === "subject") options.subject.push(value);
-      else options[key] = value;
+      else if (key === "registry") options.registry = value;
+      else if (key === "vault_id") options.vault_id = value;
+      else if (key === "title") options.title = value;
+      else if (key === "write_policy") options.write_policy = value;
+      else if (key === "current_state_policy") options.current_state_policy = value;
+      else if (key === "history") options.history = value;
       continue;
     }
     if (token.startsWith("-")) throw new Error(`unrecognized argument: ${token}`);
@@ -69,21 +114,24 @@ function parseArguments(arguments_) {
   return options;
 }
 
-export function formatFindings(findings, { json = false } = {}) {
+export function formatFindings(findings: Finding[], { json = false }: { json?: boolean } = {}): string {
   if (json) return `${JSON.stringify(findings, null, 2)}\n`;
   if (!findings.length) return "PASS no findings\n";
   return `${findings.map((item) => `${item.severity.toLocaleUpperCase().padEnd(7)} ${item.code}${item.path ? ` [${item.path}${item.line ? `:${item.line}` : ""}]` : ""}: ${item.message}`).join("\n")}\n`;
 }
 
-function requirePositionals(options, count, usage) {
+function requirePositionals(options: ParsedOptions, count: number, usage: string): void {
   if (options.positional.length !== count) throw new Error(usage.trim());
 }
 
-export async function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr } = {}) {
+export async function runCli(
+  arguments_: string[] = process.argv.slice(2),
+  { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr }: CliIo = {},
+): Promise<number> {
   try {
     const options = parseArguments(arguments_);
     if (options.help) {
-      stdout.write(options.command && COMMAND_HELP[options.command] ? COMMAND_HELP[options.command] : HELP);
+      stdout.write(options.command ? COMMAND_HELP[options.command] : HELP);
       return 0;
     }
 
@@ -107,33 +155,38 @@ export async function runCli(arguments_ = process.argv.slice(2), { cwd = process
     }
     if (options.command === "register") {
       requirePositionals(options, 2, COMMAND_HELP.register);
-      const [registryPath, rendered] = registerVault(options.positional[0], options.positional[1], { registryPath: options.registry, apply: options.apply === true });
-      if (options.apply) stdout.write(`registered ${options.positional[0]} in ${registryPath}\n`);
+      const vaultId = options.positional[0]!;
+      const vaultPath = options.positional[1]!;
+      const [registryPath, rendered] = registerVault(vaultId, vaultPath, { registryPath: options.registry, apply: options.apply === true });
+      if (options.apply) stdout.write(`registered ${vaultId} in ${registryPath}\n`);
       else stdout.write(`DRY RUN would write ${registryPath}\n\n${rendered}`);
       return 0;
     }
     if (options.command === "associate") {
       requirePositionals(options, 2, COMMAND_HELP.associate);
-      const [registryPath, rendered, projectRoot] = associateProject(options.positional[0], options.positional[1], {
+      const vaultId = options.positional[0]!;
+      const projectPath = options.positional[1]!;
+      const [registryPath, rendered, projectRoot] = associateProject(vaultId, projectPath, {
         registryPath: options.registry,
         apply: options.apply === true,
         replace: options.replace === true,
       });
-      if (options.apply) stdout.write(`associated ${projectRoot} with ${options.positional[0]} in ${registryPath}\n`);
-      else stdout.write(`DRY RUN would associate ${projectRoot} with ${options.positional[0]} in ${registryPath}\n\n${rendered}`);
+      if (options.apply) stdout.write(`associated ${projectRoot} with ${vaultId} in ${registryPath}\n`);
+      else stdout.write(`DRY RUN would associate ${projectRoot} with ${vaultId} in ${registryPath}\n\n${rendered}`);
       return 0;
     }
 
     requirePositionals(options, 1, COMMAND_HELP.init);
-    for (const required of ["vault_id", "title"]) if (!options[required]) throw new Error(`--${required.replaceAll("_", "-")} is required`);
+    if (!options.vault_id) throw new Error("--vault-id is required");
+    if (!options.title) throw new Error("--title is required");
     if (!options.subject.length) throw new Error("--subject is required");
     const writePolicy = options.write_policy ?? "proactive-durable-capture";
     const currentStatePolicy = options.current_state_policy ?? "maintain-after-material-change";
     const historyType = options.history ?? "none";
-    if (!new Set(["explicit-only", "proactive-durable-capture"]).has(writePolicy)) throw new Error(`unsupported write policy: ${writePolicy}`);
-    if (!new Set(["explicit-only", "maintain-after-material-change"]).has(currentStatePolicy)) throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);
-    if (!new Set(["git", "none"]).has(historyType)) throw new Error(`unsupported history type: ${historyType}`);
-    const root = path.resolve(expandHome(options.positional[0]));
+    if (!isWritePolicy(writePolicy)) throw new Error(`unsupported write policy: ${writePolicy}`);
+    if (!isCurrentStatePolicy(currentStatePolicy)) throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);
+    if (!isHistoryType(historyType)) throw new Error(`unsupported history type: ${historyType}`);
+    const root = path.resolve(expandHome(options.positional[0]!));
     const contract = buildContract(root, {
       vaultId: options.vault_id,
       title: options.title,
@@ -153,7 +206,7 @@ export async function runCli(arguments_ = process.argv.slice(2), { cwd = process
     else stdout.write(`DRY RUN would create ${contractPath}\n\n${rendered}`);
     return 0;
   } catch (error) {
-    stderr.write(`ERROR ${error.message}\n`);
+    stderr.write(`ERROR ${errorMessage(error)}\n`);
     return 2;
   }
 }

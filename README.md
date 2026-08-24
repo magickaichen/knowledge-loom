@@ -292,8 +292,8 @@ CLI control:
 git clone https://github.com/magickaichen/knowledge-loom.git
 cd knowledge-loom
 npm ci
-node scripts/install.mjs
-node scripts/install.mjs --apply
+npm run install:skills
+npm run install:skills -- --apply
 ```
 
 The installer previews first, refuses collisions, and links the four skills into both
@@ -361,8 +361,9 @@ access control, encrypt notes, host a sync service, or reorganize an existing va
 ## Develop and validate
 
 Fixtures are fictional and must not contain real work, health, family, credential, or private vault
-data. Edit the top-level JavaScript modules, protocol, and schema rather than generated copies
-inside individual skills.
+data. Edit the top-level strict TypeScript modules, protocol, and schema rather than generated
+copies inside individual skills. The contributor toolchain uses TypeScript and `tsx`; installed
+skills receive one self-contained JavaScript runner and do not install either dependency.
 
 Run the complete validation entrypoint before committing:
 
@@ -370,9 +371,9 @@ Run the complete validation entrypoint before committing:
 npm run validate:npx
 ```
 
-It checks generated skill packages, unit tests, fixture audits, the behavior-eval matrix, the
-Claude Desktop ZIP, and a real `npx skills` copy installation. See [CONTRIBUTING.md](CONTRIBUTING.md)
-for the contribution workflow.
+It checks strict types, generated skill packages, unit tests, fixture audits, the behavior-eval
+matrix, the Claude Desktop ZIP, and a real `npx skills` copy installation. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the contribution workflow.
 
 ## Releases
 

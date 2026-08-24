@@ -1,24 +1,51 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
+import type { ChildProcess, ChildProcessByStdio } from "node:child_process";
+import type { Readable } from "node:stream";
 
-import { finding, KEBAB_CASE_ID_RE } from "./contract.mjs";
-import { canonicalPath, isVaultRelativePath, resolveVaultPath } from "./pathing.mjs";
-import { loadRegistry } from "./registry.mjs";
+import { finding, isUnknownRecord, KEBAB_CASE_ID_RE } from "./contract.js";
+import { errorMessage } from "./errors.js";
+import { canonicalPath, isVaultRelativePath, resolveVaultPath } from "./pathing.js";
+import { loadRegistry } from "./registry.js";
+import type { Finding, FindingSeverity, LoadedVault, Registry } from "./types.js";
 
 const VALIDATION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const ALLOWED_SEVERITIES = new Set(["error", "warning", "info"]);
-const STATUS_EXIT_CODES = { pass: 0, fail: 1, error: 2 };
+const ALLOWED_SEVERITIES = new Set<FindingSeverity>(["error", "warning", "info"]);
+const STATUS_EXIT_CODES = { pass: 0, fail: 1, error: 2 } as const;
 const ADAPTER_TIMEOUT_MS = 30_000;
 const ADAPTER_MAX_BUFFER = 1024 * 1024;
 
-function adapterFinding(adapterId, code, message, findingPath = null) {
+type ContentCheckStatus = keyof typeof STATUS_EXIT_CODES;
+
+interface AdapterConfiguration {
+  executable: string;
+  arguments: string[];
+}
+
+interface CodedError extends Error {
+  code?: string;
+}
+
+type AdapterExecution =
+  | { ok: false; error: CodedError }
+  | { ok: true; stdout: string; status: number | null; signal: NodeJS.Signals | null };
+
+type NormalizedResult =
+  | { ok: false; error: Finding }
+  | { ok: true; status: ContentCheckStatus; validationDate: string; findings: Finding[] };
+
+function asCodedError(error: unknown): CodedError {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function adapterFinding(adapterId: string, code: string, message: string, findingPath: string | null = null): Finding {
   return {
     ...finding("error", `content-check.${code}`, message, findingPath),
     source: adapterId ? `content-check:${adapterId}` : "content-check",
   };
 }
 
-function passedFinding(adapterId, validationDate) {
+function passedFinding(adapterId: string, validationDate: string): Finding {
   return {
     severity: "info",
     code: `content-check.${adapterId}.passed`,
@@ -29,71 +56,84 @@ function passedFinding(adapterId, validationDate) {
   };
 }
 
-function validValidationDate(value) {
+function validValidationDate(value: unknown): value is string {
   if (typeof value !== "string" || !VALIDATION_DATE_RE.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-function adapterConfiguration(registry, adapterId) {
+function adapterConfiguration(registry: Registry, adapterId: string): unknown {
   const adapters = registry.content_check_adapters;
   if (!adapters || typeof adapters !== "object" || Array.isArray(adapters)) return null;
   return adapters[adapterId] ?? null;
 }
 
-function configurationError(adapterId, configuration) {
+function parseConfiguration(
+  adapterId: string,
+  configuration: unknown,
+): { ok: false; error: Finding } | { ok: true; value: AdapterConfiguration } {
   if (!configuration) {
-    return adapterFinding(
+    return { ok: false, error: adapterFinding(
       adapterId,
       "adapter-missing",
       `content check adapter \`${adapterId}\` is not configured in the local registry`,
-    );
+    ) };
   }
-  if (typeof configuration !== "object" || Array.isArray(configuration)) {
-    return adapterFinding(
+  if (!isUnknownRecord(configuration)) {
+    return { ok: false, error: adapterFinding(
       adapterId,
       "adapter-config",
       `content check adapter \`${adapterId}\` must be a mapping`,
-    );
+    ) };
   }
   if (typeof configuration.executable !== "string" || !configuration.executable.trim()) {
-    return adapterFinding(
+    return { ok: false, error: adapterFinding(
       adapterId,
       "adapter-config",
       `content check adapter \`${adapterId}\` requires a non-empty \`executable\``,
-    );
+    ) };
   }
   if (
     !Array.isArray(configuration.arguments)
     || configuration.arguments.some((value) => typeof value !== "string")
   ) {
-    return adapterFinding(
+    return { ok: false, error: adapterFinding(
       adapterId,
       "adapter-config",
       `content check adapter \`${adapterId}\` requires a string \`arguments\` list`,
-    );
+    ) };
   }
-  for (const value of [configuration.executable, ...configuration.arguments]) {
+  const arguments_ = configuration.arguments.filter((value): value is string => typeof value === "string");
+  for (const value of [configuration.executable, ...arguments_]) {
     const placeholders = value.match(/\{[^}]+\}/g) ?? [];
     if (placeholders.some((placeholder) => placeholder !== "{vault_root}")) {
-      return adapterFinding(
+      return { ok: false, error: adapterFinding(
         adapterId,
         "adapter-config",
         `content check adapter \`${adapterId}\` uses an unsupported placeholder`,
-      );
+      ) };
     }
   }
-  return null;
+  return { ok: true, value: { executable: configuration.executable, arguments: arguments_ } };
 }
 
-function normalizedResult(adapterId, result, vaultRoot) {
-  const invalid = (message, code = "output") => ({
+function isContentCheckStatus(value: unknown): value is ContentCheckStatus {
+  return typeof value === "string" && Object.hasOwn(STATUS_EXIT_CODES, value);
+}
+
+function isFindingSeverity(value: unknown): value is FindingSeverity {
+  return typeof value === "string" && ALLOWED_SEVERITIES.has(value as FindingSeverity);
+}
+
+function normalizedResult(adapterId: string, result: unknown, vaultRoot: string): NormalizedResult {
+  const invalid = (message: string, code = "output"): NormalizedResult => ({
+    ok: false,
     error: adapterFinding(adapterId, code, message),
   });
-  if (!result || typeof result !== "object" || Array.isArray(result)) {
+  if (!isUnknownRecord(result)) {
     return invalid("content checker output must be a JSON object");
   }
-  if (!Object.hasOwn(STATUS_EXIT_CODES, result.status)) {
+  if (!isContentCheckStatus(result.status)) {
     return invalid("content checker returned an unsupported status");
   }
   if (typeof result.root !== "string") {
@@ -110,13 +150,11 @@ function normalizedResult(adapterId, result, vaultRoot) {
     return invalid("content checker output requires a `findings` list");
   }
 
-  const findings = [];
+  const findings: Finding[] = [];
   for (const item of result.findings) {
     if (
-      !item
-      || typeof item !== "object"
-      || Array.isArray(item)
-      || !ALLOWED_SEVERITIES.has(item.severity)
+      !isUnknownRecord(item)
+      || !isFindingSeverity(item.severity)
       || typeof item.code !== "string"
       || !item.code.trim()
       || typeof item.message !== "string"
@@ -130,19 +168,20 @@ function normalizedResult(adapterId, result, vaultRoot) {
           || !resolveVaultPath(vaultRoot, item.path)
         )
       )
-      || (item.line !== undefined && (!Number.isInteger(item.line) || item.line < 1))
+      || (item.line !== undefined && (typeof item.line !== "number" || !Number.isInteger(item.line) || item.line < 1))
     ) {
       return invalid("content checker returned an invalid finding");
     }
-    const normalized = {
+    const normalizedPath = item.path === null ? null : item.path;
+    const normalized: Finding = {
       severity: item.severity,
       code: `content-check.${adapterId}.${item.code}`,
       message: item.message,
-      path: item.path ?? null,
+      path: normalizedPath,
       source: `content-check:${adapterId}`,
       validationDate: result.validationDate,
     };
-    if (item.line !== undefined) normalized.line = item.line;
+    if (typeof item.line === "number") normalized.line = item.line;
     findings.push(normalized);
   }
 
@@ -150,10 +189,10 @@ function normalizedResult(adapterId, result, vaultRoot) {
   if ((result.status === "pass" && hasError) || (result.status !== "pass" && !hasError)) {
     return invalid("content checker status is inconsistent with its findings");
   }
-  return { status: result.status, validationDate: result.validationDate, findings };
+  return { ok: true, status: result.status, validationDate: result.validationDate, findings };
 }
 
-function killProcessTree(child) {
+function killProcessTree(child: ChildProcess): void {
   if (!child.pid) return;
   if (process.platform === "win32") {
     const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
@@ -173,9 +212,13 @@ function killProcessTree(child) {
   }
 }
 
-function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
+function executeAdapter(
+  executable: string,
+  arguments_: string[],
+  { cwd, timeoutMs }: { cwd: string; timeoutMs: number },
+): Promise<AdapterExecution> {
   return new Promise((resolve) => {
-    let child;
+    let child: ChildProcessByStdio<null, Readable, Readable>;
     try {
       child = spawn(executable, arguments_, {
         cwd,
@@ -185,32 +228,32 @@ function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
         windowsHide: true,
       });
     } catch (error) {
-      resolve({ error });
+      resolve({ ok: false, error: asCodedError(error) });
       return;
     }
 
     let settled = false;
-    let timer;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let stdout = "";
     let outputBytes = 0;
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
-    const finish = (result) => {
+    const finish = (result: AdapterExecution): void => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      if (timer !== undefined) clearTimeout(timer);
       resolve(result);
     };
-    const terminate = (error) => {
+    const terminate = (error: CodedError): void => {
       killProcessTree(child);
       child.stdout.destroy();
       child.stderr.destroy();
-      finish({ error });
+      finish({ ok: false, error });
     };
-    const collect = (chunk, { capture = false } = {}) => {
+    const collect = (chunk: string, { capture = false }: { capture?: boolean } = {}): void => {
       outputBytes += Buffer.byteLength(chunk, "utf8");
       if (outputBytes > ADAPTER_MAX_BUFFER) {
-        const error = new Error("output exceeded the 1 MiB limit");
+        const error: CodedError = new Error("output exceeded the 1 MiB limit");
         error.code = "ENOBUFS";
         terminate(error);
         return;
@@ -218,12 +261,12 @@ function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
       if (capture) stdout += chunk;
     };
 
-    child.once("error", (error) => finish({ error }));
+    child.once("error", (error) => finish({ ok: false, error: asCodedError(error) }));
     child.stdout.on("data", (chunk) => collect(chunk, { capture: true }));
     child.stderr.on("data", (chunk) => collect(chunk));
-    child.once("close", (status, signal) => finish({ stdout, status, signal }));
+    child.once("close", (status, signal) => finish({ ok: true, stdout, status, signal }));
     timer = setTimeout(() => {
-      const error = new Error("timed out");
+      const error: CodedError = new Error("timed out");
       error.code = "ETIMEDOUT";
       terminate(error);
     }, timeoutMs);
@@ -231,14 +274,15 @@ function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
 }
 
 export async function runDeclaredContentCheck(
-  vault,
+  vault: LoadedVault,
   {
     registryPath,
     timeoutMs = ADAPTER_TIMEOUT_MS,
-  } = {},
-) {
-  const adapterId = vault.contract.content_checks?.adapter;
-  if (!adapterId || !KEBAB_CASE_ID_RE.test(adapterId)) return [];
+  }: { registryPath?: string | undefined; timeoutMs?: number } = {},
+): Promise<Finding[]> {
+  const contentChecks = isUnknownRecord(vault.contract.content_checks) ? vault.contract.content_checks : {};
+  const adapterId = contentChecks.adapter;
+  if (typeof adapterId !== "string" || !KEBAB_CASE_ID_RE.test(adapterId)) return [];
 
   let registry;
   try {
@@ -248,16 +292,16 @@ export async function runDeclaredContentCheck(
       adapterFinding(
         adapterId,
         "registry",
-        `cannot load the local adapter registry: ${error.message}`,
+        `cannot load the local adapter registry: ${errorMessage(error)}`,
       ),
     ];
   }
 
-  const configuration = adapterConfiguration(registry, adapterId);
-  const invalidConfiguration = configurationError(adapterId, configuration);
-  if (invalidConfiguration) return [invalidConfiguration];
+  const parsedConfiguration = parseConfiguration(adapterId, adapterConfiguration(registry, adapterId));
+  if (!parsedConfiguration.ok) return [parsedConfiguration.error];
+  const configuration = parsedConfiguration.value;
 
-  const substitute = (value) => value.replaceAll("{vault_root}", vault.root);
+  const substitute = (value: string): string => value.replaceAll("{vault_root}", vault.root);
   const completed = await executeAdapter(
     substitute(configuration.executable),
     configuration.arguments.map(substitute),
@@ -267,7 +311,7 @@ export async function runDeclaredContentCheck(
     },
   );
 
-  if (completed.error) {
+  if (!completed.ok) {
     const reason = completed.error.code === "ETIMEDOUT"
       ? "timed out"
       : completed.error.code === "ENOBUFS"
@@ -291,7 +335,7 @@ export async function runDeclaredContentCheck(
     ];
   }
 
-  let result;
+  let result: unknown;
   try {
     result = JSON.parse(completed.stdout);
   } catch {
@@ -305,7 +349,7 @@ export async function runDeclaredContentCheck(
   }
 
   const normalized = normalizedResult(adapterId, result, vault.root);
-  if (normalized.error) return [normalized.error];
+  if (!normalized.ok) return [normalized.error];
   if (completed.status !== STATUS_EXIT_CODES[normalized.status]) {
     return [
       adapterFinding(

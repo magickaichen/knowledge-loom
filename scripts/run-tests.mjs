@@ -9,7 +9,7 @@ const testFiles = fs.readdirSync(path.join(packageRoot, "tests"))
   .filter((name) => name.endsWith(".test.mjs"))
   .sort()
   .map((name) => path.join("tests", name));
-const completed = spawnSync(process.execPath, ["--test", ...testFiles], {
+const completed = spawnSync(process.execPath, ["--import", "tsx", "--test", ...testFiles], {
   cwd: packageRoot,
   stdio: "inherit",
 });

@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.6.0
+
+The contributor runtime now uses strict TypeScript while every installation route continues to
+ship one self-contained JavaScript runner.
+
+### Changed
+
+- Migrated deterministic parsing, resolution, initialization, audit, content-check, and CLI source
+  modules to strict TypeScript.
+- Added explicit internal types for contracts, registries, findings, vaults, CLI options, and
+  content-check results while keeping YAML and JSON inputs runtime-validated from `unknown`.
+- Added TypeScript checking to the standard validation path on Node.js 20, 22, and 24.
+
+### Compatibility
+
+- Preserved the protocol, contract schema, CLI commands, output, exit statuses, and Node.js 20+
+  requirement.
+- Kept installed skills independent of TypeScript, `tsx`, `node_modules`, and repository checkouts
+  by generating the same self-contained `.mjs` distribution boundary.
+
 ## v0.5.0
 
 Applicable vaults now participate automatically in substantive project work and preserve durable

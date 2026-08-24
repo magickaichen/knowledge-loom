@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import { checkSkill, managedFiles, SKILL_REFERENCES } from "../scripts/build-skill-packages.mjs";
-import { splitFrontmatter } from "../src/knowledge-loom/contract.mjs";
+import { splitFrontmatter } from "../src/knowledge-loom/contract.ts";
 import { FIXTURES, PACKAGE_ROOT, temporaryDirectory } from "./helpers.mjs";
 
 test("generated skill packages are current", async () => {

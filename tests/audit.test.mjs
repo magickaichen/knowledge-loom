@@ -4,9 +4,9 @@ import path from "node:path";
 import test from "node:test";
 import YAML from "yaml";
 
-import { auditVault, matchesPath } from "../src/knowledge-loom/audit.mjs";
-import { runDeclaredContentCheck } from "../src/knowledge-loom/content-checks.mjs";
-import { loadVault, renderContract } from "../src/knowledge-loom/contract.mjs";
+import { auditVault, matchesPath } from "../src/knowledge-loom/audit.ts";
+import { runDeclaredContentCheck } from "../src/knowledge-loom/content-checks.ts";
+import { loadVault, renderContract } from "../src/knowledge-loom/contract.ts";
 import { copyFixture, FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
 function contentCheckFixture(t, {
@@ -343,6 +343,19 @@ test("metadata gap is reported", async (t) => {
 
 test("focus limits are reported", async (t) => {
   const root = copyFixture("single-proactive", path.join(temporaryDirectory(t), "single"));
+  const focus = path.join(root, "Projects", "current-focus.md");
+  fs.writeFileSync(focus, fs.readFileSync(focus, "utf8").replace("\n## Waiting\n", "\n### 3. Hidden parallel task\n\n- **Next action:** Start another stream.\n\n## Waiting\n"));
+  const findings = await auditVault(loadVault(root));
+  assert.ok(findings.some((item) => item.code === "focus.max-top"));
+  assert.ok(findings.some((item) => item.code === "focus.max-active"));
+});
+
+test("malformed optional focus settings do not hide limit findings", async (t) => {
+  const root = copyFixture("single-proactive", path.join(temporaryDirectory(t), "single"));
+  const vault = loadVault(root);
+  const contract = structuredClone(vault.contract);
+  contract.focus_views.work.require_start_here = "not-a-boolean";
+  fs.writeFileSync(vault.contractPath, renderContract(contract, vault.body));
   const focus = path.join(root, "Projects", "current-focus.md");
   fs.writeFileSync(focus, fs.readFileSync(focus, "utf8").replace("\n## Waiting\n", "\n### 3. Hidden parallel task\n\n- **Next action:** Start another stream.\n\n## Waiting\n"));
   const findings = await auditVault(loadVault(root));
