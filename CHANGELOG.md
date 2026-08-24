@@ -18,8 +18,8 @@ knowledge without requiring users to know a skill name.
 
 - Defaulted newly initialized and conservatively adopted vaults to
   `proactive-durable-capture` writes and `maintain-after-material-change` current-state upkeep.
-- Kept `explicit-only` and `on-request` available as explicit contract overrides; existing vault
-  contracts retain their declared policies.
+- Kept `explicit-only` available as an explicit contract override; existing vault contracts retain
+  their declared policies.
 
 ### Safety
 
