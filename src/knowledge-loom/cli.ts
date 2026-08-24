@@ -5,7 +5,9 @@ import { validateContractData } from "./contract.js";
 import { buildContract, initializeVault } from "./initializer.js";
 import { expandHome } from "./pathing.js";
 import { associateProject, registerVault, resolveApplicableVault, resolveVault } from "./registry.js";
-import type { CliIo, CurrentStatePolicy, Finding, HistoryType, WritePolicy } from "./types.js";
+import { errorMessage } from "./errors.js";
+import { isCurrentStatePolicy, isHistoryType, isWritePolicy } from "./types.js";
+import type { CliIo, Finding } from "./types.js";
 
 const HELP = `usage: knowledge-loom {audit,probe,resolve,register,associate,init} ...
 
@@ -122,10 +124,6 @@ function requirePositionals(options: ParsedOptions, count: number, usage: string
   if (options.positional.length !== count) throw new Error(usage.trim());
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export async function runCli(
   arguments_: string[] = process.argv.slice(2),
   { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr }: CliIo = {},
@@ -185,17 +183,17 @@ export async function runCli(
     const writePolicy = options.write_policy ?? "proactive-durable-capture";
     const currentStatePolicy = options.current_state_policy ?? "maintain-after-material-change";
     const historyType = options.history ?? "none";
-    if (writePolicy !== "explicit-only" && writePolicy !== "proactive-durable-capture") throw new Error(`unsupported write policy: ${writePolicy}`);
-    if (currentStatePolicy !== "explicit-only" && currentStatePolicy !== "maintain-after-material-change") throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);
-    if (historyType !== "git" && historyType !== "none") throw new Error(`unsupported history type: ${historyType}`);
+    if (!isWritePolicy(writePolicy)) throw new Error(`unsupported write policy: ${writePolicy}`);
+    if (!isCurrentStatePolicy(currentStatePolicy)) throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);
+    if (!isHistoryType(historyType)) throw new Error(`unsupported history type: ${historyType}`);
     const root = path.resolve(expandHome(options.positional[0]!));
     const contract = buildContract(root, {
       vaultId: options.vault_id,
       title: options.title,
       subjects: options.subject,
-      writePolicy: writePolicy satisfies WritePolicy,
-      currentStatePolicy: currentStatePolicy satisfies CurrentStatePolicy,
-      historyType: historyType satisfies HistoryType,
+      writePolicy,
+      currentStatePolicy,
+      historyType,
       adopt: options.adopt === true,
     });
     const findings = validateContractData(contract);

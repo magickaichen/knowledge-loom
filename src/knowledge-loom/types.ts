@@ -19,9 +19,34 @@ export interface LoadedVault {
   body: string;
 }
 
-export type WritePolicy = "explicit-only" | "proactive-durable-capture";
-export type CurrentStatePolicy = "explicit-only" | "maintain-after-material-change";
-export type HistoryType = "git" | "none";
+export const WRITE_POLICIES = ["explicit-only", "proactive-durable-capture"] as const;
+export const CURRENT_STATE_POLICIES = ["explicit-only", "maintain-after-material-change"] as const;
+export const HISTORY_TYPES = ["git", "none"] as const;
+
+export type WritePolicy = typeof WRITE_POLICIES[number];
+export type CurrentStatePolicy = typeof CURRENT_STATE_POLICIES[number];
+export type HistoryType = typeof HISTORY_TYPES[number];
+
+export function isWritePolicy(value: unknown): value is WritePolicy {
+  return typeof value === "string" && WRITE_POLICIES.some((policy) => policy === value);
+}
+
+export function isCurrentStatePolicy(value: unknown): value is CurrentStatePolicy {
+  return typeof value === "string" && CURRENT_STATE_POLICIES.some((policy) => policy === value);
+}
+
+export function isHistoryType(value: unknown): value is HistoryType {
+  return typeof value === "string" && HISTORY_TYPES.some((type) => type === value);
+}
+
+export interface FocusView {
+  path: string;
+  subject: string;
+  active_section?: string;
+  max_active: number;
+  max_top: number;
+  require_start_here?: boolean;
+}
 
 export interface VaultContract extends UnknownRecord {
   schema_version: 1;
@@ -49,7 +74,7 @@ export interface VaultContract extends UnknownRecord {
   instruction_roots: string[];
   navigation: { entrypoints: string[] };
   metadata_profiles: UnknownRecord;
-  focus_views: UnknownRecord;
+  focus_views: Record<string, FocusView>;
   privacy: { never_track: string[] };
 }
 

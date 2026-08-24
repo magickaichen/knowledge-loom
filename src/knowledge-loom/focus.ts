@@ -1,8 +1,8 @@
 import fs from "node:fs";
 
-import { finding } from "./contract.js";
+import { finding, isUnknownRecord } from "./contract.js";
 import { resolveVaultPath } from "./pathing.js";
-import type { Finding, UnknownRecord } from "./types.js";
+import type { Finding, FocusView } from "./types.js";
 
 const HEADING_RE = /^(#{2,3})\s+(.+?)\s*$/;
 
@@ -23,9 +23,34 @@ function activeItems(text: string, sectionName: string): string[] {
   return items;
 }
 
-export function checkFocusView(root: string, name: string, view: UnknownRecord): Finding[] {
+export function parseFocusView(value: unknown): FocusView | null {
+  if (
+    !isUnknownRecord(value)
+    || typeof value.path !== "string"
+    || typeof value.subject !== "string"
+    || typeof value.max_active !== "number"
+    || !Number.isInteger(value.max_active)
+    || value.max_active < 1
+    || typeof value.max_top !== "number"
+    || !Number.isInteger(value.max_top)
+    || value.max_top < 1
+    || (value.active_section !== undefined && typeof value.active_section !== "string")
+    || (value.require_start_here !== undefined && typeof value.require_start_here !== "boolean")
+  ) {
+    return null;
+  }
+  return {
+    path: value.path,
+    subject: value.subject,
+    max_active: value.max_active,
+    max_top: value.max_top,
+    ...(value.active_section === undefined ? {} : { active_section: value.active_section }),
+    ...(value.require_start_here === undefined ? {} : { require_start_here: value.require_start_here }),
+  };
+}
+
+export function checkFocusView(root: string, name: string, view: FocusView): Finding[] {
   const relative = view.path;
-  if (typeof relative !== "string") return [];
   const focusPath = resolveVaultPath(root, relative);
   if (focusPath === null) return [finding("error", "focus.boundary", `focus view \`${name}\` resolves outside the vault`, relative)];
   if (!fs.statSync(focusPath, { throwIfNoEntry: false })?.isFile()) {
@@ -33,11 +58,9 @@ export function checkFocusView(root: string, name: string, view: UnknownRecord):
   }
 
   const section = view.active_section ?? "Top of mind";
-  if (typeof section !== "string") return [];
   const items = activeItems(fs.readFileSync(focusPath, "utf8"), section);
-  const maxTop = view.max_top ?? 3;
-  const maxActive = view.max_active ?? maxTop;
-  if (typeof maxTop !== "number" || typeof maxActive !== "number" || !Number.isInteger(maxTop) || !Number.isInteger(maxActive)) return [];
+  const maxTop = view.max_top;
+  const maxActive = view.max_active;
 
   const findings: Finding[] = [];
   if (items.length > maxTop) {

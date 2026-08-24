@@ -4,6 +4,7 @@ import type { ChildProcess, ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 
 import { finding, isUnknownRecord, KEBAB_CASE_ID_RE } from "./contract.js";
+import { errorMessage } from "./errors.js";
 import { canonicalPath, isVaultRelativePath, resolveVaultPath } from "./pathing.js";
 import { loadRegistry } from "./registry.js";
 import type { Finding, FindingSeverity, LoadedVault, Registry } from "./types.js";
@@ -32,10 +33,6 @@ type AdapterExecution =
 type NormalizedResult =
   | { ok: false; error: Finding }
   | { ok: true; status: ContentCheckStatus; validationDate: string; findings: Finding[] };
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function asCodedError(error: unknown): CodedError {
   return error instanceof Error ? error : new Error(String(error));
@@ -338,7 +335,7 @@ export async function runDeclaredContentCheck(
     ];
   }
 
-  let result;
+  let result: unknown;
   try {
     result = JSON.parse(completed.stdout);
   } catch {

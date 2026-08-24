@@ -5,7 +5,7 @@ import path from "node:path";
 import YAML from "yaml";
 
 import { CONTRACT_NAME, isUnknownRecord, loadVault } from "./contract.js";
-import { ContractError, ResolutionError } from "./errors.js";
+import { ContractError, errorMessage, ResolutionError } from "./errors.js";
 import { canonicalPath, expandHome, isWithin } from "./pathing.js";
 import type { LoadedVault, Registry, UnknownRecord } from "./types.js";
 
@@ -15,10 +15,6 @@ export function defaultRegistryPath() {
   return process.env.KNOWLEDGE_VAULT_REGISTRY
     ? path.resolve(expandHome(process.env.KNOWLEDGE_VAULT_REGISTRY))
     : path.join(os.homedir(), ".config", "knowledge-vault", "registry.yaml");
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function loadRegistry(registryPath: string | undefined = defaultRegistryPath()): Registry {

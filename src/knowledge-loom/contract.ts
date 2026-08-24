@@ -2,8 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 
-import { ContractError } from "./errors.js";
+import { ContractError, errorMessage } from "./errors.js";
 import { canonicalPath, isVaultRelativePath, isWithin } from "./pathing.js";
+import { isCurrentStatePolicy, isHistoryType, isWritePolicy } from "./types.js";
 import type { Finding, FindingSeverity, LoadedVault, UnknownRecord } from "./types.js";
 
 export { ContractError } from "./errors.js";
@@ -13,10 +14,6 @@ export const KEBAB_CASE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function isUnknownRecord(value: unknown): value is UnknownRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function finding(
@@ -144,15 +141,15 @@ export function validateContractData(contract: unknown): Finding[] {
   }
 
   const write = mapping(contract, "write", findings);
-  if (Object.keys(write).length && write.policy !== "explicit-only" && write.policy !== "proactive-durable-capture") {
+  if (Object.keys(write).length && !isWritePolicy(write.policy)) {
     findings.push(finding("error", "contract.write-policy", "unsupported `write.policy`"));
   }
-  if (Object.keys(write).length && write.current_state_policy !== "explicit-only" && write.current_state_policy !== "maintain-after-material-change") {
+  if (Object.keys(write).length && !isCurrentStatePolicy(write.current_state_policy)) {
     findings.push(finding("error", "contract.current-state-policy", "unsupported current-state policy"));
   }
 
   const history = mapping(contract, "history", findings);
-  if (Object.keys(history).length && history.type !== "git" && history.type !== "none") {
+  if (Object.keys(history).length && !isHistoryType(history.type)) {
     findings.push(finding("error", "contract.history", "`history.type` must be `git` or `none`"));
   }
 

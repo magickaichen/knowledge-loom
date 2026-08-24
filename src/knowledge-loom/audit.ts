@@ -4,7 +4,8 @@ import { spawnSync } from "node:child_process";
 
 import { finding, isUnknownRecord, loadNoteFrontmatter, validateContractData } from "./contract.js";
 import { runDeclaredContentCheck } from "./content-checks.js";
-import { checkFocusView } from "./focus.js";
+import { errorMessage } from "./errors.js";
+import { checkFocusView, parseFocusView } from "./focus.js";
 import {
   canonicalPath,
   isVaultRelativePath,
@@ -14,10 +15,6 @@ import {
   toPosixRelative,
 } from "./pathing.js";
 import type { Finding, FindingSeverity, LoadedVault } from "./types.js";
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function escapeRegex(character: string): string {
   return /[\\^$.*+?()[\]{}|]/.test(character) ? `\\${character}` : character;
@@ -245,8 +242,9 @@ export async function auditVault(
   }
 
   const focusViews = isUnknownRecord(contract.focus_views) ? contract.focus_views : {};
-  for (const [name, view] of Object.entries(focusViews)) {
-    if (!isUnknownRecord(view) || typeof view.path !== "string" || !isVaultRelativePath(view.path)) continue;
+  for (const [name, value] of Object.entries(focusViews)) {
+    const view = parseFocusView(value);
+    if (!view || !isVaultRelativePath(view.path)) continue;
     findings.push(...checkFocusView(root, name, view));
   }
   if (!findings.some((item) => item.severity === "error")) {
