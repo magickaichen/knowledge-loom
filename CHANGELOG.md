@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.5.0
+
+Applicable vaults now participate automatically in substantive project work and preserve durable
+knowledge without requiring users to know a skill name.
+
+### Added
+
+- Added a successful no-op `probe` command so agents can test vault applicability before asking the
+  user to choose one.
+- Added route-first retrieval for current attention, governance, lifecycle, and protected-data
+  evidence before general relevance ranking.
+- Added automatic use guidance for Codex and Claude integrations, including post-task durable
+  capture and current-focus maintenance.
+
+### Changed
+
+- Defaulted newly initialized and conservatively adopted vaults to
+  `proactive-durable-capture` writes and `maintain-after-material-change` current-state upkeep.
+- Kept `explicit-only` and `on-request` available as explicit contract overrides; existing vault
+  contracts retain their declared policies.
+
+### Safety
+
+- Projects without an ancestor vault contract or registered project association remain a silent
+  no-op instead of triggering vault selection.
+- Automatic use still honors deterministic vault and subject selection, privacy boundaries,
+  preview requirements, lifecycle actions, and backup declarations.
+
 ## v0.4.0
 
 One audit can now enforce both portable vault structure and local content rules.

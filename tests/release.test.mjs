@@ -33,7 +33,7 @@ test("release checker writes curated changelog notes", (t) => {
   const result = runChecker(`v${version}`, "--notes-output", notes);
   assert.equal(result.status, 0, result.stderr);
   const contents = fs.readFileSync(notes, "utf8");
-  assert.ok(contents.startsWith("One audit can now enforce both portable vault structure and local content rules."));
+  assert.ok(contents.startsWith("Applicable vaults now participate automatically in substantive project work"));
   assert.doesNotMatch(contents, /Full Changelog/);
 });
 

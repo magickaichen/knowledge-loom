@@ -45,7 +45,7 @@ test("init expands a literal home path before previewing", async () => {
   assert.match(stdout.toString(), /current_state_policy: maintain-after-material-change/);
 });
 
-test("probe returns a successful no-op when no project vault applies", (t) => {
+test("probe returns a successful no-op when no project vault applies", async (t) => {
   const temporary = temporaryDirectory(t);
   const registry = path.join(temporary, "registry.yaml");
   fs.writeFileSync(registry, YAML.stringify({
@@ -57,7 +57,7 @@ test("probe returns a successful no-op when no project vault applies", (t) => {
   }));
   const stdout = memoryStream();
   const stderr = memoryStream();
-  assert.equal(runCli(["probe", "--registry", registry], { cwd: temporary, stdout, stderr }), 0, stderr.toString());
+  assert.equal(await runCli(["probe", "--registry", registry], { cwd: temporary, stdout, stderr }), 0, stderr.toString());
   assert.equal(stdout.toString(), "NO_APPLICABLE_VAULT\n");
 });
 
@@ -85,7 +85,7 @@ test("associate previews and applies a project-to-vault binding", async (t) => {
 
   stdout = memoryStream();
   stderr = memoryStream();
-  assert.equal(runCli(["probe", "--registry", registry], { cwd: project, stdout, stderr }), 0, stderr.toString());
+  assert.equal(await runCli(["probe", "--registry", registry], { cwd: project, stdout, stderr }), 0, stderr.toString());
   assert.equal(stdout.toString(), `${fs.realpathSync(path.join(FIXTURES, "single-proactive"))}\n`);
 });
 

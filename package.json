@@ -1,6 +1,6 @@
 {
   "name": "knowledge-loom",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Agent-neutral governance and skills for local Markdown knowledge vaults",
   "type": "module",
