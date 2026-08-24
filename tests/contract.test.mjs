@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
-import { ContractError, loadVault, renderContract, validateContractData } from "../src/knowledge-loom/contract.mjs";
+import { ContractError, loadVault, renderContract, validateContractData } from "../src/knowledge-loom/contract.ts";
 import { FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
 test("fixture contracts are valid", () => {

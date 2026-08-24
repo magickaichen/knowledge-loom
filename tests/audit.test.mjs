@@ -4,9 +4,9 @@ import path from "node:path";
 import test from "node:test";
 import YAML from "yaml";
 
-import { auditVault, matchesPath } from "../src/knowledge-loom/audit.mjs";
-import { runDeclaredContentCheck } from "../src/knowledge-loom/content-checks.mjs";
-import { loadVault, renderContract } from "../src/knowledge-loom/contract.mjs";
+import { auditVault, matchesPath } from "../src/knowledge-loom/audit.ts";
+import { runDeclaredContentCheck } from "../src/knowledge-loom/content-checks.ts";
+import { loadVault, renderContract } from "../src/knowledge-loom/contract.ts";
 import { copyFixture, FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
 function contentCheckFixture(t, {

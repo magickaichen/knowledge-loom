@@ -5,7 +5,7 @@ import test from "node:test";
 import { unzipSync } from "fflate";
 
 import { buildArchive, SKILL_ROOT } from "../scripts/build-claude-desktop-skill.mjs";
-import { splitFrontmatter } from "../src/knowledge-loom/contract.mjs";
+import { splitFrontmatter } from "../src/knowledge-loom/contract.ts";
 import { temporaryDirectory } from "./helpers.mjs";
 
 test("Desktop skill metadata states its capability boundary", () => {

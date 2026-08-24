@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { CONTRACT_NAME, renderContract } from "./contract.mjs";
-import { canonicalPath } from "./pathing.mjs";
+import { CONTRACT_NAME, renderContract } from "./contract.js";
+import { canonicalPath } from "./pathing.js";
+import type { BuildContractOptions, VaultContract } from "./types.js";
 
 export const DEFAULT_BODY = `# Vault policy
 
@@ -24,27 +25,35 @@ Describe who can see committed content and where sensitive originals belong.
 Describe naming, linking, metadata, and archival conventions.
 `;
 
-function discoverInstructionRoots(root) {
+function discoverInstructionRoots(root: string): string[] {
   for (const candidate of ["AGENTS.md", "LLM_CONTEXT.md", "CLAUDE.md"]) {
     if (fs.statSync(path.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
   }
   return [];
 }
 
-function discoverEntrypoints(root) {
+function discoverEntrypoints(root: string): string[] {
   for (const candidate of ["INDEX.md", "Home.md", "README.md"]) {
     if (fs.statSync(path.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
   }
   return ["INDEX.md"];
 }
 
-export function buildContract(root, { vaultId, title, subjects, writePolicy, currentStatePolicy, historyType, adopt }) {
+export function buildContract(root: string, {
+  vaultId,
+  title,
+  subjects,
+  writePolicy,
+  currentStatePolicy,
+  historyType,
+  adopt,
+}: BuildContractOptions): VaultContract {
   const subjectValues = [...new Set(subjects)];
-  const subjectBlock = {
+  const subjectBlock: VaultContract["subjects"] = {
     mode: subjectValues.length === 1 ? "single" : "multiple",
     values: subjectValues,
   };
-  if (subjectValues.length === 1) subjectBlock.default = subjectValues[0];
+  if (subjectValues.length === 1) subjectBlock.default = subjectValues[0]!;
   return {
     schema_version: 1,
     vault_id: vaultId,
@@ -63,7 +72,10 @@ export function buildContract(root, { vaultId, title, subjects, writePolicy, cur
   };
 }
 
-export function initializeVault(root, { contract, adopt, apply }) {
+export function initializeVault(
+  root: string,
+  { contract, adopt, apply }: { contract: VaultContract; adopt: boolean; apply: boolean },
+): [string, string] {
   const rootPath = canonicalPath(root);
   const contractPath = path.join(rootPath, CONTRACT_NAME);
   if (fs.existsSync(contractPath)) throw new Error(`${contractPath} already exists`);

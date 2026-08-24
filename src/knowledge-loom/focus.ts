@@ -1,17 +1,19 @@
 import fs from "node:fs";
 
-import { finding } from "./contract.mjs";
-import { resolveVaultPath } from "./pathing.mjs";
+import { finding } from "./contract.js";
+import { resolveVaultPath } from "./pathing.js";
+import type { Finding, UnknownRecord } from "./types.js";
 
 const HEADING_RE = /^(#{2,3})\s+(.+?)\s*$/;
 
-function activeItems(text, sectionName) {
+function activeItems(text: string, sectionName: string): string[] {
   let inSection = false;
   const items = [];
   for (const line of text.split(/\r?\n/)) {
     const match = line.match(HEADING_RE);
     if (!match) continue;
     const [, level, title] = match;
+    if (!level || !title) continue;
     if (level === "##") {
       inSection = title.trim().toLocaleLowerCase() === sectionName.trim().toLocaleLowerCase();
     } else if (inSection) {
@@ -21,7 +23,7 @@ function activeItems(text, sectionName) {
   return items;
 }
 
-export function checkFocusView(root, name, view) {
+export function checkFocusView(root: string, name: string, view: UnknownRecord): Finding[] {
   const relative = view.path;
   if (typeof relative !== "string") return [];
   const focusPath = resolveVaultPath(root, relative);
@@ -35,9 +37,9 @@ export function checkFocusView(root, name, view) {
   const items = activeItems(fs.readFileSync(focusPath, "utf8"), section);
   const maxTop = view.max_top ?? 3;
   const maxActive = view.max_active ?? maxTop;
-  if (!Number.isInteger(maxTop) || !Number.isInteger(maxActive)) return [];
+  if (typeof maxTop !== "number" || typeof maxActive !== "number" || !Number.isInteger(maxTop) || !Number.isInteger(maxActive)) return [];
 
-  const findings = [];
+  const findings: Finding[] = [];
   if (items.length > maxTop) {
     findings.push(finding("error", "focus.max-top", `focus view \`${name}\` has ${items.length} items; maximum is ${maxTop}`, relative));
   }

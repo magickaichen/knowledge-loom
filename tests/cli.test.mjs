@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import YAML from "yaml";
 
-import { runCli } from "../src/knowledge-loom/cli.mjs";
+import { runCli } from "../src/knowledge-loom/cli.ts";
 import { FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
 function memoryStream() {

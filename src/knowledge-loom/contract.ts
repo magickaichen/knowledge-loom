@@ -2,40 +2,54 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 
-import { ContractError } from "./errors.mjs";
-import { canonicalPath, isVaultRelativePath, isWithin } from "./pathing.mjs";
+import { ContractError } from "./errors.js";
+import { canonicalPath, isVaultRelativePath, isWithin } from "./pathing.js";
+import type { Finding, FindingSeverity, LoadedVault, UnknownRecord } from "./types.js";
 
-export { ContractError } from "./errors.mjs";
+export { ContractError } from "./errors.js";
 
 export const CONTRACT_NAME = "KNOWLEDGE_VAULT.md";
 export const KEBAB_CASE_ID_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-export function finding(severity, code, message, findingPath = null) {
+export function isUnknownRecord(value: unknown): value is UnknownRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function finding(
+  severity: FindingSeverity,
+  code: string,
+  message: string,
+  findingPath: string | null = null,
+): Finding {
   return { severity, code, message, path: findingPath };
 }
 
-export function splitFrontmatter(text, { source = "<text>" } = {}) {
+export function splitFrontmatter(text: string, { source = "<text>" }: { source?: string } = {}): [UnknownRecord, string] {
   const lines = text.match(/.*(?:\r?\n|$)/g)?.filter((line) => line.length) ?? [];
-  if (!lines.length || lines[0].trim() !== "---") {
+  if (!lines.length || lines[0]!.trim() !== "---") {
     throw new ContractError(`${source}: missing opening YAML frontmatter delimiter`);
   }
   const end = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
   if (end < 0) throw new ContractError(`${source}: missing closing YAML frontmatter delimiter`);
 
   const raw = lines.slice(1, end).join("");
-  let data;
+  let data: unknown;
   try {
     data = YAML.parse(raw) ?? {};
   } catch (error) {
-    throw new ContractError(`${source}: invalid YAML frontmatter: ${error.message}`, { cause: error });
+    throw new ContractError(`${source}: invalid YAML frontmatter: ${errorMessage(error)}`, { cause: error });
   }
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
+  if (!isUnknownRecord(data)) {
     throw new ContractError(`${source}: frontmatter must be a mapping`);
   }
   return [data, lines.slice(end + 1).join("")];
 }
 
-export function loadVault(root) {
+export function loadVault(root: string): LoadedVault {
   const rootPath = canonicalPath(root);
   const contractPath = path.join(rootPath, CONTRACT_NAME);
   if (!fs.statSync(contractPath, { throwIfNoEntry: false })?.isFile()) {
@@ -48,7 +62,7 @@ export function loadVault(root) {
   return { root: rootPath, contractPath, contract, body };
 }
 
-export function loadNoteFrontmatter(notePath) {
+export function loadNoteFrontmatter(notePath: string): UnknownRecord {
   try {
     return splitFrontmatter(fs.readFileSync(notePath, "utf8"), { source: notePath })[0];
   } catch (error) {
@@ -57,27 +71,30 @@ export function loadNoteFrontmatter(notePath) {
   }
 }
 
-export function renderContract(data, body) {
+export function renderContract(data: unknown, body: string): string {
   const yamlText = YAML.stringify(data, { lineWidth: 0 }).trimEnd();
   return `---\n${yamlText}\n---\n\n${body.trim()}\n`;
 }
 
-function mapping(contract, key, findings) {
+function mapping(contract: UnknownRecord, key: string, findings: Finding[]): UnknownRecord {
   const value = contract[key];
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!isUnknownRecord(value)) {
     findings.push(finding("error", `contract.${key}`, `\`${key}\` must be a mapping`));
     return {};
   }
   return value;
 }
 
-function validatePathValue(value, description, findings) {
+function validatePathValue(value: unknown, description: string, findings: Finding[]): void {
   if (!isVaultRelativePath(value)) {
-    findings.push(finding("error", "contract.path-boundary", `${description} must stay within the vault root`, value));
+    findings.push(finding("error", "contract.path-boundary", `${description} must stay within the vault root`, typeof value === "string" ? value : null));
   }
 }
 
-function validatePathValues(values, { field, findings, requireNonempty = false }) {
+function validatePathValues(
+  values: unknown,
+  { field, findings, requireNonempty = false }: { field: string; findings: Finding[]; requireNonempty?: boolean },
+): string[] {
   if (!Array.isArray(values) || (requireNonempty && values.length === 0) || values.some((item) => typeof item !== "string")) {
     const qualifier = requireNonempty ? "non-empty " : "";
     findings.push(finding("error", `contract.${field}`, `\`${field}\` must be a ${qualifier}string list`));
@@ -87,8 +104,11 @@ function validatePathValues(values, { field, findings, requireNonempty = false }
   return values;
 }
 
-export function validateContractData(contract) {
-  const findings = [];
+export function validateContractData(contract: unknown): Finding[] {
+  const findings: Finding[] = [];
+  if (!isUnknownRecord(contract)) {
+    return [finding("error", "contract.mapping", "contract frontmatter must be a mapping")];
+  }
   if (contract.schema_version !== 1) findings.push(finding("error", "contract.schema-version", "`schema_version` must equal 1"));
 
   const vaultId = contract.vault_id;
@@ -106,11 +126,11 @@ export function validateContractData(contract) {
 
   const subjects = mapping(contract, "subjects", findings);
   const mode = subjects.mode;
-  let values = subjects.values;
-  if (!new Set(["single", "multiple"]).has(mode)) {
+  let values: string[] = Array.isArray(subjects.values) ? subjects.values.filter((item): item is string => typeof item === "string") : [];
+  if (mode !== "single" && mode !== "multiple") {
     findings.push(finding("error", "contract.subject-mode", "`subjects.mode` must be `single` or `multiple`"));
   }
-  if (!Array.isArray(values) || !values.length || values.some((item) => typeof item !== "string")) {
+  if (!Array.isArray(subjects.values) || !subjects.values.length || subjects.values.some((item) => typeof item !== "string")) {
     findings.push(finding("error", "contract.subject-values", "`subjects.values` must be a non-empty string list"));
     values = [];
   } else if (new Set(values).size !== values.length) {
@@ -124,20 +144,20 @@ export function validateContractData(contract) {
   }
 
   const write = mapping(contract, "write", findings);
-  if (Object.keys(write).length && !new Set(["explicit-only", "proactive-durable-capture"]).has(write.policy)) {
+  if (Object.keys(write).length && write.policy !== "explicit-only" && write.policy !== "proactive-durable-capture") {
     findings.push(finding("error", "contract.write-policy", "unsupported `write.policy`"));
   }
-  if (Object.keys(write).length && !new Set(["explicit-only", "maintain-after-material-change"]).has(write.current_state_policy)) {
+  if (Object.keys(write).length && write.current_state_policy !== "explicit-only" && write.current_state_policy !== "maintain-after-material-change") {
     findings.push(finding("error", "contract.current-state-policy", "unsupported current-state policy"));
   }
 
   const history = mapping(contract, "history", findings);
-  if (Object.keys(history).length && !new Set(["git", "none"]).has(history.type)) {
+  if (Object.keys(history).length && history.type !== "git" && history.type !== "none") {
     findings.push(finding("error", "contract.history", "`history.type` must be `git` or `none`"));
   }
 
   const sync = mapping(contract, "sync", findings);
-  if (Object.keys(sync).length && !new Set(["none", "git-remote-push", "lifecycle-hook"]).has(sync.mode)) {
+  if (Object.keys(sync).length && sync.mode !== "none" && sync.mode !== "git-remote-push" && sync.mode !== "lifecycle-hook") {
     findings.push(finding("error", "contract.sync", "unsupported `sync.mode`"));
   }
   if (sync.mode === "lifecycle-hook" && !sync.adapter) {
@@ -145,7 +165,7 @@ export function validateContractData(contract) {
   }
 
   const backup = mapping(contract, "backup", findings);
-  if (Object.keys(backup).length && !new Set(["none", "lifecycle-hook"]).has(backup.mode)) {
+  if (Object.keys(backup).length && backup.mode !== "none" && backup.mode !== "lifecycle-hook") {
     findings.push(finding("error", "contract.backup", "unsupported `backup.mode`"));
   }
   if (backup.mode === "lifecycle-hook" && !backup.adapter) {
@@ -182,17 +202,17 @@ export function validateContractData(contract) {
     findings.push(finding("error", "contract.metadata-profiles", "`metadata_profiles` must be a mapping"));
   } else {
     for (const [name, profile] of Object.entries(profiles)) {
-      if (!profile || typeof profile !== "object" || Array.isArray(profile)) {
+      if (!isUnknownRecord(profile)) {
         findings.push(finding("error", "contract.metadata-profile", `profile \`${name}\` must be a mapping`));
         continue;
       }
-      if (!Array.isArray(profile.paths) || !profile.paths.length || profile.paths.some((item) => typeof item !== "string")) {
+      if (!Array.isArray(profile.paths) || !profile.paths.length || profile.paths.some((item: unknown) => typeof item !== "string")) {
         findings.push(finding("error", "contract.metadata-paths", `profile \`${name}\` requires string paths`));
       } else {
         for (const profilePath of profile.paths) validatePathValue(profilePath, `metadata profile \`${name}\` path`, findings);
       }
       if (!Array.isArray(profile.required)) findings.push(finding("error", "contract.metadata-required", `profile \`${name}\` requires a field list`));
-      if (!new Set(["error", "warning"]).has(profile.severity ?? "error")) {
+      if (profile.severity !== undefined && profile.severity !== "error" && profile.severity !== "warning") {
         findings.push(finding("error", "contract.metadata-severity", `profile \`${name}\` has invalid severity`));
       }
     }
@@ -204,24 +224,25 @@ export function validateContractData(contract) {
   } else {
     const subjectValues = new Set(values);
     for (const [name, view] of Object.entries(focusViews)) {
-      if (!view || typeof view !== "object" || Array.isArray(view)) {
+      if (!isUnknownRecord(view)) {
         findings.push(finding("error", "contract.focus-view", `focus view \`${name}\` must be a mapping`));
         continue;
       }
       if (typeof view.path !== "string") findings.push(finding("error", "contract.focus-path", `focus view \`${name}\` requires \`path\``));
       else validatePathValue(view.path, `focus view \`${name}\` path`, findings);
-      if (!subjectValues.has(view.subject)) findings.push(finding("error", "contract.focus-subject", `focus view \`${name}\` has unknown subject`));
-      for (const key of ["max_active", "max_top"]) {
-        if (!Number.isInteger(view[key]) || view[key] < 1) findings.push(finding("error", `contract.focus-${key}`, `focus view \`${name}\` requires positive \`${key}\``));
+      if (typeof view.subject !== "string" || !subjectValues.has(view.subject)) findings.push(finding("error", "contract.focus-subject", `focus view \`${name}\` has unknown subject`));
+      for (const key of ["max_active", "max_top"] as const) {
+        const value = view[key];
+        if (typeof value !== "number" || !Number.isInteger(value) || value < 1) findings.push(finding("error", `contract.focus-${key}`, `focus view \`${name}\` requires positive \`${key}\``));
       }
-      if (Number.isInteger(view.max_active) && Number.isInteger(view.max_top) && view.max_active > view.max_top) {
+      if (typeof view.max_active === "number" && typeof view.max_top === "number" && Number.isInteger(view.max_active) && Number.isInteger(view.max_top) && view.max_active > view.max_top) {
         findings.push(finding("error", "contract.focus-limits", `focus view \`${name}\` has max_active > max_top`));
       }
     }
   }
 
   const privacy = contract.privacy ?? {};
-  if (!privacy || typeof privacy !== "object" || Array.isArray(privacy)) {
+  if (!isUnknownRecord(privacy)) {
     findings.push(finding("error", "contract.privacy", "`privacy.never_track` must be a string list"));
   } else {
     validatePathValues(privacy.never_track ?? [], { field: "privacy.never_track", findings });

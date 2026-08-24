@@ -13,10 +13,11 @@ npm run build
 npm run validate:npx
 ```
 
-Edit the top-level protocol, schema, and JavaScript modules rather than their generated copies inside
-`skills/*/references` and `skills/*/scripts`. Include tests for behavioral or safety changes. Never
-place credentials or real personal, company, health, family, or private-vault content in issues,
-fixtures, logs, or pull requests.
+Edit the top-level protocol, schema, and strict TypeScript modules rather than their generated copies
+inside `skills/*/references` and `skills/*/scripts`. `npm run typecheck` checks the source without
+emitting files; `npm run build` bundles it into the self-contained JavaScript runners that users
+install. Include tests for behavioral or safety changes. Never place credentials or real personal,
+company, health, family, or private-vault content in issues, fixtures, logs, or pull requests.
 
 ## Distribution metadata
 

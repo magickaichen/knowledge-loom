@@ -10,7 +10,7 @@ import {
   ResolutionError,
   resolveApplicableVault,
   resolveVault,
-} from "../src/knowledge-loom/registry.mjs";
+} from "../src/knowledge-loom/registry.ts";
 import { FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
 function writeRegistry(target, vaults, projects = undefined) {

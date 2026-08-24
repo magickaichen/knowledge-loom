@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { canonicalPath, expandHome } from "../src/knowledge-loom/pathing.mjs";
+import { canonicalPath, expandHome } from "../src/knowledge-loom/pathing.ts";
 
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SKILLS = ["use-knowledge-vault", "init-knowledge-vault", "audit-knowledge-vault", "manage-current-focus"];

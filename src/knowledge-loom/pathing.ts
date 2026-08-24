@@ -2,13 +2,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-export function expandHome(value) {
+export function expandHome(value: string): string {
   if (value === "~") return os.homedir();
   if (value.startsWith("~/")) return path.join(os.homedir(), value.slice(2));
   return value;
 }
 
-export function isVaultRelativePath(value) {
+export function isVaultRelativePath(value: unknown): value is string {
   if (typeof value !== "string" || value.length === 0 || value.includes("\0") || value.includes("\\")) {
     return false;
   }
@@ -16,7 +16,7 @@ export function isVaultRelativePath(value) {
   return !value.split("/").includes("..");
 }
 
-export function canonicalPath(value) {
+export function canonicalPath(value: unknown): string {
   const absolute = path.resolve(expandHome(String(value)));
   let existing = absolute;
   const missing = [];
@@ -29,12 +29,12 @@ export function canonicalPath(value) {
   return path.join(fs.realpathSync(existing), ...missing);
 }
 
-export function isWithin(root, candidate) {
+export function isWithin(root: string, candidate: string): boolean {
   const relative = path.relative(canonicalPath(root), canonicalPath(candidate));
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
 }
 
-export function resolveVaultPath(root, value) {
+export function resolveVaultPath(root: string, value: unknown): string | null {
   if (!isVaultRelativePath(value)) return null;
   try {
     const resolvedRoot = canonicalPath(root);
@@ -45,7 +45,7 @@ export function resolveVaultPath(root, value) {
   }
 }
 
-export function resolveVaultPatternPrefix(root, value) {
+export function resolveVaultPatternPrefix(root: string, value: unknown): string | null {
   if (!isVaultRelativePath(value)) return null;
   const parts = [];
   for (const part of value.split("/")) {
@@ -55,6 +55,6 @@ export function resolveVaultPatternPrefix(root, value) {
   return resolveVaultPath(root, parts.length ? parts.join("/") : ".");
 }
 
-export function toPosixRelative(root, candidate) {
+export function toPosixRelative(root: string, candidate: string): string {
   return path.relative(root, candidate).split(path.sep).join("/");
 }

@@ -33,7 +33,8 @@ test("release checker writes curated changelog notes", (t) => {
   const result = runChecker(`v${version}`, "--notes-output", notes);
   assert.equal(result.status, 0, result.stderr);
   const contents = fs.readFileSync(notes, "utf8");
-  assert.ok(contents.startsWith("Applicable vaults now participate automatically in substantive project work"));
+  assert.ok(contents.startsWith("The contributor runtime now uses strict TypeScript"));
+  assert.match(contents, /self-contained JavaScript runner/);
   assert.doesNotMatch(contents, /Full Changelog/);
 });
 

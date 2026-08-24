@@ -57,7 +57,7 @@ test("Claude marketplace and all-skills group point to the root plugin", () => {
   assert.deepEqual(manifest.skills, CLAUDE_PLUGIN_SKILLS);
 });
 
-test("repository runtime is JavaScript-only", () => {
+test("distributed runtime excludes contributor-only and Python files", () => {
   const forbidden = [];
   const visit = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -69,6 +69,14 @@ test("repository runtime is JavaScript-only", () => {
   };
   visit(PACKAGE_ROOT);
   assert.deepEqual(forbidden, []);
+  const project = readJson("package.json");
+  const sourceFiles = fs.readdirSync(path.join(PACKAGE_ROOT, "src", "knowledge-loom"));
+  assert.ok(sourceFiles.length > 0);
+  assert.ok(sourceFiles.every((name) => name.endsWith(".ts")));
+  assert.equal(project.scripts.typecheck, "tsc --noEmit");
+  assert.equal(project.scripts["install:skills"], "tsx scripts/install.mjs");
+  assert.match(project.bin["knowledge-loom"], /\.mjs$/);
+  assert.doesNotMatch(project.bin["knowledge-loom"], /^src\//);
 });
 
 test("README leads with the outcome and explains the no-install runner", () => {
@@ -94,5 +102,7 @@ test("README leads with the outcome and explains the no-install runner", () => {
   assert.match(readme, /content_check_adapters:/);
   assert.match(readme, /Node\.js 20\+/);
   assert.match(readme, /does not run `npm install`/);
+  assert.match(readme, /strict TypeScript modules/);
+  assert.match(readme, /one self-contained JavaScript runner/);
   assert.match(readme, /Claude Desktop custom skills use a ZIP upload/);
 });

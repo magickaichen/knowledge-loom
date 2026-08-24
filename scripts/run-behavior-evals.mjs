@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 
-import { loadVault, renderContract } from "../src/knowledge-loom/contract.mjs";
+import { loadVault, renderContract } from "../src/knowledge-loom/contract.ts";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
