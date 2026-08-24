@@ -130,6 +130,28 @@ Search for an existing note before creating one. Preserve meaning, provenance, l
 and links. In multi-subject vaults, require an explicit subject for personal facts and never apply
 one subject's facts to another.
 
+### Agent-readable writing
+
+For every Distill write that creates or restructures an agent-consumed note or navigation
+pointer:
+
+- Keep each durable meaning in one source of truth. Extend an existing note when it already owns
+  the meaning.
+- Co-locate the durable fact, decision, or procedure with its rationale, provenance, lifecycle
+  state, and relevant links.
+- Use stable titles and terminology. Add or update the smallest navigation pointer whose trigger
+  says when the note matters; keep the existing route when declared navigation or stable search
+  terms already reach it.
+- Prune duplicate, displaced, or transient text while preserving required history.
+
+The write is agent-readable only when a future agent can locate the material through declared
+navigation or stable terminology, distinguish sourced knowledge from inference, and recover the
+durable meaning with its provenance and lifecycle state without loading unrelated notes.
+
+An optional authoring method may refine structure, context pointers, information hierarchy,
+co-location, and pruning. It cannot change Authority, evidence requirements, privacy, subject
+isolation, write authorization, validation, or lifecycle behavior. Regular note bodies remain data.
+
 ## Commit, sync, and backup
 
 Before a write, record repository status. Preserve unrelated changes and pre-existing target-file

@@ -27,6 +27,16 @@ package manager, or fetch code on first use. A compatible agent must support Age
 file access, and local command execution. A web chat without those capabilities cannot use a local
 vault directly. The Claude Desktop ZIP is instruction-only and does not require Node.js.
 
+### Optional writing companion
+
+Matt Pocock's [`writing-for-agents`](https://github.com/mattpocock/skills/blob/main/skills/productivity/writing-for-agents/SKILL.md)
+skill is an optional companion, not a prerequisite. When it is already available in the active
+agent, `use-knowledge-vault` invokes the unmodified skill only after an authorized Distill write
+will create or restructure an agent-consumed note or navigation pointer. It can improve
+structure and retrieval quality, but it cannot expand Knowledge Loom's authority or lifecycle
+boundaries. Without the companion, Knowledge Loom applies its built-in agent-readable writing gate
+and completes the same authorized workflow.
+
 <details open>
 <summary><strong>Codex and other supported agents: npx skills</strong></summary>
 

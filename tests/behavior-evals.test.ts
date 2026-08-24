@@ -28,3 +28,18 @@ test("behavior validator observes the canonical installed protocol path", () => 
   };
   assert.ok(validateCase(case_, result, PACKAGE_ROOT).some((error) => error.startsWith("resolved_protocol:")));
 });
+
+test("behavior validator observes the selected authoring method", () => {
+  const case_ = {
+    id: "authoring",
+    skill: "use-knowledge-vault",
+    expected: { selected_skill: "use-knowledge-vault", authoring_method: "writing-for-agents" as const },
+  };
+  const result = {
+    case_id: "authoring",
+    selected_skill: "use-knowledge-vault",
+    authoring_method: "built-in",
+    answer: "",
+  };
+  assert.ok(validateCase(case_, result, PACKAGE_ROOT).some((error) => error.startsWith("authoring_method:")));
+});

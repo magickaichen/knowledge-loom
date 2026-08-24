@@ -33,7 +33,12 @@ policy, lifecycle, and failure behavior.
    complete **Retrieve** before finishing the primary task. Use only context that materially affects
    its result.
 4. Evaluate **Write authorization** after the primary task. Enter **Distill** only when the selected
-   policy and current request authorize a vault change.
+   policy and current request authorize a vault change. When that branch will create or restructure
+   an agent-consumed note or navigation pointer, apply the protocol's **Agent-readable
+   writing** gate. If the active skill catalog exposes `writing-for-agents`, invoke that unmodified
+   companion at this point for structure, context pointers, information hierarchy, co-location, and
+   pruning, then complete the protocol gate. Its absence selects the built-in gate and does not
+   block the authorized write.
 5. After any write, run the deterministic audit:
 
    ```bash
