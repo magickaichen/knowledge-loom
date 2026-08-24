@@ -2,20 +2,29 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import type { TestContext } from "node:test";
 import YAML from "yaml";
 
 import { auditVault, matchesPath } from "../src/knowledge-loom/audit.ts";
 import { runDeclaredContentCheck } from "../src/knowledge-loom/content-checks.ts";
-import { loadVault, renderContract } from "../src/knowledge-loom/contract.ts";
-import { copyFixture, FIXTURES, temporaryDirectory } from "./helpers.mjs";
+import { isUnknownRecord, loadVault, renderContract } from "../src/knowledge-loom/contract.ts";
+import { copyFixture, FIXTURES, temporaryDirectory } from "./helpers.ts";
 
-function contentCheckFixture(t, {
+interface ContentCheckFixtureOptions {
+  result?: unknown;
+  exitCode?: number;
+  rawOutput?: string | null;
+  arguments_?: string[] | null;
+  executable?: string;
+}
+
+function contentCheckFixture(t: TestContext, {
   result,
   exitCode = 0,
   rawOutput = null,
   arguments_ = null,
   executable = process.execPath,
-} = {}) {
+}: ContentCheckFixtureOptions = {}): { root: string; registry: string; script: string } {
   const temporary = temporaryDirectory(t);
   const root = copyFixture("single-proactive", path.join(temporary, "vault"));
   const vault = loadVault(root);
@@ -133,7 +142,7 @@ test("built-in errors prevent content checker execution", async (t) => {
   assert.equal(fs.existsSync(marker), false);
 });
 
-for (const [name, setup, code] of [
+const contentCheckErrorCases: Array<[string, ContentCheckFixtureOptions, string]> = [
   [
     "invalid JSON",
     { result: null, rawOutput: "not json" },
@@ -144,7 +153,9 @@ for (const [name, setup, code] of [
     { result: { status: "pass", validationDate: "2026-08-12", findings: [] }, exitCode: 1 },
     "content-check.exit-status",
   ],
-]) {
+];
+
+for (const [name, setup, code] of contentCheckErrorCases) {
   test(`content checker reports ${name}`, async (t) => {
     const { root, registry } = contentCheckFixture(t, setup);
     assert.ok(
@@ -354,6 +365,8 @@ test("malformed optional focus settings do not hide limit findings", async (t) =
   const root = copyFixture("single-proactive", path.join(temporaryDirectory(t), "single"));
   const vault = loadVault(root);
   const contract = structuredClone(vault.contract);
+  assert.ok(isUnknownRecord(contract.focus_views));
+  assert.ok(isUnknownRecord(contract.focus_views.work));
   contract.focus_views.work.require_start_here = "not-a-boolean";
   fs.writeFileSync(vault.contractPath, renderContract(contract, vault.body));
   const focus = path.join(root, "Projects", "current-focus.md");
@@ -380,12 +393,14 @@ test("glob character classes match privacy and metadata paths", () => {
   assert.equal(matchesPath("Private/[!]].md", "Private/].md"), false);
 });
 
-for (const [relative, findingCode] of [
+const symlinkEscapeCases: Array<[string, string]> = [
   ["AGENTS.md", "path.instruction-boundary"],
   ["INDEX.md", "path.navigation-boundary"],
   ["Projects/current-focus.md", "focus.boundary"],
   ["Projects/parser-project.md", "path.metadata-boundary"],
-]) {
+];
+
+for (const [relative, findingCode] of symlinkEscapeCases) {
   test(`audit rejects symlink escape from ${relative}`, async (t) => {
     const temporary = temporaryDirectory(t);
     const root = copyFixture("single-proactive", path.join(temporary, "vault"));
@@ -416,6 +431,7 @@ test("privacy pattern rejects a symlinked prefix outside the vault", async (t) =
   fs.symlinkSync(outside, path.join(root, "External"), "dir");
   const vault = loadVault(root);
   const contract = structuredClone(vault.contract);
+  assert.ok(isUnknownRecord(contract.privacy));
   contract.privacy.never_track = ["External/**"];
   fs.writeFileSync(vault.contractPath, renderContract(contract, vault.body));
   assert.ok((await auditVault(loadVault(root))).some((item) => item.code === "path.privacy-boundary" && item.path === "External/**"));

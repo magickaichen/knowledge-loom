@@ -4,15 +4,18 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { checkSkill, managedFiles, SKILL_REFERENCES } from "../scripts/build-skill-packages.mjs";
+import { checkSkill, managedFiles, SKILL_REFERENCES } from "../scripts/build-skill-packages.ts";
+import type { SkillName } from "../scripts/build-skill-packages.ts";
 import { splitFrontmatter } from "../src/knowledge-loom/contract.ts";
-import { FIXTURES, PACKAGE_ROOT, temporaryDirectory } from "./helpers.mjs";
+import { asRecord, FIXTURES, PACKAGE_ROOT, temporaryDirectory } from "./helpers.ts";
+
+const SKILL_NAMES = Object.keys(SKILL_REFERENCES) as SkillName[];
 
 test("generated skill packages are current", async () => {
-  for (const skillName of Object.keys(SKILL_REFERENCES)) assert.deepEqual(await checkSkill(PACKAGE_ROOT, skillName), []);
+  for (const skillName of SKILL_NAMES) assert.deepEqual(await checkSkill(PACKAGE_ROOT, skillName), []);
 });
 
-for (const skillName of Object.keys(SKILL_REFERENCES)) {
+for (const skillName of SKILL_NAMES) {
   test(`${skillName} runner works without the source checkout or node_modules`, (t) => {
     const temporary = temporaryDirectory(t);
     const installed = path.join(temporary, "installed", skillName);
@@ -39,19 +42,22 @@ test("unmanaged runtime files are treated as package drift", (t) => {
 });
 
 test("skill frontmatter and plugin manifests match the distribution", () => {
-  const skillNames = new Set(Object.keys(SKILL_REFERENCES));
+  const skillNames = new Set<string>(SKILL_NAMES);
   for (const skillName of skillNames) {
     const [metadata, body] = splitFrontmatter(fs.readFileSync(path.join(PACKAGE_ROOT, "skills", skillName, "SKILL.md"), "utf8"), { source: skillName });
     assert.deepEqual(new Set(Object.keys(metadata)), new Set(["name", "description"]));
     assert.equal(metadata.name, skillName);
-    assert.ok(metadata.description.trim());
+    assert.equal(typeof metadata.description, "string");
+    assert.ok((metadata.description as string).trim());
     assert.match(body, /Requires Node\.js 20\+/);
     assert.ok(fs.statSync(path.join(PACKAGE_ROOT, "skills", skillName, "licenses", "yaml.txt")).isFile());
   }
-  const codex = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, ".codex-plugin", "plugin.json"), "utf8"));
-  const claude = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, ".claude-plugin", "plugin.json"), "utf8"));
+  const codex = asRecord(JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, ".codex-plugin", "plugin.json"), "utf8")) as unknown, "Codex manifest");
+  const claude = asRecord(JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, ".claude-plugin", "plugin.json"), "utf8")) as unknown, "Claude manifest");
   assert.equal(codex.name, "knowledge-loom");
   assert.equal(claude.name, "knowledge-loom");
-  assert.equal(path.resolve(PACKAGE_ROOT, codex.skills), path.join(PACKAGE_ROOT, "skills"));
-  assert.deepEqual(new Set(claude.skills.map((entry) => path.basename(entry))), skillNames);
+  assert.equal(typeof codex.skills, "string");
+  assert.equal(path.resolve(PACKAGE_ROOT, codex.skills as string), path.join(PACKAGE_ROOT, "skills"));
+  assert.ok(Array.isArray(claude.skills) && claude.skills.every((entry) => typeof entry === "string"));
+  assert.deepEqual(new Set((claude.skills as string[]).map((entry) => path.basename(entry))), skillNames);
 });

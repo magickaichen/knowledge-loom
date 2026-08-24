@@ -271,7 +271,7 @@ To build the same self-contained ZIP from a checkout:
 
 ```bash
 npm ci
-node scripts/build-claude-desktop-skill.mjs
+node --import tsx scripts/build-claude-desktop-skill.ts
 ```
 
 To use local notes, start a Cowork session and connect exactly one folder containing
@@ -361,9 +361,10 @@ access control, encrypt notes, host a sync service, or reorganize an existing va
 ## Develop and validate
 
 Fixtures are fictional and must not contain real work, health, family, credential, or private vault
-data. Edit the top-level strict TypeScript modules, protocol, and schema rather than generated
-copies inside individual skills. The contributor toolchain uses TypeScript and `tsx`; installed
-skills receive one self-contained JavaScript runner and do not install either dependency.
+data. Edit the top-level protocol, schema, and handwritten TypeScript under `src/`, `scripts/`, and
+`tests/` rather than generated copies inside individual skills. Installed skills receive one
+self-contained JavaScript runner and do not install TypeScript, `tsx`, `node_modules`, or a source
+checkout.
 
 Run the complete validation entrypoint before committing:
 

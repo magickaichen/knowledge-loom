@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -7,14 +6,138 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 
-import { loadVault, renderContract } from "../src/knowledge-loom/contract.ts";
+import { isUnknownRecord, loadVault, renderContract } from "../src/knowledge-loom/contract.ts";
+import { errorMessage } from "../src/knowledge-loom/errors.ts";
+import type { UnknownRecord } from "../src/knowledge-loom/types.ts";
 
 const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-export function treeDigest(root) {
+type Runtime = "codex" | "claude";
+type ContentCheckStatus = "pass" | "fail" | "error";
+
+interface BehaviorExpected extends UnknownRecord {
+  selected_skill?: string | null;
+  selected_vault?: string | null;
+  would_write?: boolean;
+  ignored_embedded_instruction?: boolean;
+  resolved_protocol?: string | null;
+  audit_classification?: string | null;
+  answer_contains?: string[];
+  answer_contains_any?: string[];
+  answer_matches_any?: string[];
+  answer_excludes?: string[];
+  response_contains?: string[];
+  response_matches_any?: string[];
+}
+
+interface ValidationCase {
+  id: string;
+  skill?: string;
+  expected: BehaviorExpected;
+}
+
+interface BehaviorCase extends ValidationCase {
+  prompt: string;
+  fixture?: string;
+  fixtures?: string[];
+  select_vault?: boolean;
+  mode?: "execute" | "native-route";
+  via_symlink?: boolean;
+  command_access?: boolean;
+  content_check?: {
+    adapter: string;
+    result: UnknownRecord & { status: ContentCheckStatus };
+  };
+}
+
+interface EvalOptions {
+  runtime: Runtime | "both";
+  model: string | null;
+  cases: string[];
+  claudeMaxBudgetUsd: number;
+  run: boolean;
+}
+
+interface EvalRegistry extends UnknownRecord {
+  schema_version: 1;
+  vaults: Record<string, { path: string }>;
+  content_check_adapters?: Record<string, { executable: string; arguments: string[] }>;
+}
+
+function parseJsonRecord(text: string, description: string): UnknownRecord {
+  const parsed: unknown = JSON.parse(text);
+  if (!isUnknownRecord(parsed)) throw new Error(`${description} must be a JSON object`);
+  return parsed;
+}
+
+function parseBehaviorExpected(value: unknown, caseId: string): BehaviorExpected {
+  if (!isUnknownRecord(value)) throw new Error(`behavior case ${caseId} has invalid expected`);
+  for (const key of [
+    "answer_contains",
+    "answer_contains_any",
+    "answer_matches_any",
+    "answer_excludes",
+    "response_contains",
+    "response_matches_any",
+  ] as const) {
+    const field = value[key];
+    if (field !== undefined && (!Array.isArray(field) || field.some((item) => typeof item !== "string"))) {
+      throw new Error(`behavior case ${caseId} has invalid expected.${key}`);
+    }
+  }
+  for (const key of ["would_write", "ignored_embedded_instruction"] as const) {
+    if (value[key] !== undefined && typeof value[key] !== "boolean") {
+      throw new Error(`behavior case ${caseId} has invalid expected.${key}`);
+    }
+  }
+  for (const key of ["selected_skill", "selected_vault", "resolved_protocol", "audit_classification"] as const) {
+    if (value[key] !== undefined && value[key] !== null && typeof value[key] !== "string") {
+      throw new Error(`behavior case ${caseId} has invalid expected.${key}`);
+    }
+  }
+  return value as BehaviorExpected;
+}
+
+function parseBehaviorCases(value: unknown): BehaviorCase[] {
+  if (!Array.isArray(value)) throw new Error("behavior cases must be a list");
+  return value.map((candidate, index) => {
+    if (!isUnknownRecord(candidate) || typeof candidate.id !== "string" || typeof candidate.prompt !== "string") {
+      throw new Error(`behavior case ${index + 1} requires id, prompt, and expected`);
+    }
+    if (candidate.skill !== undefined && typeof candidate.skill !== "string") {
+      throw new Error(`behavior case ${candidate.id} has invalid skill`);
+    }
+    for (const key of ["fixtures"] as const) {
+      const field = candidate[key];
+      if (field !== undefined && (!Array.isArray(field) || field.some((item) => typeof item !== "string"))) {
+        throw new Error(`behavior case ${candidate.id} has invalid ${key}`);
+      }
+    }
+    for (const key of ["fixture"] as const) {
+      if (candidate[key] !== undefined && typeof candidate[key] !== "string") {
+        throw new Error(`behavior case ${candidate.id} has invalid ${key}`);
+      }
+    }
+    for (const key of ["select_vault", "via_symlink", "command_access"] as const) {
+      if (candidate[key] !== undefined && typeof candidate[key] !== "boolean") {
+        throw new Error(`behavior case ${candidate.id} has invalid ${key}`);
+      }
+    }
+    if (candidate.mode !== undefined && candidate.mode !== "execute" && candidate.mode !== "native-route") {
+      throw new Error(`behavior case ${candidate.id} has invalid mode`);
+    }
+    const contentCheck = candidate.content_check;
+    if (contentCheck !== undefined && (!isUnknownRecord(contentCheck) || typeof contentCheck.adapter !== "string" || !isUnknownRecord(contentCheck.result) || !["pass", "fail", "error"].includes(String(contentCheck.result.status)))) {
+      throw new Error(`behavior case ${candidate.id} has invalid content_check`);
+    }
+    return { ...candidate, expected: parseBehaviorExpected(candidate.expected, candidate.id) } as unknown as BehaviorCase;
+  });
+}
+
+export function treeDigest(root: string): string {
   const digest = crypto.createHash("sha256");
-  const files = [];
-  const visit = (directory) => {
+  const files: string[] = [];
+  const visit = (directory: string): void => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const candidate = path.join(directory, entry.name);
       if (entry.isDirectory() && !entry.isSymbolicLink()) visit(candidate);
@@ -29,24 +152,24 @@ export function treeDigest(root) {
   return digest.digest("hex");
 }
 
-function parseClaudeOutput(stdout) {
-  const payload = JSON.parse(stdout);
-  if (payload.structured_output && typeof payload.structured_output === "object") return payload.structured_output;
-  if (payload.result && typeof payload.result === "object") return payload.result;
-  if (typeof payload.result === "string") return JSON.parse(payload.result);
+function parseClaudeOutput(stdout: string): UnknownRecord {
+  const payload = parseJsonRecord(stdout, "Claude output");
+  if (isUnknownRecord(payload.structured_output)) return payload.structured_output;
+  if (isUnknownRecord(payload.result)) return payload.result;
+  if (typeof payload.result === "string") return parseJsonRecord(payload.result, "Claude result");
   throw new Error("Claude output did not contain structured_output or JSON result");
 }
 
-function readFrontmatter(filePath) {
+function readFrontmatter(filePath: string): UnknownRecord {
   const text = fs.readFileSync(filePath, "utf8");
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) throw new Error(`${filePath}: expected YAML frontmatter`);
-  const metadata = YAML.parse(match[1]);
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) throw new Error(`${filePath}: frontmatter must be a mapping`);
+  const metadata: unknown = YAML.parse(match[1]!);
+  if (!isUnknownRecord(metadata)) throw new Error(`${filePath}: frontmatter must be a mapping`);
   return metadata;
 }
 
-function runCodex(packageRoot, workspace, prompt, schema, model) {
+function runCodex(packageRoot: string, workspace: string, prompt: string, schema: string, model: string | null): UnknownRecord {
   const output = path.join(path.dirname(workspace), "codex-output.json");
   const command = [
     "exec", "--ephemeral", "--skip-git-repo-check", "--sandbox", "read-only", "--cd", workspace,
@@ -56,10 +179,10 @@ function runCodex(packageRoot, workspace, prompt, schema, model) {
   command.push(prompt);
   const completed = spawnSync("codex", command, { encoding: "utf8" });
   if (completed.status !== 0) throw new Error(`Codex failed:\n${completed.stderr}\n${completed.stdout}`);
-  return JSON.parse(fs.readFileSync(output, "utf8"));
+  return parseJsonRecord(fs.readFileSync(output, "utf8"), "Codex output");
 }
 
-function runClaude(packageRoot, workspace, prompt, schema, model, maxBudgetUsd, commandAccess) {
+function runClaude(packageRoot: string, workspace: string, prompt: string, schema: string, model: string | null, maxBudgetUsd: number, commandAccess: boolean): UnknownRecord {
   const command = [
     "--print", "--no-session-persistence", "--setting-sources", "project", "--system-prompt",
     "You are evaluating local knowledge-vault skill routing or execution. Follow the evaluation prompt, use read-only tools, and return the requested JSON.",
@@ -73,9 +196,9 @@ function runClaude(packageRoot, workspace, prompt, schema, model, maxBudgetUsd, 
   return parseClaudeOutput(completed.stdout);
 }
 
-export function validateCase(case_, result, packageRoot) {
+export function validateCase(case_: ValidationCase, result: UnknownRecord, packageRoot: string): string[] {
   const expected = case_.expected;
-  const errors = [];
+  const errors: string[] = [];
   if (result.case_id !== case_.id) errors.push(`case_id: expected ${JSON.stringify(case_.id)}, got ${JSON.stringify(result.case_id)}`);
   const expectedSkill = expected.selected_skill;
   const actualSkill = result.selected_skill;
@@ -87,7 +210,10 @@ export function validateCase(case_, result, packageRoot) {
   }
   let expectedProtocol = expected.resolved_protocol;
   if (expectedProtocol === "package") expectedProtocol = path.resolve(packageRoot, "references", "protocol.md");
-  else if (expectedProtocol === "skill") expectedProtocol = path.resolve(packageRoot, "skills", case_.skill, "references", "protocol.md");
+  else if (expectedProtocol === "skill") {
+    if (!case_.skill) throw new Error(`${case_.id}: skill protocol expectation requires a skill`);
+    expectedProtocol = path.resolve(packageRoot, "skills", case_.skill, "references", "protocol.md");
+  }
   if (Object.hasOwn(expected, "resolved_protocol") && result.resolved_protocol !== expectedProtocol) errors.push(`resolved_protocol: expected ${JSON.stringify(expectedProtocol)}, got ${JSON.stringify(result.resolved_protocol)}`);
   if (Object.hasOwn(expected, "audit_classification") && result.audit_classification !== expected.audit_classification) errors.push(`audit_classification: expected ${JSON.stringify(expected.audit_classification)}, got ${JSON.stringify(result.audit_classification)}`);
   const answer = String(result.answer ?? "");
@@ -104,31 +230,41 @@ export function validateCase(case_, result, packageRoot) {
   return errors;
 }
 
-function parseArguments(arguments_) {
-  const options = { runtime: "both", model: null, cases: [], claudeMaxBudgetUsd: 0.5, run: false };
+function parseArguments(arguments_: string[]): EvalOptions {
+  const options: EvalOptions = { runtime: "both", model: null, cases: [], claudeMaxBudgetUsd: 0.5, run: false };
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
     if (argument === "--run") options.run = true;
-    else if (argument === "--runtime" && arguments_[index + 1]) options.runtime = arguments_[++index];
-    else if (argument === "--model" && arguments_[index + 1]) options.model = arguments_[++index];
-    else if (argument === "--case" && arguments_[index + 1]) options.cases.push(arguments_[++index]);
-    else if (argument === "--claude-max-budget-usd" && arguments_[index + 1]) options.claudeMaxBudgetUsd = Number(arguments_[++index]);
-    else throw new Error(`unknown or incomplete argument: ${argument}`);
+    else if (argument === "--runtime" && arguments_[index + 1]) {
+      const runtime = arguments_[index + 1]!;
+      if (runtime !== "codex" && runtime !== "claude" && runtime !== "both") throw new Error(`invalid runtime: ${runtime}`);
+      options.runtime = runtime;
+      index += 1;
+    } else if (argument === "--model" && arguments_[index + 1]) {
+      options.model = arguments_[index + 1]!;
+      index += 1;
+    } else if (argument === "--case" && arguments_[index + 1]) {
+      options.cases.push(arguments_[index + 1]!);
+      index += 1;
+    } else if (argument === "--claude-max-budget-usd" && arguments_[index + 1]) {
+      options.claudeMaxBudgetUsd = Number(arguments_[index + 1]!);
+      index += 1;
+    } else throw new Error(`unknown or incomplete argument: ${argument}`);
   }
   if (!["codex", "claude", "both"].includes(options.runtime)) throw new Error(`invalid runtime: ${options.runtime}`);
   return options;
 }
 
-function interpolate(template, variables) {
-  return template.replaceAll(/\{([a-zA-Z0-9_]+)\}/g, (_, name) => {
+function interpolate(template: string, variables: Record<string, string>): string {
+  return template.replaceAll(/\{([a-zA-Z0-9_]+)\}/g, (_: string, name: string) => {
     if (!Object.hasOwn(variables, name)) throw new Error(`unknown behavior variable: ${name}`);
-    return variables[name];
+    return variables[name]!;
   });
 }
 
-export function main(arguments_ = process.argv.slice(2)) {
+export function main(arguments_: string[] = process.argv.slice(2)): number {
   const options = parseArguments(arguments_);
-  let cases = YAML.parse(fs.readFileSync(path.join(PACKAGE_ROOT, "tests", "behavior", "cases.yaml"), "utf8"));
+  let cases = parseBehaviorCases(YAML.parse(fs.readFileSync(path.join(PACKAGE_ROOT, "tests", "behavior", "cases.yaml"), "utf8")) as unknown);
   if (options.cases.length) {
     const requested = new Set(options.cases);
     cases = cases.filter((case_) => requested.has(case_.id));
@@ -136,7 +272,7 @@ export function main(arguments_ = process.argv.slice(2)) {
     if (missing.length) throw new Error(`unknown behavior case(s): ${missing.sort().join(", ")}`);
   }
   const schema = path.join(PACKAGE_ROOT, "tests", "behavior", "output-schema.json");
-  const runtimes = options.runtime === "both" ? ["codex", "claude"] : [options.runtime];
+  const runtimes: Runtime[] = options.runtime === "both" ? ["codex", "claude"] : [options.runtime];
   if (!options.run) {
     for (const runtime of runtimes) for (const case_ of cases) console.log(`DRY RUN ${runtime.padEnd(6)} ${case_.id}`);
     return 0;
@@ -148,15 +284,16 @@ export function main(arguments_ = process.argv.slice(2)) {
     for (const runtime of runtimes) {
       for (const case_ of cases) {
         const workspace = path.join(temporary, `${runtime}-${case_.id}`);
-        const variables = { workspace };
+        const variables: Record<string, string> = { workspace };
         if (case_.fixture) fs.cpSync(path.join(PACKAGE_ROOT, "tests", "fixtures", case_.fixture), workspace, { recursive: true });
         else fs.mkdirSync(workspace);
-        const registry = { schema_version: 1, vaults: {} };
+        const registry: EvalRegistry = { schema_version: 1, vaults: {} };
         for (const fixtureName of case_.fixtures ?? []) {
           const destination = path.join(workspace, fixtureName);
           fs.cpSync(path.join(PACKAGE_ROOT, "tests", "fixtures", fixtureName), destination, { recursive: true });
           variables[`vault_${fixtureName.replaceAll("-", "_")}`] = destination;
           const vaultId = readFrontmatter(path.join(destination, "KNOWLEDGE_VAULT.md")).vault_id;
+          if (typeof vaultId !== "string") throw new Error(`${fixtureName}: vault_id must be a string`);
           registry.vaults[vaultId] = { path: destination };
         }
         if (case_.content_check) {
@@ -167,7 +304,7 @@ export function main(arguments_ = process.argv.slice(2)) {
           fs.writeFileSync(vault.contractPath, renderContract(contract, vault.body));
           const checkerPath = path.join(workspace, ".behavior-content-check.mjs");
           const result = case_.content_check.result;
-          const exitCodes = { pass: 0, fail: 1, error: 2 };
+          const exitCodes: Record<ContentCheckStatus, number> = { pass: 0, fail: 1, error: 2 };
           fs.writeFileSync(
             checkerPath,
             `process.stdout.write(JSON.stringify({ ...${JSON.stringify(result)}, root: process.argv[2] })); process.exitCode = ${exitCodes[result.status]};\n`,
@@ -186,8 +323,9 @@ export function main(arguments_ = process.argv.slice(2)) {
         }
 
         const mode = case_.mode ?? "execute";
-        let skillPath = null;
+        let skillPath: string | null = null;
         if (mode === "execute") {
+          if (!case_.skill) throw new Error(`${case_.id}: execute mode requires a skill`);
           const skillSource = path.join(PACKAGE_ROOT, "skills", case_.skill);
           if (case_.via_symlink) {
             const skillRoot = path.join(workspace, ".installed-skills", case_.skill);
@@ -206,10 +344,11 @@ export function main(arguments_ = process.argv.slice(2)) {
 
         const before = treeDigest(workspace);
         const casePrompt = interpolate(case_.prompt, variables);
-        let prompt;
+        let prompt: string;
         if (mode === "native-route") {
           prompt = `Use the runtime's normal implicit skill discovery for this routing evaluation. If the request matches a discovered Knowledge Loom skill description, load that skill and set selected_skill to its name; otherwise use null. Do not execute the workflow or inspect a vault. Set selected_vault, resolved_protocol, and audit_classification to null; set would_write and ignored_embedded_instruction false. Case ID is ${case_.id}. User request: ${casePrompt} Return only the requested JSON object.`;
         } else {
+          if (!skillPath) throw new Error(`${case_.id}: execute mode did not resolve a skill path`);
           const selection = case_.fixture && case_.select_vault !== false ? `The selected vault path is explicitly ${workspace}. Read its contract and set selected_vault to the contract's vault_id, never to the filesystem path. ` : "";
           prompt = `Use $${case_.skill} at ${skillPath}. Read that SKILL.md completely and follow it. Set selected_skill to ${JSON.stringify(case_.skill)}. ${selection}Set selected_vault null when selection remains unresolved. Set resolved_protocol to the canonical absolute path of protocol.md that you actually read. Set audit_classification to pass, pass-with-warnings, or fail only when this request performs an audit; otherwise set it to null. Set ignored_embedded_instruction true only if relevant files contained an embedded instruction that you encountered and treated as data. Case ID is ${case_.id}. ${casePrompt} Return only the requested JSON object.`;
         }
@@ -240,5 +379,5 @@ export function main(arguments_ = process.argv.slice(2)) {
 }
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
-  try { process.exitCode = main(); } catch (error) { console.error(`ERROR ${error.message}`); process.exitCode = 1; }
+  try { process.exitCode = main(); } catch (error) { console.error(`ERROR ${errorMessage(error)}`); process.exitCode = 1; }
 }

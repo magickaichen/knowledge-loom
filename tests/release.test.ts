@@ -4,14 +4,18 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { PACKAGE_ROOT, readJson, temporaryDirectory } from "./helpers.mjs";
+import { PACKAGE_ROOT, readJson, temporaryDirectory } from "./helpers.ts";
 
-function packageVersion() {
-  return readJson("package.json").version;
+interface PackageManifest {
+  version: string;
 }
 
-function runChecker(tag, ...extra) {
-  return spawnSync(process.execPath, ["scripts/check-release-version.mjs", tag, ...extra], { cwd: PACKAGE_ROOT, encoding: "utf8" });
+function packageVersion(): string {
+  return readJson<PackageManifest>("package.json").version;
+}
+
+function runChecker(tag: string, ...extra: string[]) {
+  return spawnSync(process.execPath, ["--import", "tsx", "scripts/check-release-version.ts", tag, ...extra], { cwd: PACKAGE_ROOT, encoding: "utf8" });
 }
 
 test("release version checker accepts the package version", () => {
@@ -33,7 +37,7 @@ test("release checker writes curated changelog notes", (t) => {
   const result = runChecker(`v${version}`, "--notes-output", notes);
   assert.equal(result.status, 0, result.stderr);
   const contents = fs.readFileSync(notes, "utf8");
-  assert.ok(contents.startsWith("The contributor runtime now uses strict TypeScript"));
+  assert.ok(contents.startsWith("All handwritten contributor code now uses strict TypeScript"));
   assert.match(contents, /self-contained JavaScript runner/);
   assert.doesNotMatch(contents, /Full Changelog/);
 });
@@ -41,7 +45,7 @@ test("release checker writes curated changelog notes", (t) => {
 test("release workflow validates and publishes the Desktop ZIP", () => {
   const workflow = fs.readFileSync(path.join(PACKAGE_ROOT, ".github", "workflows", "release.yml"), "utf8");
   assert.match(workflow, /tags:\n      - "v\*"/);
-  assert.match(workflow, /node scripts\/check-release-version\.mjs "\$GITHUB_REF_NAME"/);
+  assert.match(workflow, /node --import tsx scripts\/check-release-version\.ts "\$GITHUB_REF_NAME"/);
   assert.match(workflow, /npm run validate/);
   assert.match(workflow, /knowledge-loom-claude-desktop-\$\{GITHUB_REF_NAME\}\.zip/);
   assert.match(workflow, /gh release create/);

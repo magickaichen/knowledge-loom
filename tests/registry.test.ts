@@ -11,10 +11,11 @@ import {
   resolveApplicableVault,
   resolveVault,
 } from "../src/knowledge-loom/registry.ts";
-import { FIXTURES, temporaryDirectory } from "./helpers.mjs";
+import type { UnknownRecord } from "../src/knowledge-loom/types.ts";
+import { FIXTURES, temporaryDirectory } from "./helpers.ts";
 
-function writeRegistry(target, vaults, projects = undefined) {
-  const data = { schema_version: 1, vaults };
+function writeRegistry(target: string, vaults: UnknownRecord, projects?: unknown): void {
+  const data: UnknownRecord = { schema_version: 1, vaults };
   if (projects !== undefined) data.projects = projects;
   fs.writeFileSync(target, YAML.stringify(data));
 }
@@ -63,7 +64,9 @@ test("project association selects one vault when the registry has multiple candi
   });
 
   assert.equal(resolveVault(null, { cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
-  assert.equal(resolveApplicableVault({ cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
+  const applicable = resolveApplicableVault({ cwd: nested, registryPath: registry });
+  assert.ok(applicable);
+  assert.equal(applicable.contract.vault_id, "acme-work");
 });
 
 test("explicit selector takes precedence over a project association", (t) => {
@@ -149,7 +152,9 @@ test("nearest vault contract takes precedence over a project association", (t) =
   });
 
   assert.equal(resolveVault(null, { cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
-  assert.equal(resolveApplicableVault({ cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
+  const applicable = resolveApplicableVault({ cwd: nested, registryPath: registry });
+  assert.ok(applicable);
+  assert.equal(applicable.contract.vault_id, "acme-work");
 });
 
 test("nearest vault contract resolves even when the unrelated registry is malformed", (t) => {

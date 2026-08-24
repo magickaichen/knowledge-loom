@@ -4,15 +4,17 @@ import path from "node:path";
 import test from "node:test";
 import { unzipSync } from "fflate";
 
-import { buildArchive, SKILL_ROOT } from "../scripts/build-claude-desktop-skill.mjs";
+import { buildArchive, SKILL_ROOT } from "../scripts/build-claude-desktop-skill.ts";
 import { splitFrontmatter } from "../src/knowledge-loom/contract.ts";
-import { temporaryDirectory } from "./helpers.mjs";
+import { temporaryDirectory } from "./helpers.ts";
 
 test("Desktop skill metadata states its capability boundary", () => {
   const [metadata, body] = splitFrontmatter(fs.readFileSync(path.join(SKILL_ROOT, "SKILL.md"), "utf8"), { source: "Desktop SKILL.md" });
   assert.equal(metadata.name, path.basename(SKILL_ROOT));
-  assert.ok(metadata.description.length <= 200);
-  assert.match(metadata.description, /Cowork/);
+  assert.equal(typeof metadata.description, "string");
+  const description = metadata.description as string;
+  assert.ok(description.length <= 200);
+  assert.match(description, /Cowork/);
   assert.match(body, /regular Chat/);
   assert.match(body, /Execute \*\*Retrieve\*\* in `references\/protocol\.md`/);
   assert.doesNotMatch(body, /## Retrieve narrowly/);
@@ -30,6 +32,8 @@ test("Desktop archive has one root and bundled references", (t) => {
     "knowledge-loom/references/protocol.md",
     "knowledge-loom/references/contract-schema.md",
   ]);
-  const [metadata] = splitFrontmatter(Buffer.from(entries["knowledge-loom/SKILL.md"]).toString("utf8"));
+  const skillEntry = entries["knowledge-loom/SKILL.md"];
+  assert.ok(skillEntry);
+  const [metadata] = splitFrontmatter(Buffer.from(skillEntry).toString("utf8"));
   assert.equal(metadata.name, "knowledge-loom");
 });

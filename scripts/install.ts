@@ -1,20 +1,25 @@
-#!/usr/bin/env node
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { canonicalPath, expandHome } from "../src/knowledge-loom/pathing.ts";
+import { errorMessage } from "../src/knowledge-loom/errors.ts";
 
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SKILLS = ["use-knowledge-vault", "init-knowledge-vault", "audit-knowledge-vault", "manage-current-focus"];
 export const DEFAULT_TARGETS = [path.join(os.homedir(), ".agents", "skills"), path.join(os.homedir(), ".claude", "skills")];
 
-export function install(packageRoot, targetRoots, { apply = false, log = console.log } = {}) {
+interface InstallOptions {
+  apply?: boolean;
+  log?: (message: string) => void;
+}
+
+export function install(packageRoot: string, targetRoots: string[], { apply = false, log = console.log }: InstallOptions = {}): number {
   const resolvedPackageRoot = canonicalPath(packageRoot);
   const targets = targetRoots.map((target) => canonicalPath(expandHome(String(target))));
-  const unchanged = [];
-  const actions = [];
+  const unchanged: Array<[string, string]> = [];
+  const actions: Array<[string, string]> = [];
   for (const targetRoot of targets) {
     for (const name of SKILLS) {
       const source = path.join(resolvedPackageRoot, "skills", name);
@@ -42,18 +47,21 @@ export function install(packageRoot, targetRoots, { apply = false, log = console
   return 0;
 }
 
-export function main(arguments_ = process.argv.slice(2)) {
-  const targets = [];
+export function main(arguments_: string[] = process.argv.slice(2)): number {
+  const targets: string[] = [];
   let apply = false;
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
     if (argument === "--apply") apply = true;
-    else if (argument === "--target" && arguments_[index + 1]) targets.push(arguments_[++index]);
+    else if (argument === "--target" && arguments_[index + 1]) {
+      targets.push(arguments_[index + 1]!);
+      index += 1;
+    }
     else throw new Error(`unknown or incomplete argument: ${argument}`);
   }
   return install(PACKAGE_ROOT, targets.length ? targets : DEFAULT_TARGETS, { apply });
 }
 
 if (path.resolve(process.argv[1] ?? "") === fileURLToPath(import.meta.url)) {
-  try { process.exitCode = main(); } catch (error) { console.error(`ERROR ${error.message}`); process.exitCode = 1; }
+  try { process.exitCode = main(); } catch (error) { console.error(`ERROR ${errorMessage(error)}`); process.exitCode = 1; }
 }
