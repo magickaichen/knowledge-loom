@@ -4,7 +4,13 @@ import path from "node:path";
 import test from "node:test";
 import YAML from "yaml";
 
-import { associateProject, registerVault, ResolutionError, resolveVault } from "../src/knowledge-loom/registry.mjs";
+import {
+  associateProject,
+  registerVault,
+  ResolutionError,
+  resolveApplicableVault,
+  resolveVault,
+} from "../src/knowledge-loom/registry.mjs";
 import { FIXTURES, temporaryDirectory } from "./helpers.mjs";
 
 function writeRegistry(target, vaults, projects = undefined) {
@@ -33,6 +39,16 @@ test("multiple registry candidates are ambiguous", (t) => {
   assert.throws(() => resolveVault(null, { cwd: temporary, registryPath: registry }), (error) => error instanceof ResolutionError && /ambiguous/.test(error.message));
 });
 
+test("applicability probe ignores unassociated registry candidates", (t) => {
+  const temporary = temporaryDirectory(t);
+  const registry = path.join(temporary, "registry.yaml");
+  writeRegistry(registry, {
+    work: { path: path.join(FIXTURES, "single-proactive") },
+    home: { path: path.join(FIXTURES, "shared-explicit") },
+  });
+  assert.equal(resolveApplicableVault({ cwd: temporary, registryPath: registry }), null);
+});
+
 test("project association selects one vault when the registry has multiple candidates", (t) => {
   const temporary = temporaryDirectory(t);
   const project = path.join(temporary, "project");
@@ -47,6 +63,7 @@ test("project association selects one vault when the registry has multiple candi
   });
 
   assert.equal(resolveVault(null, { cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
+  assert.equal(resolveApplicableVault({ cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
 });
 
 test("explicit selector takes precedence over a project association", (t) => {
@@ -132,6 +149,7 @@ test("nearest vault contract takes precedence over a project association", (t) =
   });
 
   assert.equal(resolveVault(null, { cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
+  assert.equal(resolveApplicableVault({ cwd: nested, registryPath: registry }).contract.vault_id, "acme-work");
 });
 
 test("nearest vault contract resolves even when the unrelated registry is malformed", (t) => {

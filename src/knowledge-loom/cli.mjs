@@ -4,12 +4,13 @@ import { auditVault } from "./audit.mjs";
 import { validateContractData } from "./contract.mjs";
 import { buildContract, initializeVault } from "./initializer.mjs";
 import { expandHome } from "./pathing.mjs";
-import { associateProject, registerVault, resolveVault } from "./registry.mjs";
+import { associateProject, registerVault, resolveApplicableVault, resolveVault } from "./registry.mjs";
 
-const HELP = `usage: knowledge-loom {audit,resolve,register,associate,init} ...
+const HELP = `usage: knowledge-loom {audit,probe,resolve,register,associate,init} ...
 
 commands:
   audit       run a read-only vault audit
+  probe       resolve only an ancestor or project-associated vault
   resolve     resolve one vault deterministically
   register    preview or register a vault
   associate   preview or associate a project with a registered vault
@@ -18,6 +19,7 @@ commands:
 
 const COMMAND_HELP = {
   audit: "usage: knowledge-loom audit [selector] [--registry PATH] [--json]\n",
+  probe: "usage: knowledge-loom probe [--registry PATH]\n",
   resolve: "usage: knowledge-loom resolve [selector] [--registry PATH]\n",
   register: "usage: knowledge-loom register vault_id path [--registry PATH] [--apply]\n",
   associate: "usage: knowledge-loom associate vault_id project_path [--registry PATH] [--replace] [--apply]\n",
@@ -97,6 +99,12 @@ export async function runCli(arguments_ = process.argv.slice(2), { cwd = process
       stdout.write(`${resolveVault(options.positional[0] ?? null, { cwd, registryPath: options.registry }).root}\n`);
       return 0;
     }
+    if (options.command === "probe") {
+      requirePositionals(options, 0, COMMAND_HELP.probe);
+      const vault = resolveApplicableVault({ cwd, registryPath: options.registry });
+      stdout.write(vault ? `${vault.root}\n` : "NO_APPLICABLE_VAULT\n");
+      return 0;
+    }
     if (options.command === "register") {
       requirePositionals(options, 2, COMMAND_HELP.register);
       const [registryPath, rendered] = registerVault(options.positional[0], options.positional[1], { registryPath: options.registry, apply: options.apply === true });
@@ -119,8 +127,8 @@ export async function runCli(arguments_ = process.argv.slice(2), { cwd = process
     requirePositionals(options, 1, COMMAND_HELP.init);
     for (const required of ["vault_id", "title"]) if (!options[required]) throw new Error(`--${required.replaceAll("_", "-")} is required`);
     if (!options.subject.length) throw new Error("--subject is required");
-    const writePolicy = options.write_policy ?? "explicit-only";
-    const currentStatePolicy = options.current_state_policy ?? "explicit-only";
+    const writePolicy = options.write_policy ?? "proactive-durable-capture";
+    const currentStatePolicy = options.current_state_policy ?? "maintain-after-material-change";
     const historyType = options.history ?? "none";
     if (!new Set(["explicit-only", "proactive-durable-capture"]).has(writePolicy)) throw new Error(`unsupported write policy: ${writePolicy}`);
     if (!new Set(["explicit-only", "maintain-after-material-change"]).has(currentStatePolicy)) throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);

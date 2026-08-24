@@ -132,6 +132,15 @@ function projectAssociation(start, registry) {
   return nearest[0];
 }
 
+function applicableVaultContext(cwd, registryPath) {
+  const ancestor = findAncestorVault(cwd);
+  if (ancestor) return { vault: loadVault(ancestor), registry: null };
+  const registry = loadRegistry(registryPath);
+  const association = projectAssociation(cwd, registry);
+  const vault = association ? registeredVault(association.record.vault_id, registry) : null;
+  return { vault, registry };
+}
+
 export function resolveVault(selector = null, { cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
   if (selector !== null && selector !== undefined) {
     const selectorPath = path.resolve(expandHome(String(selector)));
@@ -145,15 +154,16 @@ export function resolveVault(selector = null, { cwd = process.cwd(), registryPat
     throw new ResolutionError(`unknown vault selector: ${selector}`);
   }
 
-  const ancestor = findAncestorVault(cwd);
-  if (ancestor) return loadVault(ancestor);
-  const registry = loadRegistry(registryPath);
-  const association = projectAssociation(cwd, registry);
-  if (association) return registeredVault(association.record.vault_id, registry);
+  const { vault, registry } = applicableVaultContext(cwd, registryPath);
+  if (vault) return vault;
   const candidates = registeredCandidates(registry);
   if (candidates.length === 1) return loadVault(candidates[0][1]);
   if (!candidates.length) throw new ResolutionError("no vault selected, no ancestor contract found, and registry has no valid vaults");
   throw new ResolutionError(`vault selection is ambiguous; choose one of: ${candidates.map(([vaultId]) => vaultId).join(", ")}`);
+}
+
+export function resolveApplicableVault({ cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
+  return applicableVaultContext(cwd, registryPath).vault;
 }
 
 export function registerVault(vaultId, root, { registryPath = defaultRegistryPath(), apply = false, rename = fs.renameSync } = {}) {

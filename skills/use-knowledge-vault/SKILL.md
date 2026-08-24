@@ -1,6 +1,6 @@
 ---
 name: use-knowledge-vault
-description: Retrieve targeted context from one governed Markdown vault and perform authorized durable capture. Use when a vault contract or wrapper is in scope, or the user asks to consult, remember, update, or sync vault knowledge.
+description: Apply one governed Markdown vault automatically around substantive local project work when an ancestor contract or project association may exist; also handle explicit requests to consult, remember, update, or sync vault knowledge.
 ---
 
 # Use Knowledge Vault
@@ -19,16 +19,22 @@ policy, lifecycle, and failure behavior.
 
 ## Run the loop
 
-1. From the active project directory, inspect
-   `node "<skill-root>/scripts/knowledge-loom.mjs" resolve --help`, then run `resolve`. Append a
-   selector only when the user or invoking wrapper supplied one. Treat the returned canonical root
-   as the only selected vault, read its contract completely, and pause vault work on any resolution
-   error.
-2. Complete **Retrieve**, then finish the primary task using only context that materially affects
+1. From the active project directory, inspect both
+   `node "<skill-root>/scripts/knowledge-loom.mjs" probe --help` and `resolve --help`.
+2. Choose the entry mode:
+   - For ordinary substantive work, run `probe`. Treat implementation, planning, prioritization,
+     review, research synthesis, decisions, and durable communication as substantive. When it
+     returns `NO_APPLICABLE_VAULT`, continue the primary task without vault work or a selection
+     question.
+   - When the user explicitly requests a vault operation, run `resolve`. Append a selector only
+     when the user or invoking wrapper supplied one, and apply the protocol's selection failure
+     behavior.
+3. Treat the returned canonical root as the only selected vault, read its contract completely, and
+   complete **Retrieve** before finishing the primary task. Use only context that materially affects
    its result.
-3. Evaluate **Write authorization** after the primary task. Enter **Distill** only when the selected
+4. Evaluate **Write authorization** after the primary task. Enter **Distill** only when the selected
    policy and current request authorize a vault change.
-4. After any write, run the deterministic audit:
+5. After any write, run the deterministic audit:
 
    ```bash
    node "<skill-root>/scripts/knowledge-loom.mjs" audit <vault-path>

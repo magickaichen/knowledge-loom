@@ -41,6 +41,24 @@ test("init expands a literal home path before previewing", async () => {
   ], { stdout, stderr });
   assert.equal(status, 0, stderr.toString());
   assert.match(stdout.toString(), new RegExp(`DRY RUN would create ${path.join(os.homedir(), relative).replaceAll("\\", "\\\\")}`));
+  assert.match(stdout.toString(), /policy: proactive-durable-capture/);
+  assert.match(stdout.toString(), /current_state_policy: maintain-after-material-change/);
+});
+
+test("probe returns a successful no-op when no project vault applies", async (t) => {
+  const temporary = temporaryDirectory(t);
+  const registry = path.join(temporary, "registry.yaml");
+  fs.writeFileSync(registry, YAML.stringify({
+    schema_version: 1,
+    vaults: {
+      "acme-work": { path: path.join(FIXTURES, "single-proactive") },
+      "shared-home": { path: path.join(FIXTURES, "shared-explicit") },
+    },
+  }));
+  const stdout = memoryStream();
+  const stderr = memoryStream();
+  assert.equal(await runCli(["probe", "--registry", registry], { cwd: temporary, stdout, stderr }), 0, stderr.toString());
+  assert.equal(stdout.toString(), "NO_APPLICABLE_VAULT\n");
 });
 
 test("associate previews and applies a project-to-vault binding", async (t) => {
@@ -64,6 +82,11 @@ test("associate previews and applies a project-to-vault binding", async (t) => {
   assert.equal(await runCli(["associate", "acme-work", project, "--registry", registry, "--apply"], { stdout, stderr }), 0, stderr.toString());
   assert.match(stdout.toString(), /associated .* with acme-work/);
   assert.deepEqual(Object.values(YAML.parse(fs.readFileSync(registry, "utf8")).projects), [{ vault_id: "acme-work" }]);
+
+  stdout = memoryStream();
+  stderr = memoryStream();
+  assert.equal(await runCli(["probe", "--registry", registry], { cwd: project, stdout, stderr }), 0, stderr.toString());
+  assert.equal(stdout.toString(), `${fs.realpathSync(path.join(FIXTURES, "single-proactive"))}\n`);
 });
 
 test("audit reports declared content checks through the existing command", async (t) => {

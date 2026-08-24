@@ -19,7 +19,7 @@ sync:
   mode: none
 backup:
   mode: none
-instruction_roots: [AGENTS.md]
+instruction_roots: [AGENTS.md, PRIVACY.md]
 navigation:
   entrypoints: [INDEX.md]
 metadata_profiles:

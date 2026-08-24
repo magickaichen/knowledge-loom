@@ -70,10 +70,13 @@ Start a new Codex task after installation.
 Private repositories work when Git, GitHub CLI, or SSH credentials can read them. A public
 repository can be installed without GitHub authentication.
 
-## Invoke a skill directly
+## Automatic use and direct invocation
 
-Skills also load automatically when a request matches, but naming one is useful when you want a
-specific workflow. Invocation syntax depends on the agent and installation route:
+For substantive local project work, `use-knowledge-vault` first probes for a vault contract in the
+current directory tree or a registered project association. When neither exists, it exits the vault
+workflow without selecting among unrelated registered vaults. When one applies, it retrieves
+relevant context before the task and evaluates durable capture afterward. You can still name a skill
+when you want a specific workflow. Invocation syntax depends on the agent and installation route:
 
 | Installed with | Codex | Claude Code |
 |---|---|---|
@@ -123,8 +126,11 @@ Knowledge Loom proposes a vault ID, subject, write policy, and files. It stops a
 
 ### 2. Approve
 
-Check the proposal, then tell the agent to apply it. New vaults default to explicit-only writes, so
-permission to read your notes does not become permission to save every conversation.
+Check the proposal, then tell the agent to apply it. New vaults default to proactive durable capture
+and current-state maintenance. This one-time approval authorizes the defaults; the protocol still
+captures only durable, sourced knowledge and excludes transient conversation, speculation, secrets,
+and duplicates. Request `explicit-only` policies in the preview when a vault should require a fresh
+write request every time.
 
 ### 3. Use it
 
@@ -158,11 +164,12 @@ $init-knowledge-vault Associate this project with the registered vault example. 
 ```
 
 In Claude Code, use `/init-knowledge-vault`; use the namespaced form for a plugin install. Approve
-the exact preview to save the association. After that, a prompt such as this resolves `example`
-automatically from anywhere inside the project:
+the exact preview to save the association. After that, ordinary substantive prompts resolve
+`example` automatically from anywhere inside the project; the user does not need to remember the
+skill name:
 
 ```text
-$use-knowledge-vault What did we previously decide about this project's architecture?
+Implement the architecture decision we previously made for this project.
 ```
 
 Knowledge Loom keeps vault IDs and project associations in the local user registry:
@@ -327,6 +334,16 @@ instead of guessing. Select a vault by ID or path:
 ```bash
 npm run cli -- resolve example
 ```
+
+Runtime adapters use a narrower probe for ordinary work. It returns only an ancestor or
+project-associated vault and otherwise succeeds with `NO_APPLICABLE_VAULT`:
+
+```bash
+npm run cli -- probe
+```
+
+Existing vaults retain their declared write policies. Migrate one only after reviewing and
+authorizing the corresponding `KNOWLEDGE_VAULT.md` change.
 
 ## How it works
 
