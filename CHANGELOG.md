@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.7.0
+
+Durable vault notes and navigation pointers now have an agent-readable writing gate with optional
+support for Matt Pocock's unmodified `writing-for-agents` skill.
+
+### Added
+
+- Added protocol-owned checks for one source of truth, co-located rationale and provenance, stable
+  terminology, conditional navigation pointers, lifecycle state, and duplicate pruning.
+- Added optional `writing-for-agents` invocation after write authorization when Distill will create
+  or restructure an agent-consumed note or navigation pointer.
+- Added a self-contained built-in authoring fallback when the companion skill is unavailable.
+- Added hermetic Codex and Claude behavior coverage for companion availability, retrieval-only
+  work, and authority boundaries.
+
+### Compatibility and safety
+
+- Kept `writing-for-agents` optional rather than making it an installation prerequisite.
+- Kept authority, evidence, privacy, subject isolation, validation, Git, sync, backup, and lifecycle
+  behavior under the Knowledge Vault Protocol.
+- Preserved contract schema version 1 and all existing installation routes.
+
+### Maintenance
+
+- Added agent-neutral contributor guidance for issue tracking, triage labels, and domain docs.
+- Updated GitHub Actions to `actions/setup-node@v7`.
+
 ## v0.6.0
 
 All handwritten contributor code now uses strict TypeScript while every installation route
