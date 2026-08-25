@@ -10,7 +10,7 @@
       "name": "knowledge-loom",
       "source": "./",
       "description": "Keep Codex and Claude inside clear boundaries when they read or update local Markdown notes.",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "author": {
         "name": "Mike Xiao",
         "url": "https://github.com/magickaichen"
