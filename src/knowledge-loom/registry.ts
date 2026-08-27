@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -124,6 +125,24 @@ interface ProjectMatch {
   distance: number;
 }
 
+function mainCheckoutEquivalent(start: string): string | null {
+  let current = canonicalPath(start);
+  if (fs.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path.dirname(current);
+  const completed = spawnSync("git", ["-C", current, "rev-parse", "--show-toplevel", "--git-common-dir"], {
+    encoding: "utf8",
+  });
+  if (completed.status !== 0) return null;
+  const [worktreeOutput, commonDirectoryOutput] = completed.stdout.trimEnd().split(/\r?\n/);
+  if (!worktreeOutput || !commonDirectoryOutput) return null;
+
+  const worktreeRoot = canonicalPath(worktreeOutput);
+  const commonDirectory = path.resolve(current, commonDirectoryOutput);
+  if (path.basename(commonDirectory) !== ".git") return null;
+  const mainCheckout = canonicalPath(path.dirname(commonDirectory));
+  if (mainCheckout === worktreeRoot || !isWithin(worktreeRoot, current)) return null;
+  return path.join(mainCheckout, path.relative(worktreeRoot, current));
+}
+
 function projectAssociation(start: string, registry: Registry): ProjectMatch | null {
   if (registry.projects === undefined) return null;
   const projects = requireProjectsMapping(registry.projects);
@@ -153,7 +172,11 @@ function applicableVaultContext(cwd: string, registryPath: string | undefined): 
   const ancestor = findAncestorVault(cwd);
   if (ancestor) return { vault: loadVault(ancestor), registry: null };
   const registry = loadRegistry(registryPath);
-  const association = projectAssociation(cwd, registry);
+  const association = projectAssociation(cwd, registry)
+    ?? (() => {
+      const mainCheckout = mainCheckoutEquivalent(cwd);
+      return mainCheckout ? projectAssociation(mainCheckout, registry) : null;
+    })();
   const vault = association ? registeredVault(projectRecord(association.configuredRoot, association.record).vault_id, registry) : null;
   return { vault, registry };
 }

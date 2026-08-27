@@ -203,7 +203,9 @@ projects:
 The registry stays outside both repositories. An explicit ID or path still wins. Inside a vault,
 the nearest `KNOWLEDGE_VAULT.md` wins. Otherwise, the nearest project association wins; nested
 projects can deliberately override a parent association. A broken association stops resolution
-instead of silently choosing another vault.
+instead of silently choosing another vault. Linked Git worktrees inherit the main checkout's
+association through their Git common directory, so temporary worktrees do not need separate
+registry entries. A direct worktree association still takes precedence when one exists.
 
 ### Optional vault-specific content checks
 

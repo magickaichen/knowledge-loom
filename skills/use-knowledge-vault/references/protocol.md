@@ -47,7 +47,9 @@ Resolve a vault deterministically:
 
 Never select a vault from topic similarity. Never combine vaults without explicit authorization.
 Project associations select a registered vault; they do not extend that vault's read, write, sync,
-or backup authority.
+or backup authority. When the current directory is inside a linked Git worktree and no association
+matches that path directly, use the repository's Git common directory to match the equivalent path
+in the main checkout. Do not require a separate registry entry for each temporary worktree.
 
 ## Retrieve
 
