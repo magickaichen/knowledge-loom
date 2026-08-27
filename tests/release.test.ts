@@ -37,9 +37,9 @@ test("release checker writes curated changelog notes", (t) => {
   const result = runChecker(`v${version}`, "--notes-output", notes);
   assert.equal(result.status, 0, result.stderr);
   const contents = fs.readFileSync(notes, "utf8");
-  assert.ok(contents.startsWith("Durable vault notes and navigation pointers now have an agent-readable writing gate"));
-  assert.match(contents, /optional `writing-for-agents` invocation/);
-  assert.match(contents, /Preserved contract schema version 1/);
+  assert.ok(contents.startsWith("Linked Git worktrees now reuse the vault association registered for their main checkout"));
+  assert.match(contents, /`git rev-parse --git-common-dir` fallback/);
+  assert.match(contents, /Preserved registry schema version 1/);
   assert.doesNotMatch(contents, /Full Changelog/);
 });
 

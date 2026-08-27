@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.7.1
+
+Linked Git worktrees now reuse the vault association registered for their main checkout.
+
+### Fixed
+
+- Added a `git rev-parse --git-common-dir` fallback when no project association matches the
+  current worktree path directly.
+- Preserved direct worktree associations as the higher-priority match.
+- Added a regression test through the public `probe` command with a real linked worktree.
+
+### Compatibility
+
+- Preserved registry schema version 1 and all existing project associations.
+- Required no registry migration or per-worktree entries for temporary checkouts.
+
 ## v0.7.0
 
 Durable vault notes and navigation pointers now have an agent-readable writing gate with optional
