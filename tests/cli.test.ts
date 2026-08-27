@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -14,6 +15,11 @@ function memoryStream() {
     write(value: string) { contents += value; },
     toString() { return contents; },
   };
+}
+
+function runGit(arguments_: string[]): void {
+  const completed = spawnSync("git", arguments_, { encoding: "utf8" });
+  assert.equal(completed.status, 0, completed.stderr);
 }
 
 test("empty invocation remains a usage error", async () => {
@@ -86,6 +92,31 @@ test("associate previews and applies a project-to-vault binding", async (t) => {
   stdout = memoryStream();
   stderr = memoryStream();
   assert.equal(await runCli(["probe", "--registry", registry], { cwd: project, stdout, stderr }), 0, stderr.toString());
+  assert.equal(stdout.toString(), `${fs.realpathSync(path.join(FIXTURES, "single-proactive"))}\n`);
+});
+
+test("probe follows a main checkout association from a linked worktree", async (t) => {
+  const temporary = temporaryDirectory(t);
+  const project = path.join(temporary, "project");
+  const worktree = path.join(temporary, "temporary-worktree");
+  const nested = path.join(worktree, "packages", "app");
+  const registry = path.join(temporary, "registry.yaml");
+  fs.mkdirSync(project);
+  runGit(["-C", project, "init", "--initial-branch=main"]);
+  fs.writeFileSync(path.join(project, "README.md"), "# Project\n");
+  runGit(["-C", project, "add", "README.md"]);
+  runGit(["-C", project, "-c", "user.name=Knowledge Loom", "-c", "user.email=tests@example.com", "commit", "-m", "initial"]);
+  runGit(["-C", project, "worktree", "add", "--detach", worktree, "HEAD"]);
+  fs.mkdirSync(nested, { recursive: true });
+  fs.writeFileSync(registry, YAML.stringify({
+    schema_version: 1,
+    vaults: { "acme-work": { path: path.join(FIXTURES, "single-proactive") } },
+    projects: { [project]: { vault_id: "acme-work" } },
+  }));
+  const stdout = memoryStream();
+  const stderr = memoryStream();
+
+  assert.equal(await runCli(["probe", "--registry", registry], { cwd: nested, stdout, stderr }), 0, stderr.toString());
   assert.equal(stdout.toString(), `${fs.realpathSync(path.join(FIXTURES, "single-proactive"))}\n`);
 });
 
