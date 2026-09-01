@@ -34,6 +34,26 @@ An authorized, addressable part of a source system that can contribute evidence 
 as a project, space, channel, or repository.
 _Avoid_: Connector, data source
 
+**Source object**:
+The provider- and tenant-scoped stable identity of one source artifact. Mutable keys, names, paths,
+and URLs are aliases rather than identity.
+_Avoid_: Source URL, source copy
+
+**Source observation**:
+Immutable evidence captured for one observed revision or state of a source object, including revision
+evidence, provenance, observation time, and content hash without retaining the complete provider payload.
+_Avoid_: Latest snapshot, canonical knowledge
+
+**Source relation**:
+A typed, directed connection between source objects whose basis is recorded as provider-confirmed or
+inferred. An inferred relation connects evidence without merging source identities.
+_Avoid_: Source merge, semantic identity
+
+**Evidence ledger**:
+The durable inventory of fetched source observations, their dispositions, and their source relations.
+It retains compact evidence metadata while complete provider payloads remain transient.
+_Avoid_: Source archive, citation list
+
 **Bootstrap scope**:
 The person, work domain, source surfaces, and historical boundary authorized for one source-assisted
 bootstrap.
@@ -84,10 +104,35 @@ A durable, source-linked meaning distilled from one or more source surfaces and 
 note.
 _Avoid_: Source copy, generated summary
 
+**Canonical assertion**:
+The smallest independently meaningful fact, decision, status, responsibility, or rationale within
+canonical knowledge. Its provenance links to specific source observations.
+_Avoid_: Sentence citation, note summary
+
+**Assertion basis**:
+How a canonical assertion was formed: source-stated, synthesized from cited premises, inferred with
+rationale and confidence, or human-confirmed.
+_Avoid_: Confidence score, citation count
+
+**Evidence support**:
+The lifecycle-aware provenance link from a canonical assertion to a source observation. Its state
+shows whether that observation currently supports, supersedes, contradicts, or can no longer verify the assertion.
+_Avoid_: Citation URL, source list
+
 **Coverage gap**:
-Knowledge required by the bootstrap scope that is missing, conflicting, stale, inaccessible, or not
-yet distilled.
-_Avoid_: Import error
+A structured record of material within the bootstrap scope that is missing, conflicting, stale,
+inaccessible, truncated, unsupported, or unresolved, including its impact and recovery state.
+_Avoid_: Import error, warning text
+
+**Retrieval coverage**:
+The inspectable result of enumerating each authorized source surface, object class, and history boundary
+under the provider's declared endpoint semantics.
+_Avoid_: Account completeness, search result count
+
+**Synthesis coverage**:
+The disposition of every fetched source observation as cited, contextual, duplicate, out of scope,
+unresolved, or failed.
+_Avoid_: Retrieval coverage, note count
 
 **Natural knowledge need**:
 A retrieval or judgment need that arises during the user's ordinary work rather than being authored
