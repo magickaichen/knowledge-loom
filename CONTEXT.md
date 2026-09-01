@@ -39,6 +39,16 @@ The combination of source authority, destination authority, and a propagation bo
 one bootstrap action.
 _Avoid_: Access permission, consent checklist
 
+**Authority evidence**:
+The vault owner's bootstrap approval combined with verified source permissions, provider restrictions,
+and the destination vault's declared storage and lifecycle.
+_Avoid_: OAuth grant, compliance questionnaire
+
+**Authority revocation**:
+The loss of source or destination authority after canonical knowledge has been created; it stops the
+affected action and preserves or isolates existing knowledge according to which authority was lost.
+_Avoid_: Token expiry, automatic deletion
+
 **Source authority**:
 Evidence that the vault owner may use information from a selected source surface for the approved work
 purpose.
@@ -51,7 +61,7 @@ _Avoid_: Write access, filesystem permission
 
 **Propagation boundary**:
 The source-derived restrictions that govern where canonical knowledge may later be retrieved,
-disclosed, synced, or backed up.
+disclosed, synced, or backed up. Knowledge supported by multiple sources inherits the strictest boundary.
 _Avoid_: Sensitivity tag, source scope
 
 **Canonical knowledge**:
