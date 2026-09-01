@@ -29,6 +29,31 @@ The person, work domain, source surfaces, and historical boundary authorized for
 bootstrap.
 _Avoid_: Crawl scope, import scope
 
+**Bootstrap approval**:
+The single user-facing authorization to apply a previewed bootstrap scope and optionally perform later
+on-demand incremental capture within that unchanged scope.
+_Avoid_: Import confirmation, per-note approval
+
+**Authority chain**:
+The combination of source authority, destination authority, and a propagation boundary that authorizes
+one bootstrap action.
+_Avoid_: Access permission, consent checklist
+
+**Source authority**:
+Evidence that the vault owner may use information from a selected source surface for the approved work
+purpose.
+_Avoid_: Connector access, OAuth scope
+
+**Destination authority**:
+Evidence that the selected vault storage and lifecycle may retain information under the source's
+restrictions.
+_Avoid_: Write access, filesystem permission
+
+**Propagation boundary**:
+The source-derived restrictions that govern where canonical knowledge may later be retrieved,
+disclosed, synced, or backed up.
+_Avoid_: Sensitivity tag, source scope
+
 **Canonical knowledge**:
 A durable, source-linked meaning distilled from one or more source surfaces and owned by one vault
 note.
