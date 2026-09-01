@@ -83,3 +83,8 @@ _Avoid_: Benchmark question, test prompt
 The state in which a bootstrapped vault has declared coverage, provenance, navigation, privacy, and
 governance validation, so the user can begin relying on it in ordinary work.
 _Avoid_: Migration complete, fully imported
+
+**Exception review**:
+A human interruption reserved for an action that expands authority, crosses a propagation boundary,
+or causes irreversible loss.
+_Avoid_: Manual approval, review gate
