@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import { execFileSync } from "node:child_process";
 
 import { finding, isUnknownRecord, loadNoteFrontmatter, validateContractData } from "./contract.js";
 import { runDeclaredContentCheck } from "./content-checks.js";
 import { errorMessage } from "./errors.js";
 import { checkFocusView, parseFocusView } from "./focus.js";
+import { gitOutput } from "./git.js";
 import {
   canonicalPath,
   isVaultRelativePath,
@@ -78,17 +78,8 @@ export function matchesPath(pattern: string, candidate: string): boolean {
 }
 
 function git(root: string, ...arguments_: string[]): { status: number; stdout: string } {
-  try {
-    return {
-      status: 0,
-      stdout: execFileSync("git", ["-C", root, ...arguments_], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }),
-    };
-  } catch {
-    return { status: 1, stdout: "" };
-  }
+  const stdout = gitOutput(root, arguments_);
+  return stdout === null ? { status: 1, stdout: "" } : { status: 0, stdout };
 }
 
 interface DeclaredFilesOptions {

@@ -7371,7 +7371,6 @@ import path7 from "node:path";
 // src/knowledge-loom/audit.ts
 import fs5 from "node:fs";
 import path5 from "node:path";
-import { execFileSync as execFileSync2 } from "node:child_process";
 
 // src/knowledge-loom/contract.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7676,10 +7675,24 @@ import path4 from "node:path";
 // src/knowledge-loom/registry.ts
 var import_yaml2 = __toESM(require_dist(), 1);
 import crypto from "node:crypto";
-import { execFileSync } from "node:child_process";
 import fs3 from "node:fs";
 import os2 from "node:os";
 import path3 from "node:path";
+
+// src/knowledge-loom/git.ts
+import { execFileSync } from "node:child_process";
+function gitOutput(root, arguments_) {
+  try {
+    return execFileSync("git", ["-C", root, ...arguments_], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+  } catch {
+    return null;
+  }
+}
+
+// src/knowledge-loom/registry.ts
 function defaultRegistryPath() {
   return process.env.KNOWLEDGE_VAULT_REGISTRY ? path3.resolve(expandHome(process.env.KNOWLEDGE_VAULT_REGISTRY)) : path3.join(os2.homedir(), ".config", "knowledge-vault", "registry.yaml");
 }
@@ -7772,15 +7785,8 @@ function projectRecord(configuredRoot, record, { matching = false } = {}) {
 function mainCheckoutEquivalent(start) {
   let current = canonicalPath(start);
   if (fs3.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path3.dirname(current);
-  let output;
-  try {
-    output = execFileSync("git", ["-C", current, "rev-parse", "--show-toplevel", "--git-common-dir"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
-    });
-  } catch {
-    return null;
-  }
+  const output = gitOutput(current, ["rev-parse", "--show-toplevel", "--git-common-dir"]);
+  if (output === null) return null;
   const [worktreeOutput, commonDirectoryOutput] = output.trimEnd().split(/\r?\n/);
   if (!worktreeOutput || !commonDirectoryOutput) return null;
   const worktreeRoot = canonicalPath(worktreeOutput);
@@ -8316,17 +8322,8 @@ function matchesPath(pattern, candidate) {
   return globRegex(pattern).test(candidate);
 }
 function git(root, ...arguments_) {
-  try {
-    return {
-      status: 0,
-      stdout: execFileSync2("git", ["-C", root, ...arguments_], {
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"]
-      })
-    };
-  } catch {
-    return { status: 1, stdout: "" };
-  }
+  const stdout = gitOutput(root, arguments_);
+  return stdout === null ? { status: 1, stdout: "" } : { status: 0, stdout };
 }
 function auditDeclaredFiles(root, values, {
   boundaryCode,
