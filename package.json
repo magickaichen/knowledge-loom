@@ -37,7 +37,7 @@
     "yaml": "2.9.0"
   },
   "devDependencies": {
-    "@types/node": "20.19.43",
+    "@types/node": "26.4.0",
     "esbuild": "0.28.2",
     "fflate": "0.8.3",
     "tsx": "4.23.12",
