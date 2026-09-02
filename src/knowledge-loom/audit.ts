@@ -77,11 +77,6 @@ export function matchesPath(pattern: string, candidate: string): boolean {
   return globRegex(pattern).test(candidate);
 }
 
-function git(root: string, ...arguments_: string[]): { status: number; stdout: string } {
-  const stdout = gitOutput(root, arguments_);
-  return stdout === null ? { status: 1, stdout: "" } : { status: 0, stdout };
-}
-
 interface DeclaredFilesOptions {
   boundaryCode: string;
   boundaryMessage: string;
@@ -225,17 +220,16 @@ export async function auditVault(
   }
 
   const history = isUnknownRecord(contract.history) ? contract.history : {};
-  const gitCheck = git(root, "rev-parse", "--show-toplevel");
-  const gitRoot = gitCheck.status === 0 ? gitCheck.stdout.trim() : "";
+  const gitRoot = gitOutput(root, ["rev-parse", "--show-toplevel"])?.trim() ?? "";
   const isGit = Boolean(gitRoot) && canonicalPath(gitRoot) === canonicalPath(root);
   if (history.type === "git" && !isGit) findings.push(finding("error", "git.missing", "contract requires Git but root is not a Git repository"));
   if (history.type === "none" && isGit) findings.push(finding("warning", "git.unconfigured", "root is a Git repository but contract declares no history"));
 
   if (isGit) {
-    const status = git(root, "status", "--short");
-    if (status.stdout.trim()) findings.push(finding("info", "git.dirty", "working tree has uncommitted changes"));
-    const tracked = git(root, "ls-files");
-    for (const relative of tracked.stdout.split(/\r?\n/).filter(Boolean)) {
+    const status = gitOutput(root, ["status", "--short"]);
+    if (status?.trim()) findings.push(finding("info", "git.dirty", "working tree has uncommitted changes"));
+    const tracked = gitOutput(root, ["ls-files"]);
+    for (const relative of (tracked ?? "").split(/\r?\n/).filter(Boolean)) {
       for (const patternValue of validNeverTrack) {
         if (matchesPath(patternValue, relative)) findings.push(finding("error", "privacy.tracked", `tracked path matches privacy rule \`${patternValue}\``, relative));
       }
