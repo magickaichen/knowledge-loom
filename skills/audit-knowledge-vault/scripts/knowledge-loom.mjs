@@ -7371,7 +7371,6 @@ import path7 from "node:path";
 // src/knowledge-loom/audit.ts
 import fs5 from "node:fs";
 import path5 from "node:path";
-import { spawnSync as spawnSync2 } from "node:child_process";
 
 // src/knowledge-loom/contract.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7676,10 +7675,24 @@ import path4 from "node:path";
 // src/knowledge-loom/registry.ts
 var import_yaml2 = __toESM(require_dist(), 1);
 import crypto from "node:crypto";
-import { spawnSync } from "node:child_process";
 import fs3 from "node:fs";
 import os2 from "node:os";
 import path3 from "node:path";
+
+// src/knowledge-loom/git.ts
+import { execFileSync } from "node:child_process";
+function gitOutput(root, arguments_) {
+  try {
+    return execFileSync("git", ["-C", root, ...arguments_], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+  } catch {
+    return null;
+  }
+}
+
+// src/knowledge-loom/registry.ts
 function defaultRegistryPath() {
   return process.env.KNOWLEDGE_VAULT_REGISTRY ? path3.resolve(expandHome(process.env.KNOWLEDGE_VAULT_REGISTRY)) : path3.join(os2.homedir(), ".config", "knowledge-vault", "registry.yaml");
 }
@@ -7772,11 +7785,9 @@ function projectRecord(configuredRoot, record, { matching = false } = {}) {
 function mainCheckoutEquivalent(start) {
   let current = canonicalPath(start);
   if (fs3.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path3.dirname(current);
-  const completed = spawnSync("git", ["-C", current, "rev-parse", "--show-toplevel", "--git-common-dir"], {
-    encoding: "utf8"
-  });
-  if (completed.status !== 0) return null;
-  const [worktreeOutput, commonDirectoryOutput] = completed.stdout.trimEnd().split(/\r?\n/);
+  const output = gitOutput(current, ["rev-parse", "--show-toplevel", "--git-common-dir"]);
+  if (output === null) return null;
+  const [worktreeOutput, commonDirectoryOutput] = output.trimEnd().split(/\r?\n/);
   if (!worktreeOutput || !commonDirectoryOutput) return null;
   const worktreeRoot = canonicalPath(worktreeOutput);
   const commonDirectory = path3.resolve(current, commonDirectoryOutput);
@@ -8310,9 +8321,6 @@ function globRegex(pattern, { characterClasses = true } = {}) {
 function matchesPath(pattern, candidate) {
   return globRegex(pattern).test(candidate);
 }
-function git(root, ...arguments_) {
-  return spawnSync2("git", ["-C", root, ...arguments_], { encoding: "utf8" });
-}
 function auditDeclaredFiles(root, values, {
   boundaryCode,
   boundaryMessage,
@@ -8433,16 +8441,15 @@ async function auditVault(vault, { registryPath } = {}) {
     validNeverTrack.push(patternValue);
   }
   const history = isUnknownRecord(contract.history) ? contract.history : {};
-  const gitCheck = git(root, "rev-parse", "--show-toplevel");
-  const gitRoot = gitCheck.status === 0 ? gitCheck.stdout.trim() : "";
+  const gitRoot = gitOutput(root, ["rev-parse", "--show-toplevel"])?.trim() ?? "";
   const isGit = Boolean(gitRoot) && canonicalPath(gitRoot) === canonicalPath(root);
   if (history.type === "git" && !isGit) findings.push(finding("error", "git.missing", "contract requires Git but root is not a Git repository"));
   if (history.type === "none" && isGit) findings.push(finding("warning", "git.unconfigured", "root is a Git repository but contract declares no history"));
   if (isGit) {
-    const status = git(root, "status", "--short");
-    if (status.stdout.trim()) findings.push(finding("info", "git.dirty", "working tree has uncommitted changes"));
-    const tracked = git(root, "ls-files");
-    for (const relative of tracked.stdout.split(/\r?\n/).filter(Boolean)) {
+    const statusOutput = gitOutput(root, ["status", "--short"]);
+    if (statusOutput?.trim()) findings.push(finding("info", "git.dirty", "working tree has uncommitted changes"));
+    const trackedFilesOutput = gitOutput(root, ["ls-files"]);
+    for (const relative of (trackedFilesOutput ?? "").split(/\r?\n/).filter(Boolean)) {
       for (const patternValue of validNeverTrack) {
         if (matchesPath(patternValue, relative)) findings.push(finding("error", "privacy.tracked", `tracked path matches privacy rule \`${patternValue}\``, relative));
       }

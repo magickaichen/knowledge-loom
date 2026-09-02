@@ -1,5 +1,4 @@
 import crypto from "node:crypto";
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7,6 +6,7 @@ import YAML from "yaml";
 
 import { CONTRACT_NAME, isUnknownRecord, loadVault } from "./contract.js";
 import { ContractError, errorMessage, ResolutionError } from "./errors.js";
+import { gitOutput } from "./git.js";
 import { canonicalPath, expandHome, isWithin } from "./pathing.js";
 import type { LoadedVault, Registry, UnknownRecord } from "./types.js";
 
@@ -128,11 +128,9 @@ interface ProjectMatch {
 function mainCheckoutEquivalent(start: string): string | null {
   let current = canonicalPath(start);
   if (fs.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path.dirname(current);
-  const completed = spawnSync("git", ["-C", current, "rev-parse", "--show-toplevel", "--git-common-dir"], {
-    encoding: "utf8",
-  });
-  if (completed.status !== 0) return null;
-  const [worktreeOutput, commonDirectoryOutput] = completed.stdout.trimEnd().split(/\r?\n/);
+  const output = gitOutput(current, ["rev-parse", "--show-toplevel", "--git-common-dir"]);
+  if (output === null) return null;
+  const [worktreeOutput, commonDirectoryOutput] = output.trimEnd().split(/\r?\n/);
   if (!worktreeOutput || !commonDirectoryOutput) return null;
 
   const worktreeRoot = canonicalPath(worktreeOutput);
