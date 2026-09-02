@@ -1,20 +1,21 @@
 # Knowledge Loom
 
-Give any agent that supports Agent Skills a safe way to use the notes you already keep.
+Give any agent that supports Agent Skills a safe way to turn work you can already access into
+reusable Markdown knowledge.
+
+Your work already contains decisions, plans, project history, and relationships, but it is often
+scattered across source systems and Markdown notes. A bare folder leaves the agent to guess
+which vault you meant, whose facts it found, and whether it may save what it learned.
+
+Knowledge Loom can discover active work through source tools you have already authorized, distill
+it into a populated vault, and add a small rules file that tells later agents how to use it. It
+works with ordinary Markdown folders, including Obsidian vaults.
 
 Knowledge Loom is agent-neutral. Its four skills are ordinary `SKILL.md` folders, each with its
-own instructions, references, and a self-contained JavaScript runner. Install them with `npx skills` in Codex, Cursor,
-OpenCode, Claude Code, and
+own instructions, references, and a self-contained JavaScript runner. Install them with `npx skills`
+in Codex, Cursor, OpenCode, Claude Code, and
 [other supported agents](https://github.com/vercel-labs/skills#supported-agents). The Claude Code
 and Codex plugins package those same four skill folders.
-
-Your Markdown notes contain decisions, plans, project history, and personal context. Point an agent
-at the folder and it still has to guess which vault you meant, whose facts it found, and whether it
-may save what it learned.
-
-Knowledge Loom adds a small rules file to your Markdown folder. That file tells the agent what the
-vault contains, how to find the right notes, and where reading stops and writing begins. It works
-with ordinary Markdown folders, including Obsidian vaults.
 
 ## Installation
 
@@ -115,32 +116,37 @@ Claude Code:
 
 ## Set up your first vault
 
-### 1. Preview
+### 1. Run it
 
-Open your Markdown folder in your agent and paste the matching prompt. These examples assume an
-`npx skills` install; add the `knowledge-loom:` namespace shown above for a plugin install.
+Start an agent task where you normally work and invoke the skill. You do not need to choose a topic,
+enumerate sources, design folders, or invent questions first. These examples assume an `npx skills`
+install; add the `knowledge-loom:` namespace shown above for a plugin install.
 
 Codex:
 
 ```text
-$init-knowledge-vault Initialize this folder as a knowledge vault. Show me the preview and do not write anything yet.
+$init-knowledge-vault Set up my work vault.
 ```
 
 Claude Code:
 
 ```text
-/init-knowledge-vault Initialize this folder as a knowledge vault. Show me the preview and do not write anything yet.
+/init-knowledge-vault Set up my work vault.
 ```
 
-Knowledge Loom proposes a vault ID, subject, write policy, and files. It stops at the preview.
+Knowledge Loom inspects active and recent work through already-authorized source tools. It proposes
+one preview containing the vault identity and destination, discovered source boundaries, planned
+Projects, People, Decisions, Reference notes, current focus, registration, and any known gaps. It
+stops once for approval. Categories with no sourced content are omitted. If no useful work source is
+available, it names the missing access and stops before creating an empty vault.
 
 ### 2. Approve
 
-Check the proposal, then tell the agent to apply it. New vaults default to proactive durable capture
-and current-state maintenance. This one-time approval authorizes the defaults; the protocol still
-captures only durable, sourced knowledge and excludes transient conversation, speculation, secrets,
-and duplicates. Request `explicit-only` policies in the preview when a vault should require a fresh
-write request every time.
+Check the proposal, then tell the agent to apply it. That one approval covers the previewed contract,
+populated notes, current focus, registration, and active-project association. New vaults default to
+proactive durable capture and current-state maintenance; the protocol still excludes transient
+conversation, speculation, secrets, and duplicates. Request `explicit-only` policies in the preview
+when a vault should require a fresh write request every time.
 
 ### 3. Use it
 
@@ -259,8 +265,8 @@ provider, and backup provider still have their own access and privacy rules.
 
 ## The four skills
 
-- [`init-knowledge-vault`](skills/init-knowledge-vault/SKILL.md) previews and initializes a new
-  vault, or carefully adopts an existing folder.
+- [`init-knowledge-vault`](skills/init-knowledge-vault/SKILL.md) discovers existing authorized work
+  and turns it into a populated, registered vault, or carefully adopts an existing folder.
 - [`audit-knowledge-vault`](skills/audit-knowledge-vault/SKILL.md) checks the rules file, metadata,
   privacy paths, Git state, focus views, and any locally configured content checker without
   modifying the vault.

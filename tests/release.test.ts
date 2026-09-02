@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
+import { changelogNotes } from "../scripts/check-release-version.ts";
 import { PACKAGE_ROOT, readJson, temporaryDirectory } from "./helpers.ts";
 
 interface PackageManifest {
@@ -37,9 +38,7 @@ test("release checker writes curated changelog notes", (t) => {
   const result = runChecker(`v${version}`, "--notes-output", notes);
   assert.equal(result.status, 0, result.stderr);
   const contents = fs.readFileSync(notes, "utf8");
-  assert.ok(contents.startsWith("Linked Git worktrees now reuse the vault association registered for their main checkout"));
-  assert.match(contents, /`git rev-parse --git-common-dir` fallback/);
-  assert.match(contents, /Preserved registry schema version 1/);
+  assert.equal(contents, changelogNotes(`v${version}`));
   assert.doesNotMatch(contents, /Full Changelog/);
 });
 
