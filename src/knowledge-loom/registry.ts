@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -128,11 +128,16 @@ interface ProjectMatch {
 function mainCheckoutEquivalent(start: string): string | null {
   let current = canonicalPath(start);
   if (fs.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path.dirname(current);
-  const completed = spawnSync("git", ["-C", current, "rev-parse", "--show-toplevel", "--git-common-dir"], {
-    encoding: "utf8",
-  });
-  if (completed.status !== 0) return null;
-  const [worktreeOutput, commonDirectoryOutput] = completed.stdout.trimEnd().split(/\r?\n/);
+  let output: string;
+  try {
+    output = execFileSync("git", ["-C", current, "rev-parse", "--show-toplevel", "--git-common-dir"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return null;
+  }
+  const [worktreeOutput, commonDirectoryOutput] = output.trimEnd().split(/\r?\n/);
   if (!worktreeOutput || !commonDirectoryOutput) return null;
 
   const worktreeRoot = canonicalPath(worktreeOutput);

@@ -7371,7 +7371,7 @@ import path7 from "node:path";
 // src/knowledge-loom/audit.ts
 import fs5 from "node:fs";
 import path5 from "node:path";
-import { spawnSync as spawnSync2 } from "node:child_process";
+import { execFileSync as execFileSync2 } from "node:child_process";
 
 // src/knowledge-loom/contract.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7676,7 +7676,7 @@ import path4 from "node:path";
 // src/knowledge-loom/registry.ts
 var import_yaml2 = __toESM(require_dist(), 1);
 import crypto from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import fs3 from "node:fs";
 import os2 from "node:os";
 import path3 from "node:path";
@@ -7772,11 +7772,16 @@ function projectRecord(configuredRoot, record, { matching = false } = {}) {
 function mainCheckoutEquivalent(start) {
   let current = canonicalPath(start);
   if (fs3.statSync(current, { throwIfNoEntry: false })?.isFile()) current = path3.dirname(current);
-  const completed = spawnSync("git", ["-C", current, "rev-parse", "--show-toplevel", "--git-common-dir"], {
-    encoding: "utf8"
-  });
-  if (completed.status !== 0) return null;
-  const [worktreeOutput, commonDirectoryOutput] = completed.stdout.trimEnd().split(/\r?\n/);
+  let output;
+  try {
+    output = execFileSync("git", ["-C", current, "rev-parse", "--show-toplevel", "--git-common-dir"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+  } catch {
+    return null;
+  }
+  const [worktreeOutput, commonDirectoryOutput] = output.trimEnd().split(/\r?\n/);
   if (!worktreeOutput || !commonDirectoryOutput) return null;
   const worktreeRoot = canonicalPath(worktreeOutput);
   const commonDirectory = path3.resolve(current, commonDirectoryOutput);
@@ -8311,7 +8316,17 @@ function matchesPath(pattern, candidate) {
   return globRegex(pattern).test(candidate);
 }
 function git(root, ...arguments_) {
-  return spawnSync2("git", ["-C", root, ...arguments_], { encoding: "utf8" });
+  try {
+    return {
+      status: 0,
+      stdout: execFileSync2("git", ["-C", root, ...arguments_], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"]
+      })
+    };
+  } catch {
+    return { status: 1, stdout: "" };
+  }
 }
 function auditDeclaredFiles(root, values, {
   boundaryCode,

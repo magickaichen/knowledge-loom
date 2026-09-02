@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 import { finding, isUnknownRecord, loadNoteFrontmatter, validateContractData } from "./contract.js";
 import { runDeclaredContentCheck } from "./content-checks.js";
@@ -77,8 +77,18 @@ export function matchesPath(pattern: string, candidate: string): boolean {
   return globRegex(pattern).test(candidate);
 }
 
-function git(root: string, ...arguments_: string[]) {
-  return spawnSync("git", ["-C", root, ...arguments_], { encoding: "utf8" });
+function git(root: string, ...arguments_: string[]): { status: number; stdout: string } {
+  try {
+    return {
+      status: 0,
+      stdout: execFileSync("git", ["-C", root, ...arguments_], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }),
+    };
+  } catch {
+    return { status: 1, stdout: "" };
+  }
 }
 
 interface DeclaredFilesOptions {
