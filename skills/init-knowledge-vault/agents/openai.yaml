@@ -1,4 +1,4 @@
 interface:
-  display_name: "Initialize Knowledge Vault"
-  short_description: "Create, register, or link a Markdown vault"
-  default_prompt: "Use $init-knowledge-vault to create, register, or link this governed Markdown vault."
+  display_name: "Set Up Knowledge Vault"
+  short_description: "Turn existing work into a ready-to-use vault"
+  default_prompt: "Use $init-knowledge-vault to set up a useful work vault for me."

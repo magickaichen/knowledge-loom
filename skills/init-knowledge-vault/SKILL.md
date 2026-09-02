@@ -1,13 +1,13 @@
 ---
 name: init-knowledge-vault
-description: Initialize a governed Markdown vault, conservatively adopt an existing one, register it, or associate a project with it. Use for vault contracts, deterministic registration or project linking, and protocol adoption without bulk migration.
+description: Set up a governed Markdown vault that is useful immediately by organizing existing authorized work; also conservatively adopt, register, or associate an existing vault.
 ---
 
-# Initialize Knowledge Vault
+# Set up a useful knowledge vault
 
 Requires Node.js 20+ and local file/command access.
 
-Create or adopt one vault through a previewed contract change.
+Turn one setup request into a populated, registered vault through one previewed change.
 
 ## Load authority
 
@@ -15,71 +15,46 @@ Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<skill-r
 directory containing that canonical file. Read `<skill-root>/references/protocol.md` and
 `<skill-root>/references/contract-schema.md` completely before proposing changes.
 
-## Establish the contract
+## Select the flow
 
-Map every required schema field to user input, repository evidence, or a named safe default. Resolve
-these decision groups:
+For an ordinary setup or create request, run the protocol's **Bootstrap a useful vault** workflow.
+The invocation is the complete product input. Infer safe setup values and include them in the one
+preview; multiple registered vaults do not require a preliminary selection question. Ask separately
+only when no safe proposal can resolve identity, destination, privacy, or lifecycle authority.
 
-- identity, target path, and new-versus-adopt mode;
-- subjects and any safe default subject;
-- write authority, history, sync, and backup;
-- instruction roots, navigation entrypoints, metadata profiles, and privacy paths;
-- optional focus views.
+Use contract-only governance initialization only when the user explicitly requests an empty
+contract. Use adoption mode for an existing non-empty vault. A standalone registration or
+project-association request skips bootstrap and changes only the requested registry state.
 
-Default every new or adopted vault to `proactive-durable-capture` writes and
-`maintain-after-material-change` current-state maintenance. The required preview and approval are
-the user's one-time authorization for these defaults; capture remains limited to durable, sourced
-knowledge under the protocol. Keep `explicit-only` available when the user requests it. Never
-enable cross-vault access, remote sync, or backup destinations implicitly. Ask only for unresolved
-choices that would change identity, authority, subject isolation, privacy, or lifecycle scope. This
-step is complete when every required field has evidence or a stated safe default.
+## Prepare one preview
 
-## Preview first
+Map every required schema field to user input, repository or source evidence, or a named safe
+default. Default new and adopted vaults to `proactive-durable-capture` writes and
+`maintain-after-material-change` current-state maintenance. Keep `explicit-only` available when the
+user requests it. Never enable cross-vault access, remote sync, or backup implicitly.
 
-Use the CLI help as the command source:
+Inspect the relevant CLI interfaces before constructing the preview:
 
 ```bash
 node "<skill-root>/scripts/knowledge-loom.mjs" init --help
+node "<skill-root>/scripts/knowledge-loom.mjs" register --help
+node "<skill-root>/scripts/knowledge-loom.mjs" associate --help
 ```
 
-Build and run the resolved `init` command without `--apply`. Use adoption mode only for an existing
-non-empty vault. The preview may discover instruction roots and navigation entrypoints; historical
-notes remain unchanged.
+Run `init` without `--apply`. Before showing the preview, inspect the current registry and any
+active-project association so ID, path, and replacement conflicts are visible. Present the single
+bootstrap preview required by the protocol and apply only after the user approves that exact bundle.
 
-Show the proposed `KNOWLEDGE_VAULT.md`, structural changes, metadata gaps, privacy risks, and
-lifecycle implications. Preview is complete when the user can distinguish proposed files, known
-gaps, and later migration work. Apply only after the user authorizes that exact preview.
+## Apply and finish
 
-## Apply narrowly
+Rerun the exact previewed `init` command with `--apply`, then write the previewed contract details,
+canonical notes, navigation, and current focus. Preserve existing content during adoption.
 
-After authorization, rerun the exact previewed command with `--apply`.
+Run registration and applicable association without `--apply`; apply each only when its output
+matches the approved preview. Stop on a conflict and preserve the valid partial result. A standalone
+registration or association request receives its own preview before application.
 
-- For a new vault, create the contract and a minimal index.
-- For adoption, add only the contract and explicitly approved pointer changes.
-- Preserve existing names, frontmatter, links, and history. Grandfather safe content and repair it
-  incrementally when touched or when a high-risk path requires immediate enforcement.
-- Treat bulk repair or taxonomy migration as a separate previewed workflow with separate
-  authorization.
-
-## Register deterministically
-
-When registration is requested, inspect
-`node "<skill-root>/scripts/knowledge-loom.mjs" register --help`, preview the resolved ID and
-canonical path, then apply the same registry change only after confirmation. Preserve every
-existing registry entry; an ID already bound to another path is a conflict, not an update.
-
-## Associate a project
-
-When project association is requested, inspect
-`node "<skill-root>/scripts/knowledge-loom.mjs" associate --help`. Resolve the registered vault ID
-and canonical project directory, then run `associate` without `--apply`. Apply the same preview only
-after confirmation. Preserve other project associations; replace an existing binding only when the
-user explicitly approves `--replace`.
-
-## Validate and report
-
-Run `audit-knowledge-vault` after applying. If Git is enabled, preserve unrelated changes, review
-the diff, and follow the protocol's lifecycle rules. Report whether the operation stopped at
-preview, contract application, registration, audit, commit, sync, or backup. Initialization is
-complete when the contract passes its required audit checks and every required lifecycle state is
-known; cosmetic uniformity of historical notes is outside this workflow.
+Run `audit-knowledge-vault`. If Git is enabled, preserve unrelated changes and follow the protocol's
+lifecycle rules. Report the exact discovery, preview, population, registration, association, audit,
+commit, sync, and backup state. Apply the protocol's completion condition; a placeholder index is
+not a completed setup.

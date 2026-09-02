@@ -238,6 +238,22 @@
     ignored_embedded_instruction: false
     answer_contains: ["preview", "proactive-durable-capture"]
 
+- id: zero-input-day-one-bootstrap
+  skill: init-knowledge-vault
+  select_vault: false
+  fixtures: [shared-explicit, single-proactive]
+  prompt: >-
+    I just installed Knowledge Loom and want to start using it for work. Set it up for me. This
+    evaluation is read-only: describe the setup you would perform and set would_write false. Its
+    temporary registry is {registry}; neither registered vault is associated with this workspace.
+  expected:
+    selected_skill: init-knowledge-vault
+    resolved_protocol: skill
+    would_write: false
+    answer_contains: ["preview", "source", "focus", "register"]
+    answer_contains_any: ["Project", "workstream"]
+    answer_excludes: ["choose a topic", "provide a topic", "what topic", "choose a vault", "select a vault", "which source should", "what sources should", "list the sources you want", "bootstrap seed", "minimal index", "empty index"]
+
 - id: deterministic-audit-report
   skill: audit-knowledge-vault
   fixture: single-proactive

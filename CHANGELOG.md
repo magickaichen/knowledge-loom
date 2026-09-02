@@ -1,5 +1,29 @@
 # Changelog
 
+## v0.8.0
+
+`init-knowledge-vault` can now turn existing authorized work into a populated vault without first
+asking the user to define a topic, source list, taxonomy, or evaluation questions.
+
+### Added
+
+- Added zero-input source-assisted bootstrap through active and recent source views already
+  available to the agent.
+- Added source-linked Project and workstream notes, relevant People, Decisions, reusable Reference
+  knowledge, `INDEX.md`, and a current-focus view. Categories without sourced content are omitted.
+- Added one preview for the contract, source boundaries, planned notes, focus, registration,
+  project association, privacy, lifecycle, and known gaps.
+- Added behavior coverage for setup with multiple unrelated registered vaults and no project
+  association.
+
+### Safety and compatibility
+
+- Distinguished source authority from tool reachability and retained source references, capture
+  times, and explicit coverage gaps.
+- Stopped before creating an empty placeholder vault when no useful authorized source is available.
+- Preserved contract schema version 1, existing CLI commands, explicit contract-only initialization,
+  conservative adoption, registration, and project association.
+
 ## v0.7.1
 
 Linked Git worktrees now reuse the vault association registered for their main checkout.
