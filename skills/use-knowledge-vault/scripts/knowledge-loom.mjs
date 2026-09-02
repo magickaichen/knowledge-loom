@@ -8446,10 +8446,10 @@ async function auditVault(vault, { registryPath } = {}) {
   if (history.type === "git" && !isGit) findings.push(finding("error", "git.missing", "contract requires Git but root is not a Git repository"));
   if (history.type === "none" && isGit) findings.push(finding("warning", "git.unconfigured", "root is a Git repository but contract declares no history"));
   if (isGit) {
-    const status = gitOutput(root, ["status", "--short"]);
-    if (status?.trim()) findings.push(finding("info", "git.dirty", "working tree has uncommitted changes"));
-    const tracked = gitOutput(root, ["ls-files"]);
-    for (const relative of (tracked ?? "").split(/\r?\n/).filter(Boolean)) {
+    const statusOutput = gitOutput(root, ["status", "--short"]);
+    if (statusOutput?.trim()) findings.push(finding("info", "git.dirty", "working tree has uncommitted changes"));
+    const trackedFilesOutput = gitOutput(root, ["ls-files"]);
+    for (const relative of (trackedFilesOutput ?? "").split(/\r?\n/).filter(Boolean)) {
       for (const patternValue of validNeverTrack) {
         if (matchesPath(patternValue, relative)) findings.push(finding("error", "privacy.tracked", `tracked path matches privacy rule \`${patternValue}\``, relative));
       }
