@@ -16,8 +16,14 @@ structure.
 _Avoid_: Migration, reorganization
 
 **Source-assisted bootstrap**:
-Constructing an immediately usable governed vault from a bounded set of authorized source systems.
+Turning one user need and bounded authorized source context into a populated, immediately useful
+governed vault.
 _Avoid_: Initialization, adoption, bulk import
+
+**Empty-vault cliff**:
+The first-run failure state in which setup produces an empty governed vault with no useful knowledge
+or clear starting point.
+_Avoid_: Fresh vault, setup complete
 
 **Bootstrap seed**:
 The minimal clue a user provides to begin source discovery, such as a workstream name or one source
@@ -33,26 +39,6 @@ _Avoid_: User-provided source list, approved scope
 An authorized, addressable part of a source system that can contribute evidence to a bootstrap, such
 as a project, space, channel, or repository.
 _Avoid_: Connector, data source
-
-**Source object**:
-The provider- and tenant-scoped stable identity of one source artifact. Mutable keys, names, paths,
-and URLs are aliases rather than identity.
-_Avoid_: Source URL, source copy
-
-**Source observation**:
-Immutable evidence captured for one observed revision or state of a source object, including revision
-evidence, provenance, observation time, and content hash without retaining the complete provider payload.
-_Avoid_: Latest snapshot, canonical knowledge
-
-**Source relation**:
-A typed, directed connection between source objects whose basis is recorded as provider-confirmed or
-inferred. An inferred relation connects evidence without merging source identities.
-_Avoid_: Source merge, semantic identity
-
-**Evidence ledger**:
-The durable inventory of fetched source observations, their dispositions, and their source relations.
-It retains compact evidence metadata while complete provider payloads remain transient.
-_Avoid_: Source archive, citation list
 
 **Bootstrap scope**:
 The person, work domain, source surfaces, and historical boundary authorized for one source-assisted
@@ -74,16 +60,6 @@ The combination of source authority, destination authority, and a propagation bo
 one bootstrap action.
 _Avoid_: Access permission, consent checklist
 
-**Authority evidence**:
-The vault owner's bootstrap approval combined with verified source permissions, provider restrictions,
-and the destination vault's declared storage and lifecycle.
-_Avoid_: OAuth grant, compliance questionnaire
-
-**Authority revocation**:
-The loss of source or destination authority after canonical knowledge has been created; it stops the
-affected action and preserves or isolates existing knowledge according to which authority was lost.
-_Avoid_: Token expiry, automatic deletion
-
 **Source authority**:
 Evidence that the vault owner may use information from a selected source surface for the approved work
 purpose.
@@ -104,35 +80,15 @@ A durable, source-linked meaning distilled from one or more source surfaces and 
 note.
 _Avoid_: Source copy, generated summary
 
-**Canonical assertion**:
-The smallest independently meaningful fact, decision, status, responsibility, or rationale within
-canonical knowledge. Its provenance links to specific source observations.
-_Avoid_: Sentence citation, note summary
-
-**Assertion basis**:
-How a canonical assertion was formed: source-stated, synthesized from cited premises, inferred with
-rationale and confidence, or human-confirmed.
-_Avoid_: Confidence score, citation count
-
-**Evidence support**:
-The lifecycle-aware provenance link from a canonical assertion to a source observation. Its state
-shows whether that observation currently supports, supersedes, contradicts, or can no longer verify the assertion.
-_Avoid_: Citation URL, source list
+**Source reference**:
+The minimum durable provenance that lets a user navigate from canonical knowledge back to the
+supporting source, including a stable provider identity or permalink and capture time.
+_Avoid_: Evidence graph, source archive
 
 **Coverage gap**:
-A structured record of material within the bootstrap scope that is missing, conflicting, stale,
-inaccessible, truncated, unsupported, or unresolved, including its impact and recovery state.
-_Avoid_: Import error, warning text
-
-**Retrieval coverage**:
-The inspectable result of enumerating each authorized source surface, object class, and history boundary
-under the provider's declared endpoint semantics.
-_Avoid_: Account completeness, search result count
-
-**Synthesis coverage**:
-The disposition of every fetched source observation as cited, contextual, duplicate, out of scope,
-unresolved, or failed.
-_Avoid_: Retrieval coverage, note count
+A known missing, inaccessible, truncated, stale, or unresolved part of the approved bootstrap scope
+that the handoff discloses instead of hiding.
+_Avoid_: Import error, completeness score
 
 **Natural knowledge need**:
 A retrieval or judgment need that arises during the user's ordinary work rather than being authored
@@ -145,9 +101,14 @@ must not be available as input during source discovery or distillation.
 _Avoid_: Bootstrap source, canonical destination
 
 **Handoff readiness**:
-The state in which a bootstrapped vault has declared coverage, provenance, navigation, privacy, and
-governance validation, so the user can begin relying on it in ordinary work.
+The state in which a populated vault has enough navigation, source references, and disclosed gaps for
+the user to begin ordinary work immediately.
 _Avoid_: Migration complete, fully imported
+
+**Governed evolution**:
+The ordinary post-handoff workflow that retrieves and durably captures new knowledge under the vault
+contract as the user works.
+_Avoid_: Background sync, continuous ingestion
 
 **Exception review**:
 A human interruption reserved for an action that expands authority, crosses a propagation boundary,
