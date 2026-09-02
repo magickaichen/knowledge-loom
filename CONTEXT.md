@@ -16,24 +16,14 @@ structure.
 _Avoid_: Migration, reorganization
 
 **Source-assisted bootstrap**:
-Turning one user need and bounded authorized source context into a populated, immediately useful
-governed vault.
-_Avoid_: Initialization, adoption, bulk import
+Automatically discovering and distilling a user's authorized existing work into a populated,
+registered governed vault during setup, without requiring a topic or source list.
+_Avoid_: Topic bootstrap, initialization, bulk import
 
 **Empty-vault cliff**:
 The first-run failure state in which setup produces an empty governed vault with no useful knowledge
 or clear starting point.
 _Avoid_: Fresh vault, setup complete
-
-**Bootstrap seed**:
-The minimal clue a user provides to begin source discovery, such as a workstream name or one source
-object. A seed starts discovery but does not authorize the discovered scope.
-_Avoid_: Source inventory, bootstrap scope
-
-**Candidate source envelope**:
-The source objects, relationships, historical boundary, and coverage limits discovered from a
-bootstrap seed and proposed to the user in the Bootstrap approval preview.
-_Avoid_: User-provided source list, approved scope
 
 **Source surface**:
 An authorized, addressable part of a source system that can contribute evidence to a bootstrap, such
@@ -41,18 +31,13 @@ as a project, space, channel, or repository.
 _Avoid_: Connector, data source
 
 **Bootstrap scope**:
-The person, work domain, source surfaces, and historical boundary authorized for one source-assisted
-bootstrap.
+The automatically discovered person, work domains, source surfaces, and historical boundary
+authorized through one bootstrap preview.
 _Avoid_: Crawl scope, import scope
 
-**Fragment-rich workstream**:
-A bounded work domain whose decisions, status, ownership, and implementation evidence are distributed
-across source surfaces without one source object providing a reliable map of the whole.
-_Avoid_: Large workstream, many-link workstream
-
 **Bootstrap approval**:
-The single user-facing authorization to apply a previewed bootstrap scope and optionally perform later
-on-demand incremental capture within that unchanged scope.
+The single user-facing authorization to apply the previewed contract, bootstrap scope, populated
+notes, registration, and active-project association.
 _Avoid_: Import confirmation, per-note approval
 
 **Authority chain**:
@@ -90,19 +75,9 @@ A known missing, inaccessible, truncated, stale, or unresolved part of the appro
 that the handoff discloses instead of hiding.
 _Avoid_: Import error, completeness score
 
-**Natural knowledge need**:
-A retrieval or judgment need that arises during the user's ordinary work rather than being authored
-in advance as an evaluation question.
-_Avoid_: Benchmark question, test prompt
-
-**Evaluation oracle**:
-Existing trusted knowledge used only after a bootstrap run to assess its coverage and correctness. It
-must not be available as input during source discovery or distillation.
-_Avoid_: Bootstrap source, canonical destination
-
 **Handoff readiness**:
-The state in which a populated vault has enough navigation, source references, and disclosed gaps for
-the user to begin ordinary work immediately.
+The state in which a populated, registered vault has enough navigation, source references, and
+disclosed gaps for later skills to use it immediately.
 _Avoid_: Migration complete, fully imported
 
 **Governed evolution**:
