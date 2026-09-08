@@ -270,3 +270,77 @@ test("concurrent user edits during candidate audit prevent application", async (
   assert.equal(git(b, "rev-parse", "HEAD"), evidence.ours);
   assert.equal(fs.readFileSync(path.join(b, "concurrent.md"), "utf8"), "Unfinished user work\n");
 });
+
+test("remote rewind after evidence preparation is detected before applying the candidate", async (t) => {
+  const { a, b, state, root, remote } = devices(t);
+  const base = git(a, "rev-parse", "HEAD");
+  commit(a, "remote.md", "# Remote\n"); git(a, "push"); commit(b, "local.md", "# Local\n");
+  const pending = await invoke(b, state);
+  const evidence = asRecord(pending.evidence);
+  git(a, "push", "--force", "origin", `${base}:main`);
+  const resolution = path.join(root, "decision.json");
+  fs.writeFileSync(resolution, JSON.stringify({ ours: evidence.ours, theirs: evidence.theirs, rationale: "Independent contributions.", files: [] }));
+  const result = await invoke(b, state, ["--resolution", resolution]);
+  assert.equal(result.status, "pending"); assert.equal(result.recovery_required, true);
+  assert.equal(git(b, "rev-parse", "HEAD"), evidence.ours);
+  assert.equal(git(remote, "rev-parse", "main"), base);
+});
+
+test("interrupted candidate application keeps the surviving Git writer protected", async (t) => {
+  const { a, b, state, root } = devices(t);
+  commit(a, ".gitattributes", "remote.dat filter=delayed\n"); git(a, "push"); git(b, "pull", "--ff-only");
+  commit(a, "remote.dat", "Remote bytes\n"); git(a, "push"); commit(b, "local.md", "# Local\n");
+  const pending = await invoke(b, state);
+  const evidence = asRecord(pending.evidence);
+  const resolution = path.join(root, "decision.json");
+  fs.writeFileSync(resolution, JSON.stringify({ ours: evidence.ours, theirs: evidence.theirs, rationale: "Independent contributions.", files: [] }));
+  const marker = path.join(root, "apply-ready"); const release = path.join(root, "release-apply");
+  const script = path.join(root, "smudge");
+  const quote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
+  fs.writeFileSync(script, `#!/bin/sh\nprintf ready > ${quote(marker)}\nwhile [ ! -f ${quote(release)} ]; do sleep 0.05; done\ncat\n`, { mode: 0o755 });
+  git(b, "config", "filter.delayed.smudge", quote(script));
+  const owner = spawn(process.execPath, ["--import", "tsx", "src/knowledge-loom/runner.ts", "sync", b, "--state-dir", state, "--resolution", resolution, "--json"], { cwd: PACKAGE_ROOT, stdio: "ignore" });
+  const exited = new Promise<void>((resolve) => owner.once("exit", () => resolve()));
+  try {
+    const deadline = Date.now() + 10_000;
+    while (!fs.existsSync(marker) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(fs.existsSync(marker), true);
+    owner.kill("SIGKILL"); await exited;
+    assert.equal((await invoke(b, state)).status, "busy");
+    assert.equal((await invoke(b, state, ["--status"])).status, "pending");
+  } finally { fs.writeFileSync(release, "release"); owner.kill("SIGKILL"); }
+  // Wait for the protected application before temporary fixture cleanup.
+  const deadline = Date.now() + 10_000;
+  let result;
+  do { result = await invoke(b, state); } while (result.status === "busy" && Date.now() < deadline);
+  assert.equal(result.status, "synchronized");
+});
+
+test("a new unaudited revision cannot inherit the prior validated state", async (t) => {
+  const { b, state } = devices(t);
+  assert.equal((await invoke(b, state)).validated, true);
+  commit(b, "Projects/invalid.md", "# Missing metadata\n");
+  const result = await invoke(b, state, ["--status"]);
+  assert.equal(result.status, "pending"); assert.equal(result.validated, false);
+  fs.writeFileSync(path.join(b, "unfinished.md"), "Working\n");
+  assert.equal((await invoke(b, state)).validated, false);
+});
+
+test("bounded packets allow completion after explicit review of all larger source versions", async (t) => {
+  const { a, b, state, root } = devices(t);
+  const longNote = "# Remote reference\n" + "A sourced detail retained with its context.\n".repeat(80);
+  commit(a, "long.md", longNote); git(a, "push"); commit(b, "local.md", "# Independent local contribution\n");
+  const pending = await invoke(b, state);
+  const evidence = asRecord(pending.evidence);
+  assert.equal(evidence.truncated, true);
+  assert.ok(JSON.stringify(evidence).length < 8192);
+  const resolution = path.join(root, "decision.json");
+  const decision = { base: evidence.base, ours: evidence.ours, theirs: evidence.theirs, rationale: "Reviewed all source versions in bounded reads; preserve both independent contributions.", files: [] };
+  fs.writeFileSync(resolution, JSON.stringify(decision));
+  const missing = await invoke(b, state, ["--resolution", resolution]);
+  assert.equal(missing.status, "needs-reconciliation");
+  fs.writeFileSync(resolution, JSON.stringify({ ...decision, reviewed_files: ["local.md", "long.md"] }));
+  const result = await invoke(b, state, ["--resolution", resolution]);
+  assert.equal(result.status, "synchronized");
+  assert.equal(fs.readFileSync(path.join(b, "long.md"), "utf8"), longNote);
+});

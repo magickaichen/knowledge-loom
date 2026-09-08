@@ -8797,7 +8797,7 @@ async function auditVault(vault, { registryPath } = {}) {
 
 // src/knowledge-loom/sync.ts
 function git2(root, ...args) {
-  const result = spawnSync3("git", ["-C", root, ...args], { encoding: "utf8", timeout: 1e4, maxBuffer: 1024 * 1024 });
+  const result = spawnSync3("git", ["--no-optional-locks", "-C", root, ...args], { encoding: "utf8", timeout: 1e4, maxBuffer: 1024 * 1024 });
   if (result.status !== 0) throw new Error(`Git ${args[0]} failed`);
   return result.stdout.trim();
 }
@@ -8828,7 +8828,7 @@ async function synchronizeVault(vault, options = {}) {
     const state = read();
     const head = git2(vault.root, "rev-parse", "HEAD");
     const current = state.published_revision === head;
-    return { ...state, status: state.status === "synchronized" && !current ? "pending" : String(state.status ?? "unverified"), synchronized: state.synchronized === true && current, head, state_file: file };
+    return { ...state, status: state.status === "synchronized" && !current ? "pending" : String(state.status ?? "unverified"), synchronized: state.synchronized === true && current, validated: state.validated === true && state.validated_revision === head, head, state_file: file };
   }
   const locked = await withVaultLock(vault.root, async (trackWriter) => {
     let state = read();
@@ -8855,6 +8855,11 @@ async function synchronizeVault(vault, options = {}) {
       });
       return { code: code2, output: output2, error: error2 };
     };
+    const mutate = async (root, ...args) => {
+      const result = await run(root, args);
+      if (result.code !== 0) throw new Error(`Git ${args[0]} failed; pending work retained`);
+      return result.output.trim();
+    };
     if (options.resolution) {
       const evidence = isUnknownRecord(state.evidence) ? state.evidence : {};
       if (state.status !== "needs-reconciliation" || evidence.ours !== head || typeof state.workspace !== "string" || !unchanged()) return save({ status: "pending", reason: "reconciliation is stale; rerun sync for current evidence" });
@@ -8863,7 +8868,11 @@ async function synchronizeVault(vault, options = {}) {
       const decision = JSON.parse(fs7.readFileSync(options.resolution, "utf8"));
       if (!isUnknownRecord(decision) || decision.ours !== evidence.ours || decision.theirs !== evidence.theirs || typeof decision.rationale !== "string" || !decision.rationale.trim()) throw new Error("resolution requires exact ours/theirs revisions and evidence-based rationale");
       if (typeof decision.question === "string" && decision.question.trim()) return save({ status: "needs-reconciliation", question: decision.question, reason: decision.rationale });
-      if (evidence.truncated === true) return save({ status: "pending", reason: "evidence exceeds automatic bounds; scoped evidence review is required" });
+      if (evidence.truncated === true) {
+        const paths = changedPaths(vault.root, String(evidence.base), head, String(evidence.theirs));
+        const reviewed = decision.reviewed_files;
+        if (decision.base !== evidence.base || !Array.isArray(reviewed) || reviewed.some((item) => typeof item !== "string") || JSON.stringify([...new Set(reviewed)].sort()) !== JSON.stringify(paths)) return save({ status: "needs-reconciliation", reason: "complete bounded review of all pinned source versions and supply base plus reviewed_files" });
+      }
       if (!Array.isArray(decision.files)) throw new Error("resolution requires a files list");
       const workspace = canonicalPath(state.workspace);
       if (!isWithin(directory, workspace) || workspace === directory) throw new Error("invalid reconciliation workspace");
@@ -8885,29 +8894,35 @@ async function synchronizeVault(vault, options = {}) {
         const target = resolveVaultPath(workspace, file2);
         if (target && fs7.existsSync(target) && /^(?:<{7}|={7}|>{7})(?: |$)/m.test(fs7.readFileSync(target, "utf8"))) return save({ status: "needs-reconciliation", reason: "unresolved conflict markers remain" });
       }
-      git2(workspace, "add", "--all");
+      await mutate(workspace, "add", "--all");
       const candidateVault = loadVault(workspace);
       validateAuthority(candidateVault);
       if (JSON.stringify(candidateVault.contract) !== JSON.stringify(vault.contract)) return save({ status: "pending", reason: "candidate changes governing contract; review authority separately" });
-      const candidateTree = git2(workspace, "write-tree");
+      const candidateTree = await mutate(workspace, "write-tree");
       const candidateStatus = git2(workspace, "status", "--porcelain", "--untracked-files=all");
       const findings2 = await auditVault(candidateVault, { registryPath: options.registryPath });
       if (findings2.some((item) => item.severity === "error")) return save({ status: "needs-reconciliation", validated: false, reason: "candidate audit failed", findings: findings2 });
-      if (git2(workspace, "write-tree") !== candidateTree || git2(workspace, "diff", "--name-only") || git2(workspace, "status", "--porcelain", "--untracked-files=all") !== candidateStatus || !unchanged()) return save({ status: "pending", reason: "checkout or candidate changed during audit" });
-      git2(workspace, "-c", `core.hooksPath=${os5.devNull}`, "commit", "-m", "Reconcile source-backed knowledge contributions");
+      if (await mutate(workspace, "write-tree") !== candidateTree || git2(workspace, "diff", "--name-only") || git2(workspace, "status", "--porcelain", "--untracked-files=all") !== candidateStatus || !unchanged()) return save({ status: "pending", reason: "checkout or candidate changed during audit" });
+      await mutate(workspace, "-c", `core.hooksPath=${os5.devNull}`, "commit", "-m", "Reconcile source-backed knowledge contributions");
       const candidate = git2(workspace, "rev-parse", "HEAD");
-      save({ status: "pending", candidate, validated: true, reason: "audited candidate awaiting application" });
+      save({ status: "pending", candidate, validated: true, validated_revision: candidate, reason: "audited candidate awaiting application" });
       if ((await run(vault.root, ["fetch", "--no-tags", "--no-write-fetch-head", "--", workspace, candidate])).code !== 0 || !unchanged()) return save({ reason: "checkout changed before application; candidate retained" });
-      git2(vault.root, "-c", `core.hooksPath=${os5.devNull}`, "merge", "--ff-only", "--no-overwrite-ignore", candidate);
+      const remoteRef = `refs/knowledge-loom/sync/${key}`;
+      const checked = await run(vault.root, ["fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--refmap=", "--", remote, `+refs/heads/${branch}:${remoteRef}`]);
+      if (checked.code !== 0) return save({ failure: classifyFailure(checked.error), reason: "remote recheck failed; audited candidate retained" });
+      const latestRemote = git2(vault.root, "rev-parse", remoteRef);
+      if (latestRemote !== evidence.theirs) return save({ recovery_required: !ancestor2(vault.root, String(evidence.theirs), latestRemote), reason: "remote changed since evidence review; obtain fresh evidence before application" });
+      if (!unchanged()) return save({ reason: "checkout changed before application; candidate retained" });
+      await mutate(vault.root, "-c", `core.hooksPath=${os5.devNull}`, "merge", "--ff-only", "--no-overwrite-ignore", candidate);
       head = candidate;
     }
-    save({ status: "pending", head, saved: true, attempted_at: (options.now ?? Date.now)(), synchronized: false, backed_up: "not-run", committed: true });
+    save({ status: "pending", head, saved: true, validated: state.validated === true && state.validated_revision === head, attempted_at: (options.now ?? Date.now)(), synchronized: false, backed_up: "not-run", committed: true });
     if (JSON.stringify(loadVault(vault.root).contract) !== JSON.stringify(vault.contract)) return save({ reason: "authority changed; reread the contract" });
     if (upstreamProblem(vault.root, remote, branch) && localBranch === branch) {
       const settings = [[`branch.${localBranch}.remote`, remote], [`branch.${localBranch}.merge`, `refs/heads/${branch}`]];
       const current = settings.map(([key2]) => spawnSync3("git", ["-C", vault.root, "config", "--get", key2], { encoding: "utf8" }));
       if (current.every((value, i) => value.status === 1 || value.status === 0 && value.stdout.trim() === settings[i][1])) {
-        for (let i = 0; i < settings.length; i++) if (current[i].status === 1) git2(vault.root, "config", "--local", settings[i][0], settings[i][1]);
+        for (let i = 0; i < settings.length; i++) if (current[i].status === 1) await mutate(vault.root, "config", "--local", settings[i][0], settings[i][1]);
         save({ repair: "restored-authorized-upstream" });
       }
     }
@@ -8917,7 +8932,7 @@ async function synchronizeVault(vault, options = {}) {
     if (operationInProgress(vault.root) || git2(vault.root, "status", "--porcelain", "--untracked-files=all")) return save({ reason: "checkout has unfinished work; commit authorized changes separately before synchronization" });
     const findings = await auditVault(loadVault(vault.root), { registryPath: options.registryPath });
     if (findings.some((item) => item.severity === "error")) return save({ validated: false, reason: "audit failed", findings });
-    save({ validated: true });
+    save({ validated: true, validated_revision: head, findings: [] });
     if (git2(vault.root, "rev-parse", "HEAD") !== head || git2(vault.root, "status", "--porcelain", "--untracked-files=all") || operationInProgress(vault.root)) return save({ reason: "checkout changed during audit" });
     if (!unchanged()) return save({ reason: "checkout or authority changed before publication" });
     const { code, output, error } = await run(vault.root, ["push", "--porcelain", "--", remote, `${head}:refs/heads/${branch}`]);
@@ -8949,8 +8964,8 @@ async function synchronizeVault(vault, options = {}) {
       const workspace = fs7.mkdtempSync(path7.join(directory, "reconcile-"));
       save({ workspace, status: "pending", reason: "preparing isolated candidate" });
       if ((await run(directory, ["clone", "--no-hardlinks", "--no-checkout", "--", vault.root, workspace])).code !== 0) return save({ reason: "could not prepare isolated candidate" });
-      git2(workspace, "-c", `core.hooksPath=${os5.devNull}`, "checkout", "--detach", head);
-      for (const field of ["user.name", "user.email"]) git2(workspace, "config", field, git2(vault.root, "config", "--get", field));
+      await mutate(workspace, "-c", `core.hooksPath=${os5.devNull}`, "checkout", "--detach", head);
+      for (const field of ["user.name", "user.email"]) await mutate(workspace, "config", field, git2(vault.root, "config", "--get", field));
       if ((await run(workspace, ["fetch", "--no-tags", "--", vault.root, ref])).code !== 0) return save({ reason: "could not copy observed revision" });
       const merged = await run(workspace, ["-c", `core.hooksPath=${os5.devNull}`, "merge", "--no-commit", "--no-ff", theirs]);
       if (merged.code !== 0 && !fs7.existsSync(path7.join(workspace, ".git", "MERGE_HEAD"))) return save({ reason: "candidate merge failed; isolated work retained" });
@@ -8965,14 +8980,17 @@ function ancestor2(root, older, newer) {
   if (result.status !== 0 && result.status !== 1) throw new Error("could not compare history");
   return result.status === 0;
 }
+function changedPaths(root, base, ours, theirs) {
+  return [...new Set([ours, theirs].flatMap((revision) => git2(root, "diff", "--name-only", "-z", base, revision).split("\0").filter(Boolean)))].sort();
+}
 function evidencePacket(root, base, ours, theirs) {
-  const changed = [...new Set([ours, theirs].flatMap((revision) => git2(root, "diff", "--name-only", "-z", base, revision).split("\0").filter(Boolean)))].sort();
+  const changed = changedPaths(root, base, ours, theirs);
   let truncated = changed.length > 16;
   const files = changed.slice(0, 16).map((file) => {
     const read = (revision) => {
       const result = spawnSync3("git", ["-C", root, "show", `${revision}:${file}`], { encoding: "utf8", timeout: 1e4, maxBuffer: 8192 });
       if (result.error || result.stdout.length > 2048) truncated = true;
-      return result.status === 0 ? result.stdout.slice(0, 2048) : null;
+      return result.status === 0 || result.error ? result.stdout.slice(0, 2048) : null;
     };
     return { path: file, base: read(base), ours: read(ours), theirs: read(theirs) };
   });

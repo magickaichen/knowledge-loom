@@ -478,3 +478,17 @@
     would_write: false
     response_contains: ["pending", "revision", "one", "push"]
     response_matches_any: ["(?:preserve|retain|keep).*(?:dirty|edits|work)"]
+
+- id: sync-bounded-evidence-continuation
+  skill: use-knowledge-vault
+  fixture: single-proactive
+  prompt: >-
+    Read-only simulation: a non-fast-forward sync has a valid isolated candidate but its evidence
+    packet is truncated because one note is 5,000 characters. Both devices made independent
+    sourced additions. Explain how to finish review and submit a valid resolution while keeping
+    individual evidence reads bounded. Set would_write false and do not edit the fixture.
+  expected:
+    selected_skill: use-knowledge-vault
+    would_write: false
+    response_contains: ["reviewed_files", "base", "ours", "theirs", "audit"]
+    response_matches_any: ["(?:bounded|range|chunk|segment)"]
