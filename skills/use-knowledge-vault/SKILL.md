@@ -29,9 +29,12 @@ policy, lifecycle, and failure behavior.
    - When the user explicitly requests a vault operation, run `resolve`. Append a selector only
      when the user or invoking wrapper supplied one, and apply the protocol's selection failure
      behavior.
-3. Treat the returned canonical root as the only selected vault, read its contract completely, and
-   complete **Retrieve** before finishing the primary task. Use only context that materially affects
-   its result.
+3. Treat the returned canonical root as the only selected vault. Read its contract and instruction
+   roots, then follow **Prepare inbound access** with
+   `node "<skill-root>/scripts/knowledge-loom.mjs" access <vault-path> --json` before ordinary
+   retrieval. Preserve an explicit read-only request. After integration, reload governing files and
+   complete **Retrieve** using the updated knowledge. Carry degraded access state into claims that
+   depend on remote freshness; use only context that materially affects the primary task.
 4. Evaluate **Write authorization** after the primary task. Enter **Distill** only when the selected
    policy and current request authorize a vault change. When that branch will create or restructure
    an agent-consumed note or navigation pointer, apply the protocol's **Agent-readable

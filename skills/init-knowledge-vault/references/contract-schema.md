@@ -29,6 +29,36 @@ available override.
 For `subjects.mode: single`, set `subjects.default` to the only subject. For multiple subjects,
 omit the default unless the vault truly has a safe global default.
 
+## Inbound access
+
+Git vaults can explicitly authorize daily inbound access independently of their outbound
+`sync.mode`. Existing contracts without `sync.inbound` authorize no automatic fetch or integration.
+An outbound `git-remote-push` declaration alone does not grant inbound authority.
+
+```yaml
+sync:
+  mode: git-remote-push
+  remote: origin
+  inbound:
+    mode: fast-forward
+    remote: origin
+    branch: main
+```
+
+`sync.inbound` requires `history.type: git`, `mode: fast-forward`, a configured remote name, and
+a valid remote branch name. The current branch must track that same remote/branch. The initial
+implementation supports vaults at their Git checkout root, including linked worktrees; nested
+vaults return an explicit unavailable state instead of updating unrelated repository files.
+
+Use the `access --enable-inbound --remote NAME --branch NAME` preview and apply the reviewed
+contract with `--apply`. The command preserves policy text and outbound settings. Review any
+incompatible prose policy as part of migration; enabling the field does not rewrite that policy.
+Validate, commit, and synchronize the contract change under its existing lifecycle before relying
+on clean-checkout integration. Removing `sync.inbound` disables future automatic inbound access.
+
+Operational observations are local state, not contract fields. See the protocol's **Prepare inbound
+access** section for observation intervals, deferred integration, and failure behavior.
+
 ## Metadata profiles
 
 Define profiles as a mapping:

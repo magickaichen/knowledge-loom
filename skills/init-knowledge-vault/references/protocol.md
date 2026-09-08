@@ -94,6 +94,9 @@ association remains the nearest match.
 
 ## Retrieve
 
+Before ordinary retrieval, complete **Prepare inbound access** for the selected vault. Explicit
+read-only audits and resolution probes retain their read-only behavior.
+
 1. Read `KNOWLEDGE_VAULT.md` completely.
 2. Resolve declared paths inside the vault boundary, then read its instruction roots and
    navigation entrypoints. Follow every instruction-root context pointer whose stated trigger
@@ -135,6 +138,44 @@ association remains the nearest match.
 11. Complete retrieval only when each decisive claim has supporting evidence, or the result states
     that the required evidence is missing, conflicting, stale, or unavailable. If mandatory route
     evidence is absent, say what is missing and abstain from the unsupported conclusion.
+
+## Prepare inbound access
+
+1. Resolve one vault using the applicable selection mode. Read its contract and instruction roots
+   before invoking inbound access; their policy governs whether the operation is authorized.
+2. Invoke `access` on the selected canonical root before reading knowledge. Without a selector it
+   uses automatic applicability only; explicit operations resolve first and pass the root. Missing
+   `sync.inbound` returns `not-enabled` without fetching. Offer a previewed migration when enabling
+   inbound behavior is within the user's request.
+3. Reuse a successful remote observation for 24 elapsed hours on the same device, checkout, local
+   branch, and configured remote/branch identity. Ordinary conversation causes no check. Writing
+   does not bypass this interval. An observation is not evidence of later remote changes.
+4. Integrate a clean, behind-only checkout by fast-forward. Revalidate governing paths afterward
+   and reload the contract, instruction roots, and relevant knowledge. Preserve staged, untracked,
+   unfinished, and unrelated edits. An active Git operation or cooperative writer defers integration.
+   A fetched remote revision with deferred integration remains `behind`.
+5. Report the actual result. `current` means the local commit equals the observed commit; `ahead`
+   means local commits remain; `diverged` requires reconciliation. Upstream rewrites require explicit
+   recovery. `unavailable` and `busy` preserve local work without prohibiting otherwise authorized
+   reading, editing, or committing. Disclose unverified remote state when it affects a judgment.
+   Invalid contracts or escaping governing paths still stop vault access.
+6. Separate last attempt, successful observation, and integration state. Failed remote checks use a
+   bounded five-minute retry backoff. `access --status` reports persisted observations and current
+   local revision without fetching, integrating, or rewriting state.
+
+Store operational records outside tracked vault contents. Cooperating writers use the same
+repository-wide mutation lock as access, including across linked worktrees. `with-vault-lock` runs
+an executable under that lock; its child must finish its writes before exiting. The wrapper adds
+no write authority. Do not claim that arbitrary external file edits bypassing these entry points
+are intercepted.
+
+Recover only confirmed terminated lock owners; elapsed time alone never authorizes stealing a
+live writer's lock. Git lock ownership is local operational metadata: keep these references out of
+explicit mirror/all-reference transfers.
+
+Access performs no outbound push, divergent merge, skill installation, or backup. Continue the
+declared lifecycle separately and report incomplete stages. Immediate reconciliation following a
+non-fast-forward push rejection belongs to the synchronization adapter, not this access operation.
 
 ## Write authorization
 

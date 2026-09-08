@@ -160,6 +160,15 @@ export function validateContractData(contract: unknown): Finding[] {
   if (sync.mode === "lifecycle-hook" && !sync.adapter) {
     findings.push(finding("error", "contract.sync-adapter", "lifecycle sync requires `adapter`"));
   }
+  if (sync.inbound !== undefined) {
+    const inbound = sync.inbound;
+    if (!isUnknownRecord(inbound) || inbound.mode !== "fast-forward"
+      || typeof inbound.remote !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(inbound.remote)
+      || typeof inbound.branch !== "string" || !inbound.branch || /[\s\0]/.test(inbound.branch)) {
+      findings.push(finding("error", "contract.inbound", "`sync.inbound` requires fast-forward mode, a remote name and a branch"));
+    }
+    if (history.type !== "git") findings.push(finding("error", "contract.inbound-history", "inbound access requires Git history"));
+  }
 
   const backup = mapping(contract, "backup", findings);
   if (Object.keys(backup).length && backup.mode !== "none" && backup.mode !== "lifecycle-hook") {

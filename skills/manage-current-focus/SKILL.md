@@ -16,9 +16,11 @@ Resolve this `SKILL.md` to its canonical path, following symlinks. Set `<skill-r
 directory containing that canonical file. Read `<skill-root>/references/protocol.md` completely.
 From the active project directory, inspect
 `node "<skill-root>/scripts/knowledge-loom.mjs" resolve --help`, then run `resolve`, appending a
-selector only when one was supplied. Treat its returned canonical root as the only selected vault,
-then read its `KNOWLEDGE_VAULT.md`, the selected focus view, and only the linked current notes needed
-for the decision. Stop vault work on any resolution error.
+selector only when one was supplied. Treat its returned canonical root as the only selected vault.
+Read its contract and instruction roots, then follow **Prepare inbound access** before loading the
+selected focus view and linked current notes. Preserve an explicit read-only request. After
+integration, reload governing files before reasoning from the updated view. Stop vault work on
+any resolution error.
 
 - Use an explicitly named view when provided.
 - Use the only configured view when exactly one exists.

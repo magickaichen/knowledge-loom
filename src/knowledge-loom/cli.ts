@@ -1,5 +1,8 @@
 import path from "node:path";
 
+import { accessVault, configureInbound } from "./access.js";
+import { runLockedProcess, withVaultLock } from "./vault-lock.js";
+
 import { auditVault } from "./audit.js";
 import { validateContractData } from "./contract.js";
 import { buildContract, initializeVault } from "./initializer.js";
@@ -9,9 +12,11 @@ import { errorMessage } from "./errors.js";
 import { isCurrentStatePolicy, isHistoryType, isWritePolicy } from "./types.js";
 import type { CliIo, Finding } from "./types.js";
 
-const HELP = `usage: knowledge-loom {audit,probe,resolve,register,associate,init} ...
+const HELP = `usage: knowledge-loom {access,with-vault-lock,audit,probe,resolve,register,associate,init} ...
 
 commands:
+  access      prepare a vault for retrieval with an authorized daily refresh
+  with-vault-lock  run a cooperative writer under the shared mutation lock
   audit       run a read-only vault audit
   probe       resolve only an ancestor or project-associated vault
   resolve     resolve one vault deterministically
@@ -21,6 +26,8 @@ commands:
 `;
 
 const COMMAND_HELP = {
+  "with-vault-lock": "usage: knowledge-loom with-vault-lock [selector] [--registry PATH] -- executable [arguments ...]\n",
+  access: "usage: knowledge-loom access [selector] [--registry PATH] [--state-dir PATH] [--json] [--status] [--enable-inbound --remote NAME --branch NAME [--apply]]\n",
   audit: "usage: knowledge-loom audit [selector] [--registry PATH] [--json]\n",
   probe: "usage: knowledge-loom probe [--registry PATH]\n",
   resolve: "usage: knowledge-loom resolve [selector] [--registry PATH]\n",
@@ -41,6 +48,12 @@ interface ParsedOptions {
   adopt?: boolean;
   apply?: boolean;
   replace?: boolean;
+  state_dir?: string;
+  enable_inbound?: boolean;
+  remote?: string;
+  branch?: string;
+  status?: boolean;
+  executable?: string[];
   vault_id?: string;
   title?: string;
   write_policy?: string;
@@ -53,6 +66,10 @@ function isCommand(value: string): value is Command {
 }
 
 function parseArguments(arguments_: string[]): ParsedOptions {
+  if (arguments_[0] === "with-vault-lock" && arguments_.includes("--")) {
+    const separator = arguments_.indexOf("--");
+    return { ...parseArguments(arguments_.slice(0, separator)), executable: arguments_.slice(separator + 1) };
+  }
   if (!arguments_.length) throw new Error(HELP.trim());
   const first = arguments_[0]!;
   if (arguments_.includes("-h") || first === "--help") {
@@ -70,7 +87,9 @@ function parseArguments(arguments_: string[]): ParsedOptions {
   }
 
   const options: ParsedOptions = { help: false, command, positional: [], subject: [] };
-  const flags = new Set(command === "audit"
+  const flags = new Set(command === "access"
+    ? ["--json", "--enable-inbound", "--apply", "--status"]
+    : command === "audit"
     ? ["--json"]
     : command === "init"
       ? ["--adopt", "--apply"]
@@ -80,6 +99,7 @@ function parseArguments(arguments_: string[]): ParsedOptions {
           ? ["--replace", "--apply"]
           : []);
   const valueOptions = new Set(["--registry"]);
+  if (command === "access") for (const name of ["--state-dir", "--remote", "--branch"]) valueOptions.add(name);
   if (command === "init") {
     for (const name of ["--vault-id", "--title", "--subject", "--write-policy", "--current-state-policy", "--history"]) valueOptions.add(name);
   }
@@ -88,6 +108,8 @@ function parseArguments(arguments_: string[]): ParsedOptions {
     if (token === undefined) continue;
     if (flags.has(token)) {
       if (token === "--json") options.json = true;
+      else if (token === "--enable-inbound") options.enable_inbound = true;
+      else if (token === "--status") options.status = true;
       else if (token === "--adopt") options.adopt = true;
       else if (token === "--apply") options.apply = true;
       else if (token === "--replace") options.replace = true;
@@ -100,6 +122,9 @@ function parseArguments(arguments_: string[]): ParsedOptions {
       if (value === undefined || value.startsWith("--")) throw new Error(`${name} requires a value`);
       const key = name.slice(2).replaceAll("-", "_");
       if (key === "subject") options.subject.push(value);
+      else if (key === "state_dir") options.state_dir = value;
+      else if (key === "remote") options.remote = value;
+      else if (key === "branch") options.branch = value;
       else if (key === "registry") options.registry = value;
       else if (key === "vault_id") options.vault_id = value;
       else if (key === "title") options.title = value;
@@ -126,12 +151,36 @@ function requirePositionals(options: ParsedOptions, count: number, usage: string
 
 export async function runCli(
   arguments_: string[] = process.argv.slice(2),
-  { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr }: CliIo = {},
+  { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr, now = Date.now }: CliIo = {},
 ): Promise<number> {
   try {
     const options = parseArguments(arguments_);
     if (options.help) {
       stdout.write(options.command ? COMMAND_HELP[options.command] : HELP);
+      return 0;
+    }
+
+    if (options.command === "with-vault-lock") {
+      if (options.positional.length > 1 || !options.executable?.length) throw new Error(COMMAND_HELP["with-vault-lock"].trim());
+      const vault = resolveVault(options.positional[0] ?? null, { cwd, registryPath: options.registry });
+      const [executable, ...args] = options.executable;
+      const locked = await withVaultLock(vault.root, (trackWriter) => runLockedProcess(vault.root, executable!, args, trackWriter, { stdout, stderr }));
+      if (!locked.acquired) { stderr.write("BUSY another task owns the vault mutation lock\n"); return 1; }
+      return locked.value;
+    }
+
+    if (options.command === "access") {
+      if (options.positional.length > 1) throw new Error(COMMAND_HELP.access.trim());
+      const context = { cwd, registryPath: options.registry };
+      const vault = options.positional[0] ? resolveVault(options.positional[0], context) : resolveApplicableVault(context);
+      if (!options.enable_inbound && (options.apply || options.remote || options.branch)) throw new Error("--apply, --remote and --branch require --enable-inbound");
+      if (options.enable_inbound && options.status) throw new Error("--status cannot enable inbound access");
+      if (options.enable_inbound && (!vault || !options.remote || !options.branch)) throw new Error("enabling inbound requires a vault, --remote and --branch");
+      const result = options.enable_inbound && vault
+        ? await configureInbound(vault, options.remote!, options.branch!, options.apply === true)
+        : vault ? await accessVault(vault, { stateDir: options.state_dir, now, statusOnly: options.status === true })
+          : { schema_version: 1, root: null, status: "not-applicable" };
+      stdout.write(options.json ? `${JSON.stringify(result)}\n` : `${result.status}${result.root ? ` ${result.root}` : ""}\n`);
       return 0;
     }
 
