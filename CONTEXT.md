@@ -6,6 +6,21 @@ artifacts used to judge whether it is useful.
 
 ## Language
 
+**Vault observation**:
+A device's last successful check of a selected vault's configured remote revision. An observation
+does not establish that the local knowledge has incorporated that revision.
+_Avoid_: Latest knowledge, sync complete
+
+**Inbound access**:
+Contract-authorized preparation of local knowledge for retrieval, including a remote observation
+when due and safe integration when possible.
+_Avoid_: Background sync, automatic pull on every turn
+
+**Integration**:
+Incorporating an observed remote revision into the local knowledge while preserving authorized
+local work. A deferred integration leaves the local knowledge behind the observed revision.
+_Avoid_: Fetch, observation
+
 **Governance initialization**:
 Establishing a vault contract and minimal navigation for a new, empty Markdown vault.
 _Avoid_: Bootstrap, import

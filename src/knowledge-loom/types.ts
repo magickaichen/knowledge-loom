@@ -100,6 +100,7 @@ export interface TextWriter {
 }
 
 export interface CliIo {
+  now?: (() => number) | undefined;
   cwd?: string | undefined;
   stdout?: TextWriter | undefined;
   stderr?: TextWriter | undefined;

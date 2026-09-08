@@ -115,17 +115,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path8) {
-      const ctrl = callVisitor(key, node, visitor, path8);
+    function visit_(key, node, visitor, path9) {
+      const ctrl = callVisitor(key, node, visitor, path9);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visit_(key, ctrl, visitor, path8);
+        replaceNode(key, path9, ctrl);
+        return visit_(key, ctrl, visitor, path9);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path9 = Object.freeze(path9.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path8);
+            const ci = visit_(i, node.items[i], visitor, path9);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -136,13 +136,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = visit_("key", node.key, visitor, path8);
+          path9 = Object.freeze(path9.concat(node));
+          const ck = visit_("key", node.key, visitor, path9);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path8);
+          const cv = visit_("value", node.value, visitor, path9);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -163,17 +163,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path8) {
-      const ctrl = await callVisitor(key, node, visitor, path8);
+    async function visitAsync_(key, node, visitor, path9) {
+      const ctrl = await callVisitor(key, node, visitor, path9);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visitAsync_(key, ctrl, visitor, path8);
+        replaceNode(key, path9, ctrl);
+        return visitAsync_(key, ctrl, visitor, path9);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path9 = Object.freeze(path9.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path8);
+            const ci = await visitAsync_(i, node.items[i], visitor, path9);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -184,13 +184,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path8);
+          path9 = Object.freeze(path9.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path9);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path8);
+          const cv = await visitAsync_("value", node.value, visitor, path9);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -217,23 +217,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path8) {
+    function callVisitor(key, node, visitor, path9) {
       if (typeof visitor === "function")
-        return visitor(key, node, path8);
+        return visitor(key, node, path9);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path8);
+        return visitor.Map?.(key, node, path9);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path8);
+        return visitor.Seq?.(key, node, path9);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path8);
+        return visitor.Pair?.(key, node, path9);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path8);
+        return visitor.Scalar?.(key, node, path9);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path8);
+        return visitor.Alias?.(key, node, path9);
       return void 0;
     }
-    function replaceNode(key, path8, node) {
-      const parent = path8[path8.length - 1];
+    function replaceNode(key, path9, node) {
+      const parent = path9[path9.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -843,10 +843,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path8, value) {
+    function collectionFromPath(schema, path9, value) {
       let v = value;
-      for (let i = path8.length - 1; i >= 0; --i) {
-        const k = path8[i];
+      for (let i = path9.length - 1; i >= 0; --i) {
+        const k = path9[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -865,7 +865,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path8) => path8 == null || typeof path8 === "object" && !!path8[Symbol.iterator]().next().done;
+    var isEmptyPath = (path9) => path9 == null || typeof path9 === "object" && !!path9[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -895,11 +895,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path8, value) {
-        if (isEmptyPath(path8))
+      addIn(path9, value) {
+        if (isEmptyPath(path9))
           this.add(value);
         else {
-          const [key, ...rest] = path8;
+          const [key, ...rest] = path9;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -913,8 +913,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        const [key, ...rest] = path8;
+      deleteIn(path9) {
+        const [key, ...rest] = path9;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -928,8 +928,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        const [key, ...rest] = path8;
+      getIn(path9, keepScalar) {
+        const [key, ...rest] = path9;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -947,8 +947,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path8) {
-        const [key, ...rest] = path8;
+      hasIn(path9) {
+        const [key, ...rest] = path9;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -958,8 +958,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        const [key, ...rest] = path8;
+      setIn(path9, value) {
+        const [key, ...rest] = path9;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3474,9 +3474,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path8, value) {
+      addIn(path9, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path8, value);
+          this.contents.addIn(path9, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3551,14 +3551,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        if (Collection.isEmptyPath(path8)) {
+      deleteIn(path9) {
+        if (Collection.isEmptyPath(path9)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path8) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path9) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3573,10 +3573,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        if (Collection.isEmptyPath(path8))
+      getIn(path9, keepScalar) {
+        if (Collection.isEmptyPath(path9))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path8, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path9, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3587,10 +3587,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path8) {
-        if (Collection.isEmptyPath(path8))
+      hasIn(path9) {
+        if (Collection.isEmptyPath(path9))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path8) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path9) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3607,13 +3607,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        if (Collection.isEmptyPath(path8)) {
+      setIn(path9, value) {
+        if (Collection.isEmptyPath(path9)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path8), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path9), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path8, value);
+          this.contents.setIn(path9, value);
         }
       }
       /**
@@ -5573,9 +5573,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path8) => {
+    visit.itemAtPath = (cst, path9) => {
       let item = cst;
-      for (const [field, index] of path8) {
+      for (const [field, index] of path9) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5584,23 +5584,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path8) => {
-      const parent = visit.itemAtPath(cst, path8.slice(0, -1));
-      const field = path8[path8.length - 1][0];
+    visit.parentCollection = (cst, path9) => {
+      const parent = visit.itemAtPath(cst, path9.slice(0, -1));
+      const field = path9[path9.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path8, item, visitor) {
-      let ctrl = visitor(item, path8);
+    function _visit(path9, item, visitor) {
+      let ctrl = visitor(item, path9);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path8.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path9.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5611,10 +5611,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path8);
+            ctrl = ctrl(item, path9);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path8) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path9) : ctrl;
     }
     exports.visit = visit;
   }
@@ -6916,14 +6916,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs7 = this.flowScalar(this.type);
+              const fs8 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs7, sep: [] });
+                map.items.push({ start, key: fs8, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs7);
+                this.stack.push(fs8);
               } else {
-                Object.assign(it, { key: fs7, sep: [] });
+                Object.assign(it, { key: fs8, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7051,13 +7051,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs7 = this.flowScalar(this.type);
+              const fs8 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs7, sep: [] });
+                fc.items.push({ start: [], key: fs8, sep: [] });
               else if (it.sep)
-                this.stack.push(fs7);
+                this.stack.push(fs8);
               else
-                Object.assign(it, { key: fs7, sep: [] });
+                Object.assign(it, { key: fs8, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7366,11 +7366,14 @@ var require_dist = __commonJS({
 });
 
 // src/knowledge-loom/cli.ts
-import path7 from "node:path";
+import path8 from "node:path";
 
-// src/knowledge-loom/audit.ts
-import fs5 from "node:fs";
-import path5 from "node:path";
+// src/knowledge-loom/access.ts
+import { spawnSync as spawnSync2 } from "node:child_process";
+import { createHash } from "node:crypto";
+import fs4 from "node:fs";
+import os4 from "node:os";
+import path4 from "node:path";
 
 // src/knowledge-loom/contract.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7595,6 +7598,13 @@ function validateContractData(contract) {
   if (sync.mode === "lifecycle-hook" && !sync.adapter) {
     findings.push(finding("error", "contract.sync-adapter", "lifecycle sync requires `adapter`"));
   }
+  if (sync.inbound !== void 0) {
+    const inbound = sync.inbound;
+    if (!isUnknownRecord(inbound) || inbound.mode !== "fast-forward" || typeof inbound.remote !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(inbound.remote) || typeof inbound.branch !== "string" || !inbound.branch || /[\s\0]/.test(inbound.branch)) {
+      findings.push(finding("error", "contract.inbound", "`sync.inbound` requires fast-forward mode, a remote name and a branch"));
+    }
+    if (history.type !== "git") findings.push(finding("error", "contract.inbound-history", "inbound access requires Git history"));
+  }
   const backup = mapping(contract, "backup", findings);
   if (Object.keys(backup).length && backup.mode !== "none" && backup.mode !== "lifecycle-hook") {
     findings.push(finding("error", "contract.backup", "unsupported `backup.mode`"));
@@ -7667,10 +7677,6 @@ function validateContractData(contract) {
   }
   return findings;
 }
-
-// src/knowledge-loom/content-checks.ts
-import { spawn } from "node:child_process";
-import path4 from "node:path";
 
 // src/knowledge-loom/registry.ts
 var import_yaml2 = __toESM(require_dist(), 1);
@@ -7821,8 +7827,8 @@ function projectAssociation(start, registry) {
   return nearest[0] ?? null;
 }
 function applicableVaultContext(cwd, registryPath) {
-  const ancestor = findAncestorVault(cwd);
-  if (ancestor) return { vault: loadVault(ancestor), registry: null };
+  const ancestor2 = findAncestorVault(cwd);
+  if (ancestor2) return { vault: loadVault(ancestor2), registry: null };
   const registry = loadRegistry(registryPath);
   const association = projectAssociation(cwd, registry) ?? (() => {
     const mainCheckout = mainCheckoutEquivalent(cwd);
@@ -7915,7 +7921,296 @@ function associateProject(vaultId, projectRoot, {
   return [resolvedRegistryPath, rendered, root];
 }
 
+// src/knowledge-loom/vault-lock.ts
+import { spawn, spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import os3 from "node:os";
+import { setTimeout as setTimeout2 } from "node:timers/promises";
+var LOCK_REF = "refs/knowledge-loom/mutation-lock";
+function command(root, args, input) {
+  return spawnSync("git", ["-C", root, ...args], { encoding: "utf8", input, timeout: 1e4 });
+}
+function deadOwner(root, revision) {
+  try {
+    const result = command(root, ["cat-file", "blob", revision]);
+    const owner = JSON.parse(result.stdout);
+    if (!isUnknownRecord(owner) || owner.host !== os3.hostname() || typeof owner.pid !== "number" || !Number.isInteger(owner.pid) || owner.pid < 1) return false;
+    const pids = [owner.pid];
+    if (owner.writer_pid !== void 0) {
+      if (typeof owner.writer_pid !== "number" || !Number.isInteger(owner.writer_pid) || owner.writer_pid < 1) return false;
+      pids.push(owner.writer_group === true ? -owner.writer_pid : owner.writer_pid);
+    }
+    return pids.every((pid) => {
+      try {
+        process.kill(pid, 0);
+        return false;
+      } catch (error) {
+        return isUnknownRecord(error) && error.code === "ESRCH";
+      }
+    });
+  } catch {
+  }
+  return false;
+}
+async function withVaultLock(root, work, waitMs = 2e3) {
+  const owner = { schema_version: 1, host: os3.hostname(), pid: process.pid, token: randomUUID() };
+  const hashed = command(root, ["hash-object", "-w", "--stdin"], JSON.stringify(owner));
+  if (hashed.status !== 0) throw new Error("cannot create vault mutation lock");
+  let revision = hashed.stdout.trim();
+  const deadline = performance.now() + waitMs;
+  do {
+    const existing = command(root, ["rev-parse", "--verify", "--quiet", LOCK_REF]);
+    const current = existing.status === 0 ? existing.stdout.trim() : "0".repeat(revision.length);
+    if (existing.status !== 0 || deadOwner(root, current)) {
+      const acquired = command(root, ["-c", `core.hooksPath=${os3.devNull}`, "update-ref", LOCK_REF, revision, current]);
+      if (acquired.status === 0) {
+        try {
+          return { acquired: true, value: await work((pid, group = false) => {
+            const updated = command(root, ["hash-object", "-w", "--stdin"], JSON.stringify({ ...owner, writer_pid: pid, writer_group: group }));
+            const next = updated.stdout.trim();
+            if (updated.status !== 0 || command(root, ["-c", `core.hooksPath=${os3.devNull}`, "update-ref", LOCK_REF, next, revision]).status !== 0) throw new Error("cannot track the active writer");
+            revision = next;
+          }) };
+        } finally {
+          const released = command(root, ["-c", `core.hooksPath=${os3.devNull}`, "update-ref", "-d", LOCK_REF, revision]);
+          if (released.status !== 0) throw new Error("vault mutation lock release failed; inspect lock ownership before retrying");
+        }
+      }
+    }
+    if (performance.now() >= deadline) break;
+    await setTimeout2(25);
+  } while (true);
+  return { acquired: false };
+}
+function runLockedProcess(root, executable, args, trackWriter, {
+  stdout,
+  stderr,
+  timeoutMs,
+  env = process.env
+} = {}) {
+  return new Promise((resolve, reject) => {
+    const group = process.platform !== "win32";
+    const child = spawn(executable, args, { cwd: root, env, detached: group, stdio: ["ignore", "pipe", "pipe"] });
+    let failure;
+    let timer;
+    const stop = () => {
+      try {
+        if (child.pid) process.kill(group ? -child.pid : child.pid, "SIGKILL");
+      } catch {
+      }
+    };
+    child.stdout.on("data", (data) => stdout?.write(data.toString()));
+    child.stderr.on("data", (data) => stderr?.write(data.toString()));
+    child.on("error", (error) => {
+      failure = error;
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (failure) reject(failure);
+      else resolve(code ?? 1);
+    });
+    try {
+      if (child.pid) trackWriter(child.pid, group);
+    } catch (error) {
+      failure = error;
+      stop();
+    }
+    if (timeoutMs !== void 0) timer = globalThis.setTimeout(() => {
+      failure = new Error("locked command timed out");
+      stop();
+    }, timeoutMs);
+  });
+}
+
+// src/knowledge-loom/access.ts
+var DAY = 864e5;
+var RETRY = 3e5;
+function ancestor(root, older, newer) {
+  const result = spawnSync2("git", ["-C", root, "merge-base", "--is-ancestor", older, newer], { timeout: 1e4 });
+  if (result.status !== 0 && result.status !== 1) throw new Error("could not compare Git history");
+  return result.status === 0;
+}
+function git(root, ...args) {
+  const result = spawnSync2("git", ["-C", root, ...args], { encoding: "utf8", timeout: 1e4 });
+  if (result.status !== 0) throw new Error(`Git ${args[0]} failed`);
+  return result.stdout.trim();
+}
+function validateAuthority(vault) {
+  const errors = validateContractData(vault.contract).filter((item) => item.severity === "error");
+  if (errors.length) throw new ContractError(`invalid contract: ${errors.map((item) => item.message).join("; ")}`);
+  const contract = vault.contract;
+  const navigation = isUnknownRecord(contract.navigation) ? contract.navigation : {};
+  const files = [contract.instruction_roots, navigation.entrypoints].flatMap((value) => Array.isArray(value) ? value : []);
+  const views = isUnknownRecord(contract.focus_views) ? contract.focus_views : {};
+  for (const view of Object.values(views)) if (isUnknownRecord(view)) files.push(view.path);
+  for (const relative of files) {
+    const resolved = resolveVaultPath(vault.root, relative);
+    if (!resolved || !fs4.statSync(resolved, { throwIfNoEntry: false })?.isFile()) throw new ContractError("contract file is missing or crosses the vault boundary");
+  }
+  const profiles = isUnknownRecord(contract.metadata_profiles) ? contract.metadata_profiles : {};
+  const privacy = isUnknownRecord(contract.privacy) ? contract.privacy : {};
+  const patterns = Array.isArray(privacy.never_track) ? [...privacy.never_track] : [];
+  for (const profile of Object.values(profiles)) if (isUnknownRecord(profile) && Array.isArray(profile.paths)) patterns.push(...profile.paths);
+  for (const pattern of patterns) if (!resolveVaultPatternPrefix(vault.root, pattern)) throw new ContractError("contract pattern crosses the vault boundary");
+}
+function upstreamProblem(root, remote, branch) {
+  try {
+    if (canonicalPath(git(root, "rev-parse", "--show-toplevel")) !== root) return "automatic access requires a vault at its Git checkout root";
+    git(root, "check-ref-format", `refs/heads/${branch}`);
+    const local = git(root, "symbolic-ref", "--quiet", "--short", "HEAD");
+    if (git(root, "config", "--get", `branch.${local}.remote`) !== remote || git(root, "config", "--get", `branch.${local}.merge`) !== `refs/heads/${branch}`) return "current branch upstream differs from authorized inbound remote/branch";
+    git(root, "remote", "get-url", "--", remote);
+    git(root, "rev-parse", "--verify", "HEAD");
+    return null;
+  } catch {
+    return "Git repository, remote, branch or upstream is unavailable; configure the authorized upstream before retrying";
+  }
+}
+function operationInProgress(root) {
+  return ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer", "index.lock"].some((name) => fs4.existsSync(path4.resolve(root, git(root, "rev-parse", "--git-path", name))));
+}
+async function accessVault(vault, { stateDir, now = Date.now, statusOnly = false } = {}) {
+  validateAuthority(vault);
+  const base = { schema_version: 1, root: vault.root };
+  const sync = isUnknownRecord(vault.contract.sync) ? vault.contract.sync : {};
+  const inbound = isUnknownRecord(sync.inbound) ? sync.inbound : {};
+  if (inbound.mode !== "fast-forward") return { ...base, status: "not-enabled" };
+  if (typeof inbound.remote !== "string" || typeof inbound.branch !== "string") throw new Error("inbound requires remote and branch");
+  const { remote, branch } = inbound;
+  const problem = upstreamProblem(vault.root, remote, branch);
+  if (problem) return { ...base, status: "unavailable", reason: problem };
+  try {
+    if (statusOnly) return await refresh(vault, remote, branch, stateDir, now, true);
+    const locked = await withVaultLock(vault.root, (trackWriter) => refresh(vault, remote, branch, stateDir, now, false, trackWriter));
+    return locked.acquired ? locked.value : { ...base, status: "busy", reason: "another task owns the vault mutation lock; local work is preserved" };
+  } catch (error) {
+    if (error instanceof ContractError) throw error;
+    return { ...base, status: "unavailable", reason: "access could not complete; inspect repository and observation-state permissions before retrying" };
+  }
+}
+async function refresh(vault, remote, branch, stateDir, now, statusOnly, trackWriter) {
+  const base = { schema_version: 1, root: vault.root };
+  const currentVault = loadVault(vault.root);
+  validateAuthority(currentVault);
+  if (JSON.stringify(currentVault.contract.sync) !== JSON.stringify(vault.contract.sync)) return { ...base, status: "unavailable", reason: "inbound authority changed while waiting; reread the contract before retrying" };
+  const problem = upstreamProblem(vault.root, remote, branch);
+  if (problem) return { ...base, status: "unavailable", reason: problem };
+  const url = git(vault.root, "remote", "get-url", "--", remote);
+  const localBranch = git(vault.root, "symbolic-ref", "--short", "HEAD");
+  const key = createHash("sha256").update(JSON.stringify([vault.root, localBranch, remote, url, branch])).digest("hex");
+  const directory = canonicalPath(stateDir ?? path4.join(os4.homedir(), ".local", "state", "knowledge-loom"));
+  const common = canonicalPath(git(vault.root, "rev-parse", "--path-format=absolute", "--git-common-dir"));
+  if (isWithin(vault.root, directory) || isWithin(common, directory)) throw new ContractError("operational state must stay outside the vault and its Git directory");
+  const file = path4.join(directory, `${key}.json`);
+  const ref = `refs/knowledge-loom/observations/${key}`;
+  let previous = null;
+  try {
+    const stat = fs4.lstatSync(file, { throwIfNoEntry: false });
+    if (stat && (!stat.isFile() || stat.size > 16384)) throw new Error("invalid observation file");
+    if (stat) {
+      previous = JSON.parse(fs4.readFileSync(file, "utf8"));
+      if (!isUnknownRecord(previous) || previous.schema_version !== 1) throw new Error("invalid observation format");
+      for (const field of ["checked_at", "attempted_at", "retry_at"]) {
+        const value = previous[field];
+        if (value !== void 0 && (typeof value !== "number" || !Number.isFinite(value) || value < 0)) throw new Error("invalid observation time");
+      }
+      if (previous.remote_revision !== void 0 && (typeof previous.remote_revision !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(previous.remote_revision))) throw new Error("invalid observation revision");
+    }
+  } catch {
+    return { ...base, status: "unavailable", reason: "observation file is unreadable or invalid; preserve it for inspection and retry with a repaired state directory", state_file: file };
+  }
+  const observed = isUnknownRecord(previous) ? previous : {};
+  const time = now();
+  if (statusOnly && typeof observed.retry_at === "number") return { ...base, status: "unavailable", check: "read-only", observed };
+  if (statusOnly && typeof observed.remote_revision !== "string") return { ...base, status: "unverified", check: "read-only", observed };
+  if (typeof observed.retry_at === "number" && time < observed.retry_at && typeof observed.attempted_at === "number" && time >= observed.attempted_at) {
+    return { ...base, status: "unavailable", check: statusOnly ? "read-only" : "backoff", observed };
+  }
+  const cached = typeof observed.checked_at === "number" && time >= observed.checked_at && time - observed.checked_at < DAY;
+  if (!cached && !statusOnly) {
+    try {
+      if (!trackWriter) throw new Error("remote observation requires a mutation lock");
+      const code = await runLockedProcess(vault.root, "git", ["fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--refmap=", "--", remote, `+refs/heads/${branch}:${ref}`], trackWriter, {
+        timeoutMs: 3e4,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
+      });
+      if (code !== 0) throw new Error("remote fetch failed");
+    } catch {
+      previous = { ...observed, schema_version: 1, attempted_at: time, retry_at: time + RETRY };
+      atomicWriteText(file, `${JSON.stringify(previous)}
+`);
+      return { ...base, status: "unavailable", check: "failed", observed: previous, reason: "remote fetch failed; local work remains available" };
+    }
+    const revision2 = git(vault.root, "rev-parse", "--verify", ref);
+    const rewritten = typeof observed.remote_revision === "string" && !ancestor(vault.root, observed.remote_revision, revision2);
+    previous = { schema_version: 1, attempted_at: time, checked_at: now(), remote_revision: revision2, recovery_required: observed.recovery_required === true || rewritten };
+    atomicWriteText(file, `${JSON.stringify(previous)}
+`);
+  }
+  if (isUnknownRecord(previous) && previous.recovery_required === true) return { ...base, status: "recovery-required", check: statusOnly ? "read-only" : cached ? "cached" : "performed", observed: previous, reason: "upstream history changed; reconcile explicitly before resuming automatic integration" };
+  const latest = loadVault(vault.root);
+  validateAuthority(latest);
+  if (git(vault.root, "symbolic-ref", "--short", "HEAD") !== localBranch || git(vault.root, "remote", "get-url", "--", remote) !== url || upstreamProblem(vault.root, remote, branch) || JSON.stringify(latest.contract.sync) !== JSON.stringify(currentVault.contract.sync)) {
+    return { ...base, status: "unavailable", reason: "checkout or inbound authority changed during observation; retry access on the intended branch", observed: previous };
+  }
+  const head = git(vault.root, "rev-parse", "HEAD");
+  const revision = isUnknownRecord(previous) && typeof previous.remote_revision === "string" ? previous.remote_revision : "";
+  if (!revision) return { ...base, status: "unverified", check: statusOnly ? "read-only" : "cached", observed: previous };
+  let status = "current";
+  if (head !== revision) {
+    if (ancestor(vault.root, revision, head)) status = "ahead";
+    else if (!ancestor(vault.root, head, revision)) status = "diverged";
+    else if (statusOnly || operationInProgress(vault.root) || git(vault.root, "status", "--porcelain", "--untracked-files=all")) status = "behind";
+    else {
+      try {
+        git(vault.root, "-c", `core.hooksPath=${os4.devNull}`, "merge", "--ff-only", "--no-overwrite-ignore", revision);
+        status = "integrated";
+      } catch {
+        status = "behind";
+      }
+      if (status === "integrated") validateAuthority(loadVault(vault.root));
+    }
+  }
+  const localRevision = git(vault.root, "rev-parse", "HEAD");
+  if (!statusOnly && isUnknownRecord(previous)) {
+    const updated = { ...previous, integration_status: status, local_revision: localRevision };
+    if (JSON.stringify(updated) !== JSON.stringify(previous)) atomicWriteText(file, `${JSON.stringify(updated)}
+`);
+    previous = updated;
+  }
+  return { ...base, status, check: statusOnly ? "read-only" : cached ? "cached" : "performed", observed: previous, head: localRevision, state_file: file };
+}
+async function configureInbound(vault, remote, branch, apply) {
+  validateAuthority(vault);
+  if (!remote || remote.startsWith("-") || /[\s\0]/.test(remote)) throw new Error("a configured remote name is required");
+  const check = spawnSync2("git", ["-C", vault.root, "check-ref-format", `refs/heads/${branch}`], { encoding: "utf8" });
+  if (!branch || check.status !== 0) throw new Error("a valid remote branch is required");
+  const configured = spawnSync2("git", ["-C", vault.root, "remote", "get-url", "--", remote], { encoding: "utf8" });
+  if (configured.status !== 0) throw new Error("remote is not configured; configure it before enabling inbound access");
+  const sync = isUnknownRecord(vault.contract.sync) ? vault.contract.sync : {};
+  const contract = { ...vault.contract, sync: { ...sync, inbound: { mode: "fast-forward", remote, branch } } };
+  const errors = validateContractData(contract).filter((item) => item.severity === "error");
+  if (errors.length) throw new Error(errors.map((item) => item.message).join("; "));
+  const rendered = renderContract(contract, vault.body);
+  if (apply) {
+    const before = fs4.readFileSync(vault.contractPath, "utf8");
+    const locked = await withVaultLock(vault.root, async () => {
+      validateAuthority(loadVault(vault.root));
+      if (fs4.readFileSync(vault.contractPath, "utf8") !== before) throw new Error("contract changed while waiting; preview again");
+      atomicWriteText(vault.contractPath, rendered);
+    });
+    if (!locked.acquired) throw new Error("another writer owns the vault; preview again after it finishes");
+  }
+  return { schema_version: 1, root: vault.root, status: apply ? "configured" : "preview", contract: rendered };
+}
+
+// src/knowledge-loom/audit.ts
+import fs6 from "node:fs";
+import path6 from "node:path";
+
 // src/knowledge-loom/content-checks.ts
+import { spawn as spawn2 } from "node:child_process";
+import path5 from "node:path";
 var VALIDATION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 var ALLOWED_SEVERITIES = /* @__PURE__ */ new Set(["error", "warning", "info"]);
 var STATUS_EXIT_CODES = { pass: 0, fail: 1, error: 2 };
@@ -8012,7 +8307,7 @@ function normalizedResult(adapterId, result, vaultRoot) {
   if (typeof result.root !== "string") {
     return invalid("content checker output requires `root`");
   }
-  if (!path4.isAbsolute(result.root) || result.root !== canonicalPath(vaultRoot)) {
+  if (!path5.isAbsolute(result.root) || result.root !== canonicalPath(vaultRoot)) {
     return invalid("content checker root does not match the selected vault", "root");
   }
   if (!validValidationDate(result.validationDate)) {
@@ -8047,7 +8342,7 @@ function normalizedResult(adapterId, result, vaultRoot) {
 function killProcessTree(child) {
   if (!child.pid) return;
   if (process.platform === "win32") {
-    const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
+    const killer = spawn2("taskkill", ["/pid", String(child.pid), "/T", "/F"], {
       stdio: "ignore",
       windowsHide: true
     });
@@ -8073,7 +8368,7 @@ function executeAdapter(executable, arguments_, { cwd, timeoutMs }) {
   return new Promise((resolve) => {
     let child;
     try {
-      child = spawn(executable, arguments_, {
+      child = spawn2(executable, arguments_, {
         cwd,
         shell: false,
         detached: process.platform !== "win32",
@@ -8200,7 +8495,7 @@ async function runDeclaredContentCheck(vault, {
 }
 
 // src/knowledge-loom/focus.ts
-import fs4 from "node:fs";
+import fs5 from "node:fs";
 var HEADING_RE = /^(#{2,3})\s+(.+?)\s*$/;
 function activeItems(text, sectionName) {
   let inSection = false;
@@ -8238,11 +8533,11 @@ function checkFocusView(root, name, view) {
   const relative = view.path;
   const focusPath = resolveVaultPath(root, relative);
   if (focusPath === null) return [finding("error", "focus.boundary", `focus view \`${name}\` resolves outside the vault`, relative)];
-  if (!fs4.statSync(focusPath, { throwIfNoEntry: false })?.isFile()) {
+  if (!fs5.statSync(focusPath, { throwIfNoEntry: false })?.isFile()) {
     return [finding("error", "focus.missing", `focus view \`${name}\` file is missing`, relative)];
   }
   const section = view.active_section ?? "Top of mind";
-  const items = activeItems(fs4.readFileSync(focusPath, "utf8"), section);
+  const items = activeItems(fs5.readFileSync(focusPath, "utf8"), section);
   const maxTop = view.max_top;
   const maxActive = view.max_active;
   const findings = [];
@@ -8333,7 +8628,7 @@ function auditDeclaredFiles(root, values, {
     if (typeof relative !== "string" || !isVaultRelativePath(relative)) continue;
     const resolved = resolveVaultPath(root, relative);
     if (resolved === null) findings.push(finding("error", boundaryCode, boundaryMessage, relative));
-    else if (!fs5.statSync(resolved, { throwIfNoEntry: false })?.isFile()) findings.push(finding("error", missingCode, missingMessage, relative));
+    else if (!fs6.statSync(resolved, { throwIfNoEntry: false })?.isFile()) findings.push(finding("error", missingCode, missingMessage, relative));
   }
   return findings;
 }
@@ -8347,25 +8642,25 @@ function patternPrefix(patternValue) {
 }
 function walk(root) {
   const result = [];
-  if (!fs5.existsSync(root)) return result;
+  if (!fs6.existsSync(root)) return result;
   const visit = (current) => {
-    for (const entry of fs5.readdirSync(current, { withFileTypes: true })) {
-      const candidate = path5.join(current, entry.name);
+    for (const entry of fs6.readdirSync(current, { withFileTypes: true })) {
+      const candidate = path6.join(current, entry.name);
       result.push(candidate);
       if (entry.isDirectory() && !entry.isSymbolicLink()) visit(candidate);
     }
   };
-  if (fs5.lstatSync(root).isDirectory() && !fs5.lstatSync(root).isSymbolicLink()) visit(root);
+  if (fs6.lstatSync(root).isDirectory() && !fs6.lstatSync(root).isSymbolicLink()) visit(root);
   else result.push(root);
   return result;
 }
 function globPaths(root, patternValue) {
   if (!/[*?[]/.test(patternValue)) {
-    const candidate = path5.join(root, ...patternValue.split("/"));
-    return fs5.existsSync(candidate) ? [candidate] : [];
+    const candidate = path6.join(root, ...patternValue.split("/"));
+    return fs6.existsSync(candidate) ? [candidate] : [];
   }
   const prefix = patternPrefix(patternValue);
-  const searchRoot = path5.join(root, ...prefix);
+  const searchRoot = path6.join(root, ...prefix);
   return walk(searchRoot).filter((candidate) => matchesPath(patternValue, toPosixRelative(root, candidate)));
 }
 async function auditVault(vault, { registryPath } = {}) {
@@ -8413,7 +8708,7 @@ async function auditVault(vault, { registryPath } = {}) {
           findings.push(finding("error", "path.metadata-boundary", `profile \`${profileName}\` matched a file outside the vault`, relative));
           continue;
         }
-        if (!fs5.statSync(candidate, { throwIfNoEntry: false })?.isFile() || path5.extname(candidate).toLocaleLowerCase() !== ".md") continue;
+        if (!fs6.statSync(candidate, { throwIfNoEntry: false })?.isFile() || path6.extname(candidate).toLocaleLowerCase() !== ".md") continue;
         const key = `${profileName}\0${relative}`;
         if (checked.has(key)) continue;
         checked.add(key);
@@ -8468,8 +8763,8 @@ async function auditVault(vault, { registryPath } = {}) {
 }
 
 // src/knowledge-loom/initializer.ts
-import fs6 from "node:fs";
-import path6 from "node:path";
+import fs7 from "node:fs";
+import path7 from "node:path";
 var DEFAULT_BODY = `# Vault policy
 
 ## Purpose and boundary
@@ -8491,13 +8786,13 @@ Describe naming, linking, metadata, and archival conventions.
 `;
 function discoverInstructionRoots(root) {
   for (const candidate of ["AGENTS.md", "LLM_CONTEXT.md", "CLAUDE.md"]) {
-    if (fs6.statSync(path6.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
+    if (fs7.statSync(path7.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
   }
   return [];
 }
 function discoverEntrypoints(root) {
   for (const candidate of ["INDEX.md", "Home.md", "README.md"]) {
-    if (fs6.statSync(path6.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
+    if (fs7.statSync(path7.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
   }
   return ["INDEX.md"];
 }
@@ -8535,25 +8830,27 @@ function buildContract(root, {
 }
 function initializeVault(root, { contract, adopt, apply }) {
   const rootPath = canonicalPath(root);
-  const contractPath = path6.join(rootPath, CONTRACT_NAME);
-  if (fs6.existsSync(contractPath)) throw new Error(`${contractPath} already exists`);
-  if (fs6.existsSync(rootPath) && fs6.readdirSync(rootPath).length && !adopt) {
+  const contractPath = path7.join(rootPath, CONTRACT_NAME);
+  if (fs7.existsSync(contractPath)) throw new Error(`${contractPath} already exists`);
+  if (fs7.existsSync(rootPath) && fs7.readdirSync(rootPath).length && !adopt) {
     throw new Error("target is not empty; use adoption mode for an existing vault");
   }
   const rendered = renderContract(contract, DEFAULT_BODY);
   if (apply) {
-    fs6.mkdirSync(rootPath, { recursive: true });
-    fs6.writeFileSync(contractPath, rendered, "utf8");
-    const indexPath = path6.join(rootPath, "INDEX.md");
-    if (!adopt && !fs6.existsSync(indexPath)) fs6.writeFileSync(indexPath, "# Index\n\n- Add vault entrypoints here.\n", "utf8");
+    fs7.mkdirSync(rootPath, { recursive: true });
+    fs7.writeFileSync(contractPath, rendered, "utf8");
+    const indexPath = path7.join(rootPath, "INDEX.md");
+    if (!adopt && !fs7.existsSync(indexPath)) fs7.writeFileSync(indexPath, "# Index\n\n- Add vault entrypoints here.\n", "utf8");
   }
   return [contractPath, rendered];
 }
 
 // src/knowledge-loom/cli.ts
-var HELP = `usage: knowledge-loom {audit,probe,resolve,register,associate,init} ...
+var HELP = `usage: knowledge-loom {access,with-vault-lock,audit,probe,resolve,register,associate,init} ...
 
 commands:
+  access      prepare a vault for retrieval with an authorized daily refresh
+  with-vault-lock  run a cooperative writer under the shared mutation lock
   audit       run a read-only vault audit
   probe       resolve only an ancestor or project-associated vault
   resolve     resolve one vault deterministically
@@ -8562,6 +8859,8 @@ commands:
   init        preview or initialize a vault contract
 `;
 var COMMAND_HELP = {
+  "with-vault-lock": "usage: knowledge-loom with-vault-lock [selector] [--registry PATH] -- executable [arguments ...]\n",
+  access: "usage: knowledge-loom access [selector] [--registry PATH] [--state-dir PATH] [--json] [--status] [--enable-inbound --remote NAME --branch NAME [--apply]]\n",
   audit: "usage: knowledge-loom audit [selector] [--registry PATH] [--json]\n",
   probe: "usage: knowledge-loom probe [--registry PATH]\n",
   resolve: "usage: knowledge-loom resolve [selector] [--registry PATH]\n",
@@ -8573,6 +8872,10 @@ function isCommand(value) {
   return Object.hasOwn(COMMAND_HELP, value);
 }
 function parseArguments(arguments_) {
+  if (arguments_[0] === "with-vault-lock" && arguments_.includes("--")) {
+    const separator = arguments_.indexOf("--");
+    return { ...parseArguments(arguments_.slice(0, separator)), executable: arguments_.slice(separator + 1) };
+  }
   if (!arguments_.length) throw new Error(HELP.trim());
   const first = arguments_[0];
   if (arguments_.includes("-h") || first === "--help") {
@@ -8584,14 +8887,15 @@ function parseArguments(arguments_) {
     };
   }
   if (!isCommand(first)) throw new Error(`unknown command: ${first}`);
-  const command = first;
+  const command2 = first;
   if (arguments_.slice(1).includes("--help") || arguments_.slice(1).includes("-h")) {
-    return { help: true, command, positional: [], subject: [] };
+    return { help: true, command: command2, positional: [], subject: [] };
   }
-  const options = { help: false, command, positional: [], subject: [] };
-  const flags = new Set(command === "audit" ? ["--json"] : command === "init" ? ["--adopt", "--apply"] : command === "register" ? ["--apply"] : command === "associate" ? ["--replace", "--apply"] : []);
+  const options = { help: false, command: command2, positional: [], subject: [] };
+  const flags = new Set(command2 === "access" ? ["--json", "--enable-inbound", "--apply", "--status"] : command2 === "audit" ? ["--json"] : command2 === "init" ? ["--adopt", "--apply"] : command2 === "register" ? ["--apply"] : command2 === "associate" ? ["--replace", "--apply"] : []);
   const valueOptions = /* @__PURE__ */ new Set(["--registry"]);
-  if (command === "init") {
+  if (command2 === "access") for (const name of ["--state-dir", "--remote", "--branch"]) valueOptions.add(name);
+  if (command2 === "init") {
     for (const name of ["--vault-id", "--title", "--subject", "--write-policy", "--current-state-policy", "--history"]) valueOptions.add(name);
   }
   for (let index = 1; index < arguments_.length; index += 1) {
@@ -8599,6 +8903,8 @@ function parseArguments(arguments_) {
     if (token === void 0) continue;
     if (flags.has(token)) {
       if (token === "--json") options.json = true;
+      else if (token === "--enable-inbound") options.enable_inbound = true;
+      else if (token === "--status") options.status = true;
       else if (token === "--adopt") options.adopt = true;
       else if (token === "--apply") options.apply = true;
       else if (token === "--replace") options.replace = true;
@@ -8611,6 +8917,9 @@ function parseArguments(arguments_) {
       if (value === void 0 || value.startsWith("--")) throw new Error(`${name} requires a value`);
       const key = name.slice(2).replaceAll("-", "_");
       if (key === "subject") options.subject.push(value);
+      else if (key === "state_dir") options.state_dir = value;
+      else if (key === "remote") options.remote = value;
+      else if (key === "branch") options.branch = value;
       else if (key === "registry") options.registry = value;
       else if (key === "vault_id") options.vault_id = value;
       else if (key === "title") options.title = value;
@@ -8634,11 +8943,35 @@ function formatFindings(findings, { json = false } = {}) {
 function requirePositionals(options, count, usage) {
   if (options.positional.length !== count) throw new Error(usage.trim());
 }
-async function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr } = {}) {
+async function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(), stdout = process.stdout, stderr = process.stderr, now = Date.now } = {}) {
   try {
     const options = parseArguments(arguments_);
     if (options.help) {
       stdout.write(options.command ? COMMAND_HELP[options.command] : HELP);
+      return 0;
+    }
+    if (options.command === "with-vault-lock") {
+      if (options.positional.length > 1 || !options.executable?.length) throw new Error(COMMAND_HELP["with-vault-lock"].trim());
+      const vault = resolveVault(options.positional[0] ?? null, { cwd, registryPath: options.registry });
+      const [executable, ...args] = options.executable;
+      const locked = await withVaultLock(vault.root, (trackWriter) => runLockedProcess(vault.root, executable, args, trackWriter, { stdout, stderr }));
+      if (!locked.acquired) {
+        stderr.write("BUSY another task owns the vault mutation lock\n");
+        return 1;
+      }
+      return locked.value;
+    }
+    if (options.command === "access") {
+      if (options.positional.length > 1) throw new Error(COMMAND_HELP.access.trim());
+      const context = { cwd, registryPath: options.registry };
+      const vault = options.positional[0] ? resolveVault(options.positional[0], context) : resolveApplicableVault(context);
+      if (!options.enable_inbound && (options.apply || options.remote || options.branch)) throw new Error("--apply, --remote and --branch require --enable-inbound");
+      if (options.enable_inbound && options.status) throw new Error("--status cannot enable inbound access");
+      if (options.enable_inbound && (!vault || !options.remote || !options.branch)) throw new Error("enabling inbound requires a vault, --remote and --branch");
+      const result = options.enable_inbound && vault ? await configureInbound(vault, options.remote, options.branch, options.apply === true) : vault ? await accessVault(vault, { stateDir: options.state_dir, now, statusOnly: options.status === true }) : { schema_version: 1, root: null, status: "not-applicable" };
+      stdout.write(options.json ? `${JSON.stringify(result)}
+` : `${result.status}${result.root ? ` ${result.root}` : ""}
+`);
       return 0;
     }
     if (options.command === "audit") {
@@ -8699,7 +9032,7 @@ ${rendered2}`);
     if (!isWritePolicy(writePolicy)) throw new Error(`unsupported write policy: ${writePolicy}`);
     if (!isCurrentStatePolicy(currentStatePolicy)) throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);
     if (!isHistoryType(historyType)) throw new Error(`unsupported history type: ${historyType}`);
-    const root = path7.resolve(expandHome(options.positional[0]));
+    const root = path8.resolve(expandHome(options.positional[0]));
     const contract = buildContract(root, {
       vaultId: options.vault_id,
       title: options.title,

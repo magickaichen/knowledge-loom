@@ -102,6 +102,8 @@ providers retain their own access and privacy rules.
 
 - [Advanced usage](docs/advanced-usage.md): project associations, CLI commands, content checks,
   Claude Desktop, and the optional writing companion.
+- [Daily inbound access](docs/inbound-access.md): opt-in remote observations, safe integration,
+  local state, and cooperative write locking.
 - [Protocol](references/protocol.md) and [contract schema](references/contract-schema.md): exact behavior and configuration.
 - [Contributing](CONTRIBUTING.md): development, validation, and releases.
 - [Changelog](CHANGELOG.md): version history.
