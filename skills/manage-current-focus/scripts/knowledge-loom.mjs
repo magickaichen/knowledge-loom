@@ -7982,6 +7982,16 @@ async function withVaultLock(root, work, waitMs = 2e3) {
   } while (true);
   return { acquired: false };
 }
+var LOCKED_COMMAND_GATE = `
+const { spawn } = require("node:child_process");
+process.stdin.once("data", () => {
+  process.stdin.destroy();
+  const child = spawn(process.argv[1], process.argv.slice(2), { stdio: ["ignore", "inherit", "inherit"] });
+  child.once("error", () => process.exit(1));
+  child.once("exit", (code) => process.exit(code ?? 1));
+});
+process.stdin.once("end", () => process.exit(1));
+`;
 function runLockedProcess(root, executable, args, trackWriter, {
   stdout,
   stderr,
@@ -7990,7 +8000,7 @@ function runLockedProcess(root, executable, args, trackWriter, {
 } = {}) {
   return new Promise((resolve, reject) => {
     const group = process.platform !== "win32";
-    const child = spawn(executable, args, { cwd: root, env, detached: group, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, ["-e", LOCKED_COMMAND_GATE, "--", executable, ...args], { cwd: root, env, detached: group, stdio: ["pipe", "pipe", "pipe"] });
     let failure;
     let timer;
     const stop = () => {
@@ -8009,8 +8019,15 @@ function runLockedProcess(root, executable, args, trackWriter, {
       if (failure) reject(failure);
       else resolve(code ?? 1);
     });
+    child.stdin.on("error", (error) => {
+      failure = error;
+      stop();
+    });
     try {
-      if (child.pid) trackWriter(child.pid, group);
+      if (child.pid) {
+        trackWriter(child.pid, group);
+        child.stdin.end("start");
+      }
     } catch (error) {
       failure = error;
       stop();

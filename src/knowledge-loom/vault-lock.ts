@@ -67,13 +67,26 @@ export async function withVaultLock<T>(root: string, work: (trackWriter: TrackWr
   return { acquired: false };
 }
 
+// The child cannot start the command until its process group is recorded in the lock.
+// EOF before authorization (including parent termination) exits without spawning work.
+const LOCKED_COMMAND_GATE = `
+const { spawn } = require("node:child_process");
+process.stdin.once("data", () => {
+  process.stdin.destroy();
+  const child = spawn(process.argv[1], process.argv.slice(2), { stdio: ["ignore", "inherit", "inherit"] });
+  child.once("error", () => process.exit(1));
+  child.once("exit", (code) => process.exit(code ?? 1));
+});
+process.stdin.once("end", () => process.exit(1));
+`;
+
 /** Keep child lifetime inside ownership, including failed PID registration. */
 export function runLockedProcess(root: string, executable: string, args: string[], trackWriter: TrackWriter, {
   stdout, stderr, timeoutMs, env = process.env,
 }: { stdout?: TextWriter; stderr?: TextWriter; timeoutMs?: number; env?: NodeJS.ProcessEnv } = {}): Promise<number> {
   return new Promise((resolve, reject) => {
     const group = process.platform !== "win32";
-    const child = spawn(executable, args, { cwd: root, env, detached: group, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(process.execPath, ["-e", LOCKED_COMMAND_GATE, "--", executable, ...args], { cwd: root, env, detached: group, stdio: ["pipe", "pipe", "pipe"] });
     let failure: unknown;
     let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
     const stop = () => {
@@ -87,7 +100,13 @@ export function runLockedProcess(root: string, executable: string, args: string[
       if (failure) reject(failure);
       else resolve(code ?? 1);
     });
-    try { if (child.pid) trackWriter(child.pid, group); }
+    child.stdin.on("error", (error) => { failure = error; stop(); });
+    try {
+      if (child.pid) {
+        trackWriter(child.pid, group);
+        child.stdin.end("start");
+      }
+    }
     catch (error) { failure = error; stop(); }
     if (timeoutMs !== undefined) timer = globalThis.setTimeout(() => { failure = new Error("locked command timed out"); stop(); }, timeoutMs);
   });

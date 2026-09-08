@@ -244,7 +244,7 @@ test("access preserves an in-progress Git operation even with a clean index", as
 
 test("a terminated lock owner is recovered without a lease timeout", async (t) => {
   const { b, state } = await enabledDevices(t);
-  const crashed = spawnSync(process.execPath, ["--import", "tsx", "src/knowledge-loom/runner.ts", "with-vault-lock", b, "--", process.execPath, "-e", "process.kill(process.ppid, 'SIGKILL'); process.exit(0);"], { cwd: PACKAGE_ROOT, encoding: "utf8", timeout: 5000 });
+  const crashed = spawnSync(process.execPath, ["--import", "tsx", "src/knowledge-loom/runner.ts", "with-vault-lock", b, "--", process.execPath, "-e", "const owner=JSON.parse(require('node:child_process').execFileSync('git',['cat-file','blob','refs/knowledge-loom/mutation-lock'],{encoding:'utf8'})); process.kill(owner.pid, 'SIGKILL'); process.exit(0);"], { cwd: PACKAGE_ROOT, encoding: "utf8", timeout: 5000 });
   assert.equal(crashed.signal, "SIGKILL", crashed.stderr);
   const result = await invoke(["access", "--state-dir", state, "--json"], b);
   assert.equal(result.code, 0, result.stderr);
@@ -319,12 +319,18 @@ test("a surviving fetch remains protected after its access owner is terminated",
     const deadline = Date.now() + 10_000;
     while (!fs.existsSync(marker) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
     assert.equal(fs.existsSync(marker), true);
+    // Verify that the fixture established registered surviving-writer ownership
+    // before terminating the access owner.
+    let registered = false;
+    while (!registered && Date.now() < deadline) {
+      const lock = asRecord(JSON.parse(git(b, "cat-file", "blob", "refs/knowledge-loom/mutation-lock")));
+      registered = typeof lock.writer_pid === "number" && lock.writer_group === true;
+      if (!registered) await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    assert.equal(registered, true, "fetch must be registered before terminating its owner");
     owner.kill("SIGKILL");
     await exited;
-    const waiting = invoke(["access", "--state-dir", state, "--json"], b);
-    const unblock = setTimeout(() => fs.writeFileSync(release, "release"), 4000);
-    const result = await waiting;
-    clearTimeout(unblock);
+    const result = await invoke(["access", "--state-dir", state, "--json"], b);
     assert.equal(asRecord(JSON.parse(result.stdout)).status, "busy");
   } finally {
     fs.writeFileSync(release, "release");
@@ -332,6 +338,48 @@ test("a surviving fetch remains protected after its access owner is terminated",
     await exited;
     // Wait for the surviving fetch to finish before removing its temporary repository.
     await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+});
+
+test("termination before writer registration cannot start unprotected work", async (t) => {
+  const { root, b, state } = await enabledDevices(t);
+  const bin = path.join(root, "bin"); fs.mkdirSync(bin);
+  const marker = path.join(root, "registering");
+  const release = path.join(root, "release-registration");
+  const counter = path.join(root, "updates");
+  const write = path.join(root, "unprotected-write");
+  const realGit = spawnSync("which", ["git"], { encoding: "utf8" }).stdout.trim();
+  assert.ok(realGit);
+  fs.writeFileSync(path.join(bin, "git"), `#!/usr/bin/env node
+const fs=require('node:fs'); const cp=require('node:child_process');
+const args=process.argv.slice(2); const counter=${JSON.stringify(counter)};
+if(args.includes('update-ref')&&!args.includes('-d')) {
+  const n=fs.existsSync(counter)?Number(fs.readFileSync(counter,'utf8'))+1:1;
+  fs.writeFileSync(counter,String(n));
+  if(n===2) {
+    fs.writeFileSync(${JSON.stringify(marker)},'ready');
+    const timer=setInterval(()=>{ if(fs.existsSync(${JSON.stringify(release)})) { clearInterval(timer); process.exit(1); } },10);
+  } else { const r=cp.spawnSync(${JSON.stringify(realGit)},args,{stdio:'inherit'}); process.exit(r.status??1); }
+} else { const r=cp.spawnSync(${JSON.stringify(realGit)},args,{stdio:'inherit'}); process.exit(r.status??1); }
+`, { mode: 0o755 });
+  const owner = spawn(process.execPath, ["--import", "tsx", "src/knowledge-loom/runner.ts", "with-vault-lock", b, "--", process.execPath, "-e", `require('node:fs').writeFileSync(${JSON.stringify(write)},'unprotected');`], {
+    cwd: PACKAGE_ROOT, env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}` }, stdio: "ignore",
+  });
+  const exited = new Promise<void>((resolve) => owner.once("exit", () => resolve()));
+  try {
+    const deadline = Date.now() + 10_000;
+    while (!fs.existsSync(marker) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(fs.existsSync(marker), true);
+    owner.kill("SIGKILL");
+    await exited;
+    const recovered = await invoke(["access", "--state-dir", state, "--json"], b);
+    assert.equal(asRecord(JSON.parse(recovered.stdout)).status, "current");
+    assert.equal(fs.existsSync(write), false, "the command must not start before registration");
+  } finally {
+    fs.writeFileSync(release, "release");
+    if (owner.exitCode === null && owner.signalCode === null) owner.kill("SIGKILL");
+    await exited;
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
 });
 
