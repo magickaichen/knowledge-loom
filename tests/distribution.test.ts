@@ -136,8 +136,12 @@ test("all handwritten programs are TypeScript and distributed runners are JavaSc
 
 test("README leads with the outcome and explains the no-install runner", () => {
   const readme = fs.readFileSync(path.join(PACKAGE_ROOT, "README.md"), "utf8");
+  const advanced = fs.readFileSync(path.join(PACKAGE_ROOT, "docs/advanced-usage.md"), "utf8");
+  const contributing = fs.readFileSync(path.join(PACKAGE_ROOT, "CONTRIBUTING.md"), "utf8");
   const opening = readme.slice(0, 800);
   const rendered = readme.split(/\s+/).join(" ");
+  const renderedAdvanced = advanced.split(/\s+/).join(" ");
+  assert.match(readme, /\[Advanced usage\]\(docs\/advanced-usage\.md\)/);
   assert.match(opening, /Give any agent that supports Agent Skills a safe way/);
   assert.match(opening, /Knowledge Loom is agent-neutral/);
   assert.match(opening, /which vault you meant/);
@@ -150,16 +154,16 @@ test("README leads with the outcome and explains the no-install runner", () => {
   assert.match(readme, /\/use-knowledge-vault/);
   assert.match(readme, /\$knowledge-loom:use-knowledge-vault/);
   assert.match(readme, /\/knowledge-loom:use-knowledge-vault/);
-  assert.match(readme, /~\/\.config\/knowledge-vault\/registry\.yaml/);
-  assert.match(readme, /associate example ~\/code\/example-project --apply/);
-  assert.match(readme, /There is no second validation command/);
-  assert.match(readme, /instruction-only Claude Desktop adapter reports the combined audit as incomplete/);
-  assert.match(readme, /content_check_adapters:/);
+  assert.match(advanced, /~\/\.config\/knowledge-vault\/registry\.yaml/);
+  assert.match(advanced, /associate example ~\/code\/example-project --apply/);
+  assert.match(advanced, /There is no second validation command/);
+  assert.match(advanced, /instruction-only Claude Desktop adapter reports the combined audit as incomplete/);
+  assert.match(advanced, /content_check_adapters:/);
   assert.match(readme, /Node\.js 20\+/);
   assert.match(readme, /does not run `npm install`/);
-  assert.match(rendered, /`writing-for-agents`.*optional companion, not a prerequisite/);
-  assert.match(rendered, /Without the companion, Knowledge Loom applies its built-in agent-readable writing gate/);
-  assert.match(readme, /handwritten TypeScript under `src\/`, `scripts\/`, and\s+`tests\/`/);
+  assert.match(renderedAdvanced, /`writing-for-agents`.*optional companion, not a prerequisite/);
+  assert.match(renderedAdvanced, /Without the companion, Knowledge Loom applies its built-in agent-readable writing gate/);
+  assert.match(contributing, /handwritten TypeScript under `src\/`, `scripts\/`, and\s+`tests\/`/);
   assert.match(readme, /one\s+self-contained JavaScript runner/);
-  assert.match(readme, /Claude Desktop custom skills use a ZIP upload/);
+  assert.match(advanced, /Claude Desktop custom skills use a ZIP upload/);
 });
