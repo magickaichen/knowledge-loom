@@ -115,17 +115,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path9) {
-      const ctrl = callVisitor(key, node, visitor, path9);
+    function visit_(key, node, visitor, path10) {
+      const ctrl = callVisitor(key, node, visitor, path10);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path9, ctrl);
-        return visit_(key, ctrl, visitor, path9);
+        replaceNode(key, path10, ctrl);
+        return visit_(key, ctrl, visitor, path10);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path9 = Object.freeze(path9.concat(node));
+          path10 = Object.freeze(path10.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path9);
+            const ci = visit_(i, node.items[i], visitor, path10);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -136,13 +136,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path9 = Object.freeze(path9.concat(node));
-          const ck = visit_("key", node.key, visitor, path9);
+          path10 = Object.freeze(path10.concat(node));
+          const ck = visit_("key", node.key, visitor, path10);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path9);
+          const cv = visit_("value", node.value, visitor, path10);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -163,17 +163,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path9) {
-      const ctrl = await callVisitor(key, node, visitor, path9);
+    async function visitAsync_(key, node, visitor, path10) {
+      const ctrl = await callVisitor(key, node, visitor, path10);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path9, ctrl);
-        return visitAsync_(key, ctrl, visitor, path9);
+        replaceNode(key, path10, ctrl);
+        return visitAsync_(key, ctrl, visitor, path10);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path9 = Object.freeze(path9.concat(node));
+          path10 = Object.freeze(path10.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path9);
+            const ci = await visitAsync_(i, node.items[i], visitor, path10);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -184,13 +184,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path9 = Object.freeze(path9.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path9);
+          path10 = Object.freeze(path10.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path10);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path9);
+          const cv = await visitAsync_("value", node.value, visitor, path10);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -217,23 +217,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path9) {
+    function callVisitor(key, node, visitor, path10) {
       if (typeof visitor === "function")
-        return visitor(key, node, path9);
+        return visitor(key, node, path10);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path9);
+        return visitor.Map?.(key, node, path10);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path9);
+        return visitor.Seq?.(key, node, path10);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path9);
+        return visitor.Pair?.(key, node, path10);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path9);
+        return visitor.Scalar?.(key, node, path10);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path9);
+        return visitor.Alias?.(key, node, path10);
       return void 0;
     }
-    function replaceNode(key, path9, node) {
-      const parent = path9[path9.length - 1];
+    function replaceNode(key, path10, node) {
+      const parent = path10[path10.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -843,10 +843,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path9, value) {
+    function collectionFromPath(schema, path10, value) {
       let v = value;
-      for (let i = path9.length - 1; i >= 0; --i) {
-        const k = path9[i];
+      for (let i = path10.length - 1; i >= 0; --i) {
+        const k = path10[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -865,7 +865,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path9) => path9 == null || typeof path9 === "object" && !!path9[Symbol.iterator]().next().done;
+    var isEmptyPath = (path10) => path10 == null || typeof path10 === "object" && !!path10[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -895,11 +895,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path9, value) {
-        if (isEmptyPath(path9))
+      addIn(path10, value) {
+        if (isEmptyPath(path10))
           this.add(value);
         else {
-          const [key, ...rest] = path9;
+          const [key, ...rest] = path10;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -913,8 +913,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path9) {
-        const [key, ...rest] = path9;
+      deleteIn(path10) {
+        const [key, ...rest] = path10;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -928,8 +928,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path9, keepScalar) {
-        const [key, ...rest] = path9;
+      getIn(path10, keepScalar) {
+        const [key, ...rest] = path10;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -947,8 +947,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path9) {
-        const [key, ...rest] = path9;
+      hasIn(path10) {
+        const [key, ...rest] = path10;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -958,8 +958,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path9, value) {
-        const [key, ...rest] = path9;
+      setIn(path10, value) {
+        const [key, ...rest] = path10;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3474,9 +3474,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path9, value) {
+      addIn(path10, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path9, value);
+          this.contents.addIn(path10, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3551,14 +3551,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path9) {
-        if (Collection.isEmptyPath(path9)) {
+      deleteIn(path10) {
+        if (Collection.isEmptyPath(path10)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path9) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path10) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3573,10 +3573,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path9, keepScalar) {
-        if (Collection.isEmptyPath(path9))
+      getIn(path10, keepScalar) {
+        if (Collection.isEmptyPath(path10))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path9, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path10, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3587,10 +3587,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path9) {
-        if (Collection.isEmptyPath(path9))
+      hasIn(path10) {
+        if (Collection.isEmptyPath(path10))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path9) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path10) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3607,13 +3607,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path9, value) {
-        if (Collection.isEmptyPath(path9)) {
+      setIn(path10, value) {
+        if (Collection.isEmptyPath(path10)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path9), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path10), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path9, value);
+          this.contents.setIn(path10, value);
         }
       }
       /**
@@ -5573,9 +5573,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path9) => {
+    visit.itemAtPath = (cst, path10) => {
       let item = cst;
-      for (const [field, index] of path9) {
+      for (const [field, index] of path10) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5584,23 +5584,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path9) => {
-      const parent = visit.itemAtPath(cst, path9.slice(0, -1));
-      const field = path9[path9.length - 1][0];
+    visit.parentCollection = (cst, path10) => {
+      const parent = visit.itemAtPath(cst, path10.slice(0, -1));
+      const field = path10[path10.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path9, item, visitor) {
-      let ctrl = visitor(item, path9);
+    function _visit(path10, item, visitor) {
+      let ctrl = visitor(item, path10);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path9.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path10.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5611,10 +5611,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path9);
+            ctrl = ctrl(item, path10);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path9) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path10) : ctrl;
     }
     exports.visit = visit;
   }
@@ -6916,14 +6916,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs8 = this.flowScalar(this.type);
+              const fs9 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs8, sep: [] });
+                map.items.push({ start, key: fs9, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs8);
+                this.stack.push(fs9);
               } else {
-                Object.assign(it, { key: fs8, sep: [] });
+                Object.assign(it, { key: fs9, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7051,13 +7051,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs8 = this.flowScalar(this.type);
+              const fs9 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs8, sep: [] });
+                fc.items.push({ start: [], key: fs9, sep: [] });
               else if (it.sep)
-                this.stack.push(fs8);
+                this.stack.push(fs9);
               else
-                Object.assign(it, { key: fs8, sep: [] });
+                Object.assign(it, { key: fs9, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7366,7 +7366,19 @@ var require_dist = __commonJS({
 });
 
 // src/knowledge-loom/cli.ts
-import path8 from "node:path";
+import path9 from "node:path";
+
+// src/knowledge-loom/remote-failure.ts
+function classifyFailure(error) {
+  return /authentication failed|permission denied|could not read Username|could not read Password/i.test(error) ? "authentication" : "transport";
+}
+
+// src/knowledge-loom/sync.ts
+import { spawnSync as spawnSync3 } from "node:child_process";
+import { createHash as createHash2 } from "node:crypto";
+import fs7 from "node:fs";
+import os5 from "node:os";
+import path7 from "node:path";
 
 // src/knowledge-loom/access.ts
 import { spawnSync as spawnSync2 } from "node:child_process";
@@ -7827,8 +7839,8 @@ function projectAssociation(start, registry) {
   return nearest[0] ?? null;
 }
 function applicableVaultContext(cwd, registryPath) {
-  const ancestor2 = findAncestorVault(cwd);
-  if (ancestor2) return { vault: loadVault(ancestor2), registry: null };
+  const ancestor3 = findAncestorVault(cwd);
+  if (ancestor3) return { vault: loadVault(ancestor3), registry: null };
   const registry = loadRegistry(registryPath);
   const association = projectAssociation(cwd, registry) ?? (() => {
     const mainCheckout = mainCheckoutEquivalent(cwd);
@@ -8145,15 +8157,19 @@ async function refresh(vault, remote, branch, stateDir, now, statusOnly, trackWr
   }
   const cached = typeof observed.checked_at === "number" && time >= observed.checked_at && time - observed.checked_at < DAY;
   if (!cached && !statusOnly) {
+    let remoteError = "";
     try {
       if (!trackWriter) throw new Error("remote observation requires a mutation lock");
       const code = await runLockedProcess(vault.root, "git", ["fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--refmap=", "--", remote, `+refs/heads/${branch}:${ref}`], trackWriter, {
         timeoutMs: 3e4,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0" }
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
+        stderr: { write(value) {
+          remoteError = (remoteError + value).slice(0, 65536);
+        } }
       });
       if (code !== 0) throw new Error("remote fetch failed");
     } catch {
-      previous = { ...observed, schema_version: 1, attempted_at: time, retry_at: time + RETRY };
+      previous = { ...observed, schema_version: 1, attempted_at: time, retry_at: time + RETRY, failure: classifyFailure(remoteError) };
       atomicWriteText(file, `${JSON.stringify(previous)}
 `);
       return { ...base, status: "unavailable", check: "failed", observed: previous, reason: "remote fetch failed; local work remains available" };
@@ -8779,9 +8795,193 @@ async function auditVault(vault, { registryPath } = {}) {
   return findings;
 }
 
+// src/knowledge-loom/sync.ts
+function git2(root, ...args) {
+  const result = spawnSync3("git", ["-C", root, ...args], { encoding: "utf8", timeout: 1e4, maxBuffer: 1024 * 1024 });
+  if (result.status !== 0) throw new Error(`Git ${args[0]} failed`);
+  return result.stdout.trim();
+}
+async function synchronizeVault(vault, options = {}) {
+  validateAuthority(vault);
+  const sync = isUnknownRecord(vault.contract.sync) ? vault.contract.sync : {};
+  const inbound = isUnknownRecord(sync.inbound) ? sync.inbound : {};
+  if (sync.mode !== "git-remote-push") return { status: "not-enabled" };
+  if (typeof inbound.remote !== "string" || typeof inbound.branch !== "string") return { status: "pending", reason: "configure an authorized inbound destination before synchronization" };
+  const { remote, branch } = inbound;
+  const localBranch = git2(vault.root, "symbolic-ref", "--short", "HEAD");
+  const url = git2(vault.root, "remote", "get-url", "--", remote);
+  if (git2(vault.root, "remote", "get-url", "--push", "--all", "--", remote) !== url) return { status: "pending", reason: "push destination differs from the authorized inbound destination" };
+  const key = createHash2("sha256").update(JSON.stringify([vault.root, localBranch, remote, url, branch])).digest("hex");
+  const directory = canonicalPath(options.stateDir ?? path7.join(os5.homedir(), ".local", "state", "knowledge-loom"));
+  const common = canonicalPath(git2(vault.root, "rev-parse", "--path-format=absolute", "--git-common-dir"));
+  if (isWithin(vault.root, directory) || isWithin(common, directory)) throw new Error("operational state must stay outside the vault and its Git directory");
+  const file = path7.join(directory, `sync-${key}.json`);
+  const read = () => {
+    const stat = fs7.lstatSync(file, { throwIfNoEntry: false });
+    if (!stat) return {};
+    if (!stat.isFile() || stat.size > 262144) throw new Error("invalid pending state; preserve and inspect it");
+    const value = JSON.parse(fs7.readFileSync(file, "utf8"));
+    if (!isUnknownRecord(value) || value.schema_version !== 1) throw new Error("invalid pending state; preserve and inspect it");
+    return value;
+  };
+  if (options.statusOnly) {
+    const state = read();
+    const head = git2(vault.root, "rev-parse", "HEAD");
+    const current = state.published_revision === head;
+    return { ...state, status: state.status === "synchronized" && !current ? "pending" : String(state.status ?? "unverified"), synchronized: state.synchronized === true && current, head, state_file: file };
+  }
+  const locked = await withVaultLock(vault.root, async (trackWriter) => {
+    let state = read();
+    const save = (fields) => {
+      state = { ...state, schema_version: 1, root: vault.root, ...fields };
+      atomicWriteText(file, `${JSON.stringify(state)}
+`);
+      return { ...state, status: String(state.status), state_file: file };
+    };
+    let head = git2(vault.root, "rev-parse", "HEAD");
+    const unchanged = () => git2(vault.root, "rev-parse", "HEAD") === head && git2(vault.root, "symbolic-ref", "--short", "HEAD") === localBranch && !upstreamProblem(vault.root, remote, branch) && git2(vault.root, "remote", "get-url", "--", remote) === url && git2(vault.root, "remote", "get-url", "--push", "--all", "--", remote) === url && JSON.stringify(loadVault(vault.root).contract) === JSON.stringify(vault.contract) && !operationInProgress(vault.root) && !git2(vault.root, "status", "--porcelain", "--untracked-files=all");
+    const run = async (root, args) => {
+      let output2 = "";
+      let error2 = "";
+      const code2 = await runLockedProcess(root, "git", args, trackWriter, {
+        timeoutMs: 3e4,
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
+        stdout: { write(v) {
+          output2 = (output2 + v).slice(0, 65536);
+        } },
+        stderr: { write(v) {
+          error2 = (error2 + v).slice(0, 65536);
+        } }
+      });
+      return { code: code2, output: output2, error: error2 };
+    };
+    if (options.resolution) {
+      const evidence = isUnknownRecord(state.evidence) ? state.evidence : {};
+      if (state.status !== "needs-reconciliation" || evidence.ours !== head || typeof state.workspace !== "string" || !unchanged()) return save({ status: "pending", reason: "reconciliation is stale; rerun sync for current evidence" });
+      const stat = fs7.lstatSync(options.resolution);
+      if (!stat.isFile() || stat.size > 262144) throw new Error("resolution must be a bounded JSON file");
+      const decision = JSON.parse(fs7.readFileSync(options.resolution, "utf8"));
+      if (!isUnknownRecord(decision) || decision.ours !== evidence.ours || decision.theirs !== evidence.theirs || typeof decision.rationale !== "string" || !decision.rationale.trim()) throw new Error("resolution requires exact ours/theirs revisions and evidence-based rationale");
+      if (typeof decision.question === "string" && decision.question.trim()) return save({ status: "needs-reconciliation", question: decision.question, reason: decision.rationale });
+      if (evidence.truncated === true) return save({ status: "pending", reason: "evidence exceeds automatic bounds; scoped evidence review is required" });
+      if (!Array.isArray(decision.files)) throw new Error("resolution requires a files list");
+      const workspace = canonicalPath(state.workspace);
+      if (!isWithin(directory, workspace) || workspace === directory) throw new Error("invalid reconciliation workspace");
+      if (git2(workspace, "rev-parse", "HEAD") !== head) return save({ status: "pending", reason: "candidate revision changed; prepare new evidence" });
+      for (const item of decision.files) {
+        if (!isUnknownRecord(item) || typeof item.path !== "string" || item.content !== null && typeof item.content !== "string" || item.path.split("/").some((part) => part.toLowerCase() === ".git")) throw new Error("invalid resolution file");
+        const target = resolveVaultPath(workspace, item.path);
+        if (!target) throw new Error("resolution path crosses workspace boundary");
+        if (item.content === null) fs7.rmSync(target, { force: true });
+        else {
+          fs7.mkdirSync(path7.dirname(target), { recursive: true });
+          fs7.writeFileSync(target, item.content);
+        }
+      }
+      const conflicts = git2(workspace, "diff", "--name-only", "--diff-filter=U", "-z").split("\0").filter(Boolean);
+      const resolvedPaths = decision.files.filter(isUnknownRecord).map((item) => item.path);
+      if (conflicts.some((file2) => !resolvedPaths.includes(file2))) return save({ status: "needs-reconciliation", reason: "unresolved textual conflicts require explicit file resolutions" });
+      for (const file2 of conflicts) {
+        const target = resolveVaultPath(workspace, file2);
+        if (target && fs7.existsSync(target) && /^(?:<{7}|={7}|>{7})(?: |$)/m.test(fs7.readFileSync(target, "utf8"))) return save({ status: "needs-reconciliation", reason: "unresolved conflict markers remain" });
+      }
+      git2(workspace, "add", "--all");
+      const candidateVault = loadVault(workspace);
+      validateAuthority(candidateVault);
+      if (JSON.stringify(candidateVault.contract) !== JSON.stringify(vault.contract)) return save({ status: "pending", reason: "candidate changes governing contract; review authority separately" });
+      const candidateTree = git2(workspace, "write-tree");
+      const candidateStatus = git2(workspace, "status", "--porcelain", "--untracked-files=all");
+      const findings2 = await auditVault(candidateVault, { registryPath: options.registryPath });
+      if (findings2.some((item) => item.severity === "error")) return save({ status: "needs-reconciliation", validated: false, reason: "candidate audit failed", findings: findings2 });
+      if (git2(workspace, "write-tree") !== candidateTree || git2(workspace, "diff", "--name-only") || git2(workspace, "status", "--porcelain", "--untracked-files=all") !== candidateStatus || !unchanged()) return save({ status: "pending", reason: "checkout or candidate changed during audit" });
+      git2(workspace, "-c", `core.hooksPath=${os5.devNull}`, "commit", "-m", "Reconcile source-backed knowledge contributions");
+      const candidate = git2(workspace, "rev-parse", "HEAD");
+      save({ status: "pending", candidate, validated: true, reason: "audited candidate awaiting application" });
+      if ((await run(vault.root, ["fetch", "--no-tags", "--no-write-fetch-head", "--", workspace, candidate])).code !== 0 || !unchanged()) return save({ reason: "checkout changed before application; candidate retained" });
+      git2(vault.root, "-c", `core.hooksPath=${os5.devNull}`, "merge", "--ff-only", "--no-overwrite-ignore", candidate);
+      head = candidate;
+    }
+    save({ status: "pending", head, saved: true, attempted_at: (options.now ?? Date.now)(), synchronized: false, backed_up: "not-run", committed: true });
+    if (JSON.stringify(loadVault(vault.root).contract) !== JSON.stringify(vault.contract)) return save({ reason: "authority changed; reread the contract" });
+    if (upstreamProblem(vault.root, remote, branch) && localBranch === branch) {
+      const settings = [[`branch.${localBranch}.remote`, remote], [`branch.${localBranch}.merge`, `refs/heads/${branch}`]];
+      const current = settings.map(([key2]) => spawnSync3("git", ["-C", vault.root, "config", "--get", key2], { encoding: "utf8" }));
+      if (current.every((value, i) => value.status === 1 || value.status === 0 && value.stdout.trim() === settings[i][1])) {
+        for (let i = 0; i < settings.length; i++) if (current[i].status === 1) git2(vault.root, "config", "--local", settings[i][0], settings[i][1]);
+        save({ repair: "restored-authorized-upstream" });
+      }
+    }
+    const problem = upstreamProblem(vault.root, remote, branch);
+    if (problem) return save({ reason: problem });
+    if (state.recovery_required === true) return save({ reason: "remote history requires explicit recovery" });
+    if (operationInProgress(vault.root) || git2(vault.root, "status", "--porcelain", "--untracked-files=all")) return save({ reason: "checkout has unfinished work; commit authorized changes separately before synchronization" });
+    const findings = await auditVault(loadVault(vault.root), { registryPath: options.registryPath });
+    if (findings.some((item) => item.severity === "error")) return save({ validated: false, reason: "audit failed", findings });
+    save({ validated: true });
+    if (git2(vault.root, "rev-parse", "HEAD") !== head || git2(vault.root, "status", "--porcelain", "--untracked-files=all") || operationInProgress(vault.root)) return save({ reason: "checkout changed during audit" });
+    if (!unchanged()) return save({ reason: "checkout or authority changed before publication" });
+    const { code, output, error } = await run(vault.root, ["push", "--porcelain", "--", remote, `${head}:refs/heads/${branch}`]);
+    if (code === 0) {
+      const current = unchanged();
+      return save({ status: current ? "synchronized" : "pending", synchronized: current, published_revision: head, failure: null, reason: current ? null : "published audited revision; newer local work remains pending" });
+    }
+    const rejected = /^!\t[^\n]+\t\[rejected\] \((?:fetch first|non-fast-forward)\)/m.test(output) || /^!\t[^\n]+\t\[remote rejected\] \(failed to update ref\)/m.test(output) && /cannot lock ref .*is at [a-f0-9]+ but expected [a-f0-9]+/.test(error);
+    const failure = rejected ? "non-fast-forward" : classifyFailure(error);
+    if (rejected) {
+      save({ failure, reason: "non-fast-forward; fetching current remote evidence" });
+      const ref = `refs/knowledge-loom/sync/${key}`;
+      const fetched = await run(vault.root, ["fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--refmap=", "--", remote, `+refs/heads/${branch}:${ref}`]);
+      if (fetched.code !== 0) return save({ failure: classifyFailure(fetched.error), reason: "reconciliation fetch failed; local work remains usable" });
+      const theirs = git2(vault.root, "rev-parse", ref);
+      let previous = typeof state.remote_revision === "string" ? state.remote_revision : void 0;
+      const observation = path7.join(directory, `${key}.json`);
+      if (!previous && fs7.existsSync(observation)) {
+        const record = JSON.parse(fs7.readFileSync(observation, "utf8"));
+        if (isUnknownRecord(record) && typeof record.remote_revision === "string") previous = record.remote_revision;
+      }
+      if (state.recovery_required === true || previous && !ancestor2(vault.root, previous, theirs)) return save({ status: "pending", recovery_required: true, reason: "remote history was rewritten; explicit recovery required" });
+      const commonBase = spawnSync3("git", ["-C", vault.root, "merge-base", "--all", head, theirs], { encoding: "utf8", timeout: 1e4 });
+      const base = commonBase.stdout.trim();
+      if (commonBase.status !== 0 || !/^[a-f0-9]{40,64}$/.test(base)) return save({ status: "pending", recovery_required: true, reason: "no unique common ancestor; explicit recovery required" });
+      const evidence = evidencePacket(vault.root, base, head, theirs);
+      save({ remote_revision: theirs, evidence });
+      if (!unchanged()) return save({ status: "pending", reason: "checkout changed while fetching; rerun sync" });
+      const workspace = fs7.mkdtempSync(path7.join(directory, "reconcile-"));
+      save({ workspace, status: "pending", reason: "preparing isolated candidate" });
+      if ((await run(directory, ["clone", "--no-hardlinks", "--no-checkout", "--", vault.root, workspace])).code !== 0) return save({ reason: "could not prepare isolated candidate" });
+      git2(workspace, "-c", `core.hooksPath=${os5.devNull}`, "checkout", "--detach", head);
+      for (const field of ["user.name", "user.email"]) git2(workspace, "config", field, git2(vault.root, "config", "--get", field));
+      if ((await run(workspace, ["fetch", "--no-tags", "--", vault.root, ref])).code !== 0) return save({ reason: "could not copy observed revision" });
+      const merged = await run(workspace, ["-c", `core.hooksPath=${os5.devNull}`, "merge", "--no-commit", "--no-ff", theirs]);
+      if (merged.code !== 0 && !fs7.existsSync(path7.join(workspace, ".git", "MERGE_HEAD"))) return save({ reason: "candidate merge failed; isolated work retained" });
+      return save({ status: "needs-reconciliation", reason: "review all three-way evidence for factual consistency, including textually clean merges", question: null });
+    }
+    return save({ failure, reason: "push failed; local reads, authorized edits and commits remain available" });
+  });
+  return locked.acquired ? locked.value : { status: "busy", reason: "another task owns the mutation lock; local work is preserved" };
+}
+function ancestor2(root, older, newer) {
+  const result = spawnSync3("git", ["-C", root, "merge-base", "--is-ancestor", older, newer], { timeout: 1e4 });
+  if (result.status !== 0 && result.status !== 1) throw new Error("could not compare history");
+  return result.status === 0;
+}
+function evidencePacket(root, base, ours, theirs) {
+  const changed = [...new Set([ours, theirs].flatMap((revision) => git2(root, "diff", "--name-only", "-z", base, revision).split("\0").filter(Boolean)))].sort();
+  let truncated = changed.length > 16;
+  const files = changed.slice(0, 16).map((file) => {
+    const read = (revision) => {
+      const result = spawnSync3("git", ["-C", root, "show", `${revision}:${file}`], { encoding: "utf8", timeout: 1e4, maxBuffer: 8192 });
+      if (result.error || result.stdout.length > 2048) truncated = true;
+      return result.status === 0 ? result.stdout.slice(0, 2048) : null;
+    };
+    return { path: file, base: read(base), ours: read(ours), theirs: read(theirs) };
+  });
+  return { base, ours, theirs, files, truncated, trust: "data-only; timestamps are not factual authority" };
+}
+
 // src/knowledge-loom/initializer.ts
-import fs7 from "node:fs";
-import path7 from "node:path";
+import fs8 from "node:fs";
+import path8 from "node:path";
 var DEFAULT_BODY = `# Vault policy
 
 ## Purpose and boundary
@@ -8803,13 +9003,13 @@ Describe naming, linking, metadata, and archival conventions.
 `;
 function discoverInstructionRoots(root) {
   for (const candidate of ["AGENTS.md", "LLM_CONTEXT.md", "CLAUDE.md"]) {
-    if (fs7.statSync(path7.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
+    if (fs8.statSync(path8.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
   }
   return [];
 }
 function discoverEntrypoints(root) {
   for (const candidate of ["INDEX.md", "Home.md", "README.md"]) {
-    if (fs7.statSync(path7.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
+    if (fs8.statSync(path8.join(root, candidate), { throwIfNoEntry: false })?.isFile()) return [candidate];
   }
   return ["INDEX.md"];
 }
@@ -8847,25 +9047,26 @@ function buildContract(root, {
 }
 function initializeVault(root, { contract, adopt, apply }) {
   const rootPath = canonicalPath(root);
-  const contractPath = path7.join(rootPath, CONTRACT_NAME);
-  if (fs7.existsSync(contractPath)) throw new Error(`${contractPath} already exists`);
-  if (fs7.existsSync(rootPath) && fs7.readdirSync(rootPath).length && !adopt) {
+  const contractPath = path8.join(rootPath, CONTRACT_NAME);
+  if (fs8.existsSync(contractPath)) throw new Error(`${contractPath} already exists`);
+  if (fs8.existsSync(rootPath) && fs8.readdirSync(rootPath).length && !adopt) {
     throw new Error("target is not empty; use adoption mode for an existing vault");
   }
   const rendered = renderContract(contract, DEFAULT_BODY);
   if (apply) {
-    fs7.mkdirSync(rootPath, { recursive: true });
-    fs7.writeFileSync(contractPath, rendered, "utf8");
-    const indexPath = path7.join(rootPath, "INDEX.md");
-    if (!adopt && !fs7.existsSync(indexPath)) fs7.writeFileSync(indexPath, "# Index\n\n- Add vault entrypoints here.\n", "utf8");
+    fs8.mkdirSync(rootPath, { recursive: true });
+    fs8.writeFileSync(contractPath, rendered, "utf8");
+    const indexPath = path8.join(rootPath, "INDEX.md");
+    if (!adopt && !fs8.existsSync(indexPath)) fs8.writeFileSync(indexPath, "# Index\n\n- Add vault entrypoints here.\n", "utf8");
   }
   return [contractPath, rendered];
 }
 
 // src/knowledge-loom/cli.ts
-var HELP = `usage: knowledge-loom {access,with-vault-lock,audit,probe,resolve,register,associate,init} ...
+var HELP = `usage: knowledge-loom {sync,access,with-vault-lock,audit,probe,resolve,register,associate,init} ...
 
 commands:
+  sync        publish committed knowledge or prepare isolated reconciliation
   access      prepare a vault for retrieval with an authorized daily refresh
   with-vault-lock  run a cooperative writer under the shared mutation lock
   audit       run a read-only vault audit
@@ -8876,6 +9077,7 @@ commands:
   init        preview or initialize a vault contract
 `;
 var COMMAND_HELP = {
+  sync: "usage: knowledge-loom sync [selector] [--registry PATH] [--state-dir PATH] [--json] [--status] [--resolution PATH]\n",
   "with-vault-lock": "usage: knowledge-loom with-vault-lock [selector] [--registry PATH] -- executable [arguments ...]\n",
   access: "usage: knowledge-loom access [selector] [--registry PATH] [--state-dir PATH] [--json] [--status] [--enable-inbound --remote NAME --branch NAME [--apply]]\n",
   audit: "usage: knowledge-loom audit [selector] [--registry PATH] [--json]\n",
@@ -8909,8 +9111,9 @@ function parseArguments(arguments_) {
     return { help: true, command: command2, positional: [], subject: [] };
   }
   const options = { help: false, command: command2, positional: [], subject: [] };
-  const flags = new Set(command2 === "access" ? ["--json", "--enable-inbound", "--apply", "--status"] : command2 === "audit" ? ["--json"] : command2 === "init" ? ["--adopt", "--apply"] : command2 === "register" ? ["--apply"] : command2 === "associate" ? ["--replace", "--apply"] : []);
+  const flags = new Set(command2 === "sync" ? ["--json", "--status"] : command2 === "access" ? ["--json", "--enable-inbound", "--apply", "--status"] : command2 === "audit" ? ["--json"] : command2 === "init" ? ["--adopt", "--apply"] : command2 === "register" ? ["--apply"] : command2 === "associate" ? ["--replace", "--apply"] : []);
   const valueOptions = /* @__PURE__ */ new Set(["--registry"]);
+  if (command2 === "sync") for (const name of ["--state-dir", "--resolution"]) valueOptions.add(name);
   if (command2 === "access") for (const name of ["--state-dir", "--remote", "--branch"]) valueOptions.add(name);
   if (command2 === "init") {
     for (const name of ["--vault-id", "--title", "--subject", "--write-policy", "--current-state-policy", "--history"]) valueOptions.add(name);
@@ -8934,6 +9137,7 @@ function parseArguments(arguments_) {
       if (value === void 0 || value.startsWith("--")) throw new Error(`${name} requires a value`);
       const key = name.slice(2).replaceAll("-", "_");
       if (key === "subject") options.subject.push(value);
+      else if (key === "resolution") options.resolution = value;
       else if (key === "state_dir") options.state_dir = value;
       else if (key === "remote") options.remote = value;
       else if (key === "branch") options.branch = value;
@@ -8977,6 +9181,15 @@ async function runCli(arguments_ = process.argv.slice(2), { cwd = process.cwd(),
         return 1;
       }
       return locked.value;
+    }
+    if (options.command === "sync") {
+      if (options.positional.length > 1 || options.status && options.resolution) throw new Error(COMMAND_HELP.sync.trim());
+      const vault = resolveVault(options.positional[0] ?? null, { cwd, registryPath: options.registry });
+      const result = await synchronizeVault(vault, { stateDir: options.state_dir, registryPath: options.registry, statusOnly: options.status === true, resolution: options.resolution, now });
+      stdout.write(options.json ? `${JSON.stringify(result)}
+` : `${result.status} ${vault.root}
+`);
+      return 0;
     }
     if (options.command === "access") {
       if (options.positional.length > 1) throw new Error(COMMAND_HELP.access.trim());
@@ -9049,7 +9262,7 @@ ${rendered2}`);
     if (!isWritePolicy(writePolicy)) throw new Error(`unsupported write policy: ${writePolicy}`);
     if (!isCurrentStatePolicy(currentStatePolicy)) throw new Error(`unsupported current-state policy: ${currentStatePolicy}`);
     if (!isHistoryType(historyType)) throw new Error(`unsupported history type: ${historyType}`);
-    const root = path8.resolve(expandHome(options.positional[0]));
+    const root = path9.resolve(expandHome(options.positional[0]));
     const contract = buildContract(root, {
       vaultId: options.vault_id,
       title: options.title,

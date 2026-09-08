@@ -10,6 +10,7 @@ export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.
 export const SKILL_ROOT = path.join(PACKAGE_ROOT, "adapters", "claude-desktop", "knowledge-loom");
 export const REFERENCE_FILES = [
   path.join(PACKAGE_ROOT, "references", "protocol.md"),
+  path.join(PACKAGE_ROOT, "references", "synchronization.md"),
   path.join(PACKAGE_ROOT, "references", "contract-schema.md"),
 ];
 export const ARCHIVE_ROOT = "knowledge-loom";

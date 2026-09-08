@@ -1,3 +1,4 @@
+import { classifyFailure } from "./remote-failure.js";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -25,7 +26,7 @@ function git(root: string, ...args: string[]): string {
   return result.stdout.trim();
 }
 
-function validateAuthority(vault: LoadedVault): void {
+export function validateAuthority(vault: LoadedVault): void {
   const errors = validateContractData(vault.contract).filter((item) => item.severity === "error");
   if (errors.length) throw new ContractError(`invalid contract: ${errors.map((item) => item.message).join("; ")}`);
   const contract = vault.contract;
@@ -44,7 +45,7 @@ function validateAuthority(vault: LoadedVault): void {
   for (const pattern of patterns) if (!resolveVaultPatternPrefix(vault.root, pattern)) throw new ContractError("contract pattern crosses the vault boundary");
 }
 
-function upstreamProblem(root: string, remote: string, branch: string): string | null {
+export function upstreamProblem(root: string, remote: string, branch: string): string | null {
   try {
     if (canonicalPath(git(root, "rev-parse", "--show-toplevel")) !== root) return "automatic access requires a vault at its Git checkout root";
     git(root, "check-ref-format", `refs/heads/${branch}`);
@@ -57,7 +58,7 @@ function upstreamProblem(root: string, remote: string, branch: string): string |
   } catch { return "Git repository, remote, branch or upstream is unavailable; configure the authorized upstream before retrying"; }
 }
 
-function operationInProgress(root: string): boolean {
+export function operationInProgress(root: string): boolean {
   return ["MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "sequencer", "index.lock"].some((name) =>
     fs.existsSync(path.resolve(root, git(root, "rev-parse", "--git-path", name))));
 }
@@ -122,14 +123,16 @@ async function refresh(vault: LoadedVault, remote: string, branch: string, state
   }
   const cached = typeof observed.checked_at === "number" && time >= observed.checked_at && time - observed.checked_at < DAY;
   if (!cached && !statusOnly) {
+    let remoteError = "";
     try {
       if (!trackWriter) throw new Error("remote observation requires a mutation lock");
       const code = await runLockedProcess(vault.root, "git", ["fetch", "--no-tags", "--no-recurse-submodules", "--no-write-fetch-head", "--refmap=", "--", remote, `+refs/heads/${branch}:${ref}`], trackWriter, {
-        timeoutMs: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+        timeoutMs: 30_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C" },
+        stderr: { write(value) { remoteError = (remoteError + value).slice(0, 65536); } },
       });
       if (code !== 0) throw new Error("remote fetch failed");
     } catch {
-      previous = { ...observed, schema_version: 1, attempted_at: time, retry_at: time + RETRY };
+      previous = { ...observed, schema_version: 1, attempted_at: time, retry_at: time + RETRY, failure: classifyFailure(remoteError) };
       atomicWriteText(file, `${JSON.stringify(previous)}\n`);
       return { ...base, status: "unavailable", check: "failed", observed: previous, reason: "remote fetch failed; local work remains available" };
     }

@@ -7,10 +7,10 @@ import { errorMessage } from "../src/knowledge-loom/errors.ts";
 
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const SKILL_REFERENCES = {
-  "use-knowledge-vault": ["protocol.md"],
-  "init-knowledge-vault": ["protocol.md", "contract-schema.md"],
-  "audit-knowledge-vault": ["protocol.md", "contract-schema.md"],
-  "manage-current-focus": ["protocol.md"],
+  "use-knowledge-vault": ["protocol.md", "synchronization.md"],
+  "init-knowledge-vault": ["protocol.md", "contract-schema.md", "synchronization.md"],
+  "audit-knowledge-vault": ["protocol.md", "contract-schema.md", "synchronization.md"],
+  "manage-current-focus": ["protocol.md", "synchronization.md"],
 } as const;
 
 export type SkillName = keyof typeof SKILL_REFERENCES;

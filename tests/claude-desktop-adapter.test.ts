@@ -30,6 +30,7 @@ test("Desktop archive has one root and bundled references", (t) => {
   assert.deepEqual(Object.keys(entries), [
     "knowledge-loom/SKILL.md",
     "knowledge-loom/references/protocol.md",
+    "knowledge-loom/references/synchronization.md",
     "knowledge-loom/references/contract-schema.md",
   ]);
   const skillEntry = entries["knowledge-loom/SKILL.md"];
