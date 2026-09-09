@@ -7998,9 +7998,19 @@ var LOCKED_COMMAND_GATE = `
 const { spawn } = require("node:child_process");
 process.stdin.once("data", () => {
   process.stdin.destroy();
-  const child = spawn(process.argv[1], process.argv.slice(2), { stdio: ["ignore", "inherit", "inherit"] });
-  child.once("error", () => process.exit(1));
-  child.once("exit", (code) => process.exit(code ?? 1));
+  const child = spawn(process.argv[1], process.argv.slice(2), { stdio: ["ignore", "pipe", "pipe"] });
+  const forward = (source, target) => {
+    let disconnected = false;
+    target.on("error", () => { disconnected = true; source.resume(); });
+    target.on("drain", () => source.resume());
+    source.on("data", (chunk) => {
+      if (!disconnected && !target.write(chunk)) source.pause();
+    });
+  };
+  forward(child.stdout, process.stdout);
+  forward(child.stderr, process.stderr);
+  child.once("error", () => { process.exitCode = 1; });
+  child.once("close", (code) => { process.exitCode = code ?? 1; });
 });
 process.stdin.once("end", () => process.exit(1));
 `;
@@ -8940,7 +8950,7 @@ async function synchronizeVault(vault, options = {}) {
       const current = unchanged();
       return save({ status: current ? "synchronized" : "pending", synchronized: current, published_revision: head, failure: null, reason: current ? null : "published audited revision; newer local work remains pending" });
     }
-    const rejected = /^!\t[^\n]+\t\[rejected\] \((?:fetch first|non-fast-forward)\)/m.test(output) || /^!\t[^\n]+\t\[remote rejected\] \(failed to update ref\)/m.test(output) && /cannot lock ref .*is at [a-f0-9]+ but expected [a-f0-9]+/.test(error);
+    const rejected = /^!\t[^\n]+\t\[rejected\] \((?:fetch first|non-fast-forward)\)/m.test(output) || /^!\t[^\n]+\t\[remote rejected\] \((?:failed to update ref|incorrect old value provided)\)/m.test(output) && /cannot lock ref .*is at [a-f0-9]+ but expected [a-f0-9]+/.test(error);
     const failure = rejected ? "non-fast-forward" : classifyFailure(error);
     if (rejected) {
       save({ failure, reason: "non-fast-forward; fetching current remote evidence" });

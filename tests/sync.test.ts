@@ -171,7 +171,7 @@ test("repeated push races stop after one publication attempt and retain new evid
   const quote = (v: string) => `'${v.replaceAll("'", "'\\''")}'`;
   fs.writeFileSync(hook, `#!/bin/sh\necho attempt >> ${quote(counter)}\necho '# Racing addition' > ${quote(path.join(a, "race.md"))}\ngit -C ${quote(a)} add race.md\ngit -C ${quote(a)} -c user.name=Example -c user.email=example@example.com commit -m Race\ngit -C ${quote(a)} push\n`, { mode: 0o755 });
   const raced = await invoke(b, state, ["--resolution", resolution]);
-  assert.equal(raced.status, "needs-reconciliation");
+  assert.equal(raced.status, "needs-reconciliation", JSON.stringify({ reason: raced.reason, failure: raced.failure }));
   assert.equal(fs.readFileSync(counter, "utf8"), "attempt\n");
   assert.match(JSON.stringify(raced.evidence), /Racing addition/);
   assert.equal(fs.existsSync(path.join(b, ".git", "MERGE_HEAD")), false);
@@ -313,7 +313,7 @@ test("interrupted candidate application keeps the surviving Git writer protected
   const deadline = Date.now() + 10_000;
   let result;
   do { result = await invoke(b, state); } while (result.status === "busy" && Date.now() < deadline);
-  assert.equal(result.status, "synchronized");
+  assert.equal(result.status, "synchronized", JSON.stringify({ reason: result.reason, failure: result.failure }));
 });
 
 test("a new unaudited revision cannot inherit the prior validated state", async (t) => {

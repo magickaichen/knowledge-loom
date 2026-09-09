@@ -164,7 +164,7 @@ export async function synchronizeVault(vault: LoadedVault, options: SyncOptions 
       return save({ status: current ? "synchronized" : "pending", synchronized: current, published_revision: head, failure: null, reason: current ? null : "published audited revision; newer local work remains pending" });
     }
     const rejected = /^!\t[^\n]+\t\[rejected\] \((?:fetch first|non-fast-forward)\)/m.test(output)
-      || (/^!\t[^\n]+\t\[remote rejected\] \(failed to update ref\)/m.test(output) && /cannot lock ref .*is at [a-f0-9]+ but expected [a-f0-9]+/.test(error));
+      || (/^!\t[^\n]+\t\[remote rejected\] \((?:failed to update ref|incorrect old value provided)\)/m.test(output) && /cannot lock ref .*is at [a-f0-9]+ but expected [a-f0-9]+/.test(error));
     const failure = rejected ? "non-fast-forward" : classifyFailure(error);
     if (rejected) {
       save({ failure, reason: "non-fast-forward; fetching current remote evidence" });
