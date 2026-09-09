@@ -1,3 +1,4 @@
+import { isStableVersion } from "./version.js";
 import fs from "node:fs";
 import path from "node:path";
 import { unzipSync } from "fflate";
@@ -43,7 +44,7 @@ export const githubReleases: ReleaseSource = {
       if (!Array.isArray(data)) throw new Error("invalid release listing");
       for (const item of data) {
         const release = record(item);
-        if (typeof release.tag_name !== "string" || !/^v\d+\.\d+\.\d+$/.test(release.tag_name)) continue;
+        if (typeof release.tag_name !== "string" || (!release.tag_name.startsWith("v") || !isStableVersion(release.tag_name.slice(1)))) continue;
         releases.push({ version: release.tag_name.slice(1), revision: "", published: release.draft === false && typeof release.published_at === "string", prerelease: release.prerelease !== false });
       }
       if (data.length < 100) return releases;

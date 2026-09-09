@@ -3,7 +3,9 @@
 Bootstrap a device once to keep the four Knowledge Loom skills on published stable releases.
 The maintenance entry point lives outside the replaceable skills. Publishing a release does not
 upgrade devices that have not completed bootstrap and wired the external call into their use path.
-Requires Node.js 20+, Git, and a local POSIX filesystem with atomic symlink rename.
+Requires Node.js 20+ and Git. One-time adoption also requires Python 3 and a macOS or Linux
+filesystem that supports atomic directory-entry exchange. Target and backup must share that
+filesystem; unsupported cases preserve the original installation and stop.
 
 ## Bootstrap and verify
 
@@ -21,8 +23,9 @@ node dist/maintenance.cjs bootstrap --source /path/to/knowledge-loom \
 node "$HOME/.local/share/knowledge-loom/maintenance.cjs" status
 ```
 
-Bootstrap verifies the copied executable with `--help`, stages and validates the complete original
-bundle, and converts only the four selected skill paths into links. `bootstrapped`, then `ready`,
+Bootstrap checks Python availability, verifies the copied executable with `--help`, stages and validates the complete original
+bundle, and atomically exchanges each selected skill path with a prepared link to that same bundle.
+An interruption between exchanges still leaves every original skill usable. `bootstrapped`, then `ready`,
 confirms the external entry point and installation. Original directories or symlinks remain under
 `~/.local/share/knowledge-loom/backups/`. An interrupted adoption resumes through `status` or
 `bootstrap` without needing the source checkout.
@@ -60,7 +63,7 @@ node "$HOME/.local/share/knowledge-loom/maintenance.cjs" use --pin none
 
 Pins persist across calls. Only a published stable release can satisfy a pin; it may explicitly
 select an older release. Without a pin, maintenance selects the newest stable semantic version and
-never downgrades. Drafts, prereleases, and unpublished branch changes are excluded. The selected
+never downgrades. Drafts, prereleases, and unpublished branch changes are excluded. Even a pinned current version is checked for verified advisories when due. The selected
 release tag resolves to a specific commit before its archive is downloaded. The archive is bounded
 in size and only Knowledge Loom skill artifacts are extracted. Release code is syntax-checked,
 not executed during staging.

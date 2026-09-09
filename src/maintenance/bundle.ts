@@ -1,3 +1,4 @@
+import { isStableVersion } from "./version.js";
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -23,7 +24,7 @@ export function fingerprint(root: string): string {
 
 export function validateBundle(root: string): string {
   const manifest: unknown = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-  if (!manifest || typeof manifest !== "object" || !("version" in manifest) || typeof manifest.version !== "string" || !/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error("invalid stable bundle version");
+  if (!manifest || typeof manifest !== "object" || !("version" in manifest) || typeof manifest.version !== "string" || !isStableVersion(manifest.version)) throw new Error("invalid stable bundle version");
   let runner: string | undefined;
   for (const name of SKILLS) {
     const skill = path.join(root, "skills", name);
@@ -57,7 +58,7 @@ export function readAdvisories(root: string): Advisory[] {
   const data: unknown = JSON.parse(fs.readFileSync(file, "utf8"));
   if (!Array.isArray(data)) throw new Error("invalid data-integrity advisories");
   return data.map((item: unknown) => {
-    if (!item || typeof item !== "object" || !("id" in item) || typeof item.id !== "string" || !("message" in item) || typeof item.message !== "string" || !("url" in item) || typeof item.url !== "string" || !item.url.startsWith("https://github.com/magickaichen/knowledge-loom/") || !("affectedVersions" in item) || !Array.isArray(item.affectedVersions) || !item.affectedVersions.every((version: unknown) => typeof version === "string" && /^\d+\.\d+\.\d+$/.test(version))) throw new Error("invalid data-integrity advisory");
+    if (!item || typeof item !== "object" || !("id" in item) || typeof item.id !== "string" || !("message" in item) || typeof item.message !== "string" || !("url" in item) || typeof item.url !== "string" || !item.url.startsWith("https://github.com/magickaichen/knowledge-loom/") || !("affectedVersions" in item) || !Array.isArray(item.affectedVersions) || !item.affectedVersions.every((version: unknown) => typeof version === "string" && isStableVersion(version))) throw new Error("invalid data-integrity advisory");
     return { id: item.id, message: item.message, url: item.url, affectedVersions: item.affectedVersions as string[] };
   });
 }
