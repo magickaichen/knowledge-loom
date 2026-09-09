@@ -16,7 +16,9 @@ Each installed skill includes one self-contained JavaScript runner and does not 
 npx skills@latest add magickaichen/knowledge-loom
 ```
 
-Select **Knowledge Loom** for all four skills, then choose your agent. Update with `npx skills update`.
+Select **Knowledge Loom** for all four skills, then choose your agent. Update with `npx skills update`,
+or explicitly [bootstrap weekly stable release maintenance](docs/release-maintenance.md) outside the
+installed skills. Release publication alone does not upgrade existing devices.
 
 <details>
 <summary>Plugin installation for Claude Code or Codex</summary>

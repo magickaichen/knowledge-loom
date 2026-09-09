@@ -16,6 +16,7 @@ export function main(arguments_: string[] = process.argv.slice(2)): number {
   if (arguments_.some((argument) => argument !== "--npx")) throw new Error(`unknown argument: ${arguments_.find((argument) => argument !== "--npx")}`);
   run("node_modules/typescript/bin/tsc", "--noEmit");
   run("--import", "tsx", "scripts/build-skill-packages.ts", "--check");
+  run("--import", "tsx", "scripts/build-maintenance.ts");
   run("--import", "tsx", "scripts/run-tests.ts");
   for (const fixture of ["single-proactive", "shared-explicit"]) {
     run("--import", "tsx", "src/knowledge-loom/runner.ts", "audit", `tests/fixtures/${fixture}`);

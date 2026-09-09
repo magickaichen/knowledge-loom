@@ -13,6 +13,8 @@ const SKILL_NAMES = new Set(["audit-knowledge-vault", "init-knowledge-vault", "m
 const RUNNER_CHECK_ROOTS = [path.join(".agents", "skills"), path.join(".claude", "skills")];
 const INTERACTIVE_GROUP_PROMPT = "Select all 4 skills in Knowledge Loom.";
 
+let isolatedHome: string;
+
 interface RunOptions {
   cwd?: string;
   capture?: boolean;
@@ -25,7 +27,7 @@ function commandPath(name: string): string | null {
 }
 
 function environment(): NodeJS.ProcessEnv {
-  const result: NodeJS.ProcessEnv = { ...process.env, DISABLE_TELEMETRY: "1" };
+  const result: NodeJS.ProcessEnv = { ...process.env, HOME: isolatedHome, USERPROFILE: isolatedHome, XDG_CONFIG_HOME: path.join(isolatedHome, ".config"), XDG_CACHE_HOME: path.join(isolatedHome, ".cache"), DISABLE_TELEMETRY: "1" };
   for (const key of Object.keys(result)) if (key.startsWith("CODEX_")) delete result[key];
   return result;
 }
@@ -126,6 +128,7 @@ export async function main(): Promise<number> {
   const npx = commandPath("npx");
   if (!npx) throw new Error("missing required command: npx");
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "knowledge-loom-npx-"));
+  isolatedHome = fs.mkdtempSync(path.join(os.tmpdir(), "knowledge-loom-npx-home-"));
   try {
     await assertInteractiveGroup(npx, workspace);
     const listing = run(npx, ["--yes", SKILLS_CLI, "add", PACKAGE_ROOT, "--list"], { cwd: workspace, capture: true });
@@ -152,6 +155,7 @@ export async function main(): Promise<number> {
     return 0;
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(isolatedHome, { recursive: true, force: true });
   }
 }
 
