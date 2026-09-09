@@ -43,7 +43,10 @@ Setup preserves original configuration text in `~/.local/share/knowledge-loom/ru
 It appends a bounded managed block to user `AGENTS.md` / `CLAUDE.md` and a SessionStart command to
 Codex `hooks.json` / Claude `settings.json`. Unrelated instruction text is preserved byte for byte;
 JSON retains unrelated values. Configuration symlinks require explicit owner migration. Repeating
-setup is idempotent. Inspect the preview again after any local change.
+setup is idempotent. Previously bootstrapped runtime-specific targets remain tracked by the same
+maintenance owner when shared targets are added. A busy coordinator stops configuration; retry
+after its writer finishes. Directory symlinks escaping the selected home are rejected, and a
+configuration change observed during setup stops replacement so the new text is preserved. Inspect the preview again after any local change.
 
 `configured` means the installed external command passed its local hook self-check. It does **not**
 mean an active runtime has loaded the new configuration. Start or resume a runtime as supported by
@@ -86,8 +89,19 @@ remain external.
 
 Release `installedVersion` is the disk version. `loadedVersion` remains `unknown` unless the session
 can substantiate `--loaded-version VERSION`; an on-disk version is not loaded-version evidence.
-Routine updates do not require restart. A verified advisory is reported separately and needs an
-operation-specific assessment under the release policy; a version gap alone is not an advisory.
+Routine updates do not require restart. When a verified advisory exists, the route returns
+`advisory-assessment-required` **before** access/integration or publication. The active authorized
+runtime assesses whether this operation is affected. Copy the returned `assessmentRequest` to a
+JSON file and add `proceed` and an evidence-backed `rationale`; retry with `--advisory-assessment PATH`.
+Use `proceed: true` only for an unaffected operation. A false decision returns `advisory-paused`.
+The decision is bound to the canonical vault, operation, installed/loaded versions, and digest of
+the exact advisory evidence. A different operation or changed evidence requires another assessment.
+Local contract-authorized reads remain available while the mutating route is paused. A version gap
+alone is not an advisory.
+
+`runtime-status --home PATH` reports route configuration and installed state without a release lookup
+or vault fetch. `automaticMaintenance: false` means actual runtime activation still needs verification;
+a caller-supplied runtime name is not evidence of model-driven execution.
 
 Remote failure leaves local reads, authorized edits, and commits available, with durable pending sync.
 Use the same publication route after the bounded retry interval, or the explicit resolution path when

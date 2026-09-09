@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import os from "node:os";
 import { spawnSync } from "node:child_process";
@@ -14,6 +15,14 @@ import { atomicWriteText } from "../knowledge-loom/registry.js";
 const START = "<!-- knowledge-loom routing -->";
 const END = "<!-- /knowledge-loom routing -->";
 const quote = (value: string): string => "'" + value.replaceAll("'", "'\\''") + "'";
+function assertHomeDirectories(home: string): void {
+  for (const relative of [".agents/skills", ".codex/skills", ".claude/skills", ".local/share/knowledge-loom", ".local/state/knowledge-loom"]) {
+    let candidate = path.join(home, relative);
+    while (!fs.existsSync(candidate)) candidate = path.dirname(candidate);
+    const canonical = fs.realpathSync(candidate);
+    if (canonical !== home && !canonical.startsWith(home + path.sep)) throw new Error(`directory escapes selected home: ${candidate}`);
+  }
+}
 function root(home: string): string { return path.join(home, ".local/share/knowledge-loom"); }
 function entry(home: string): string { return path.join(root(home), "maintenance.cjs"); }
 function instructions(home: string, runtime: string): string {
@@ -26,6 +35,9 @@ ${command} --mode project
 Supply --selector only when explicitly selected by the user; use --registry for a supplied registry.
 Repeat on actual access later in this session, even after startup or earlier cached access.
 Ordinary conversation requires no call. Read the structured release and vault states separately.
+If an advisory assessment is required, assess applicability to the operation before retrying with
+--advisory-assessment PATH. Copy the returned assessmentRequest into JSON and add
+proceed (true only for an unaffected operation), and evidence-backed rationale. Pause affected operations.
 Resolve the installed skill's canonical directory anew after the call. Loaded instructions stay unknown
 unless this session has evidence for --loaded-version. Routine version gaps do not require restart.
 Reread the resulting contract and instruction roots before retrieval. For pending reconciliation, use
@@ -82,9 +94,10 @@ async function setup(options: RuntimeOptions) {
   fs.mkdirSync(shared, { recursive: true });
   for (const name of SKILLS) {
     const target = path.join(shared, name);
-    if (!fs.lstatSync(target, { throwIfNoEntry: false })) fs.cpSync(path.join(options.source, "skills", name), target, { recursive: true });
+    if (!fs.lstatSync(target, { throwIfNoEntry: false })) fs.cpSync(path.join(source, "skills", name), target, { recursive: true });
   }
-  await maintain({ command: "bootstrap", home: options.home, source: options.source, targets: [shared], bootstrapRunner: process.argv[1]! });
+  const adoption = await maintain({ command: "bootstrap", home: options.home, source: options.source, targets: [shared], bootstrapRunner: process.argv[1]! });
+  if (!["bootstrapped", "ready", "recovered"].includes(adoption.status)) throw new Error(`installation ${adoption.status}; setup has not configured routing`);
   // Bootstrap may already exist from an earlier release; refresh only this external executable.
   const stagedRunner = path.join(root(options.home), "runtime-prepared.cjs");
   fs.copyFileSync(process.argv[1]!, stagedRunner);
@@ -103,6 +116,7 @@ async function setup(options: RuntimeOptions) {
     }
     fs.symlinkSync(path.join(shared, name), target);
   }
+  for (const change of changes) if (readText(change.path) !== change.before) throw new Error(`configuration changed during setup; preserve edits and preview again: ${change.path}`);
   for (const change of changes) if (change.before !== change.after) {
     const backup = path.join(root(options.home), "runtime-backups", path.relative(options.home, change.path));
     if (!fs.existsSync(backup)) { fs.mkdirSync(path.dirname(backup), { recursive: true }); fs.writeFileSync(backup, change.before); }
@@ -118,6 +132,15 @@ async function route(options: RuntimeOptions, ports: RuntimePorts) {
   if (!vault && options.mode === "project") return { release: { status: "not-applicable" }, vault: { status: "not-applicable" } };
   if (vault) validateAuthority(vault);
   const release = await maintain({ command: "use", home: options.home, ...(options.loadedVersion ? { loadedVersion: options.loadedVersion } : {}) }, ports);
+  const advisories = release.advisories ?? [];
+  if (vault && advisories.length) {
+    const evidenceDigest = createHash("sha256").update(JSON.stringify({ root: vault.root, operation: options.operation, installed: release.installedVersion, loaded: release.loadedVersion, advisories })).digest("hex");
+    const assessmentRequest = { root: vault.root, operation: options.operation, installedVersion: release.installedVersion, loadedVersion: release.loadedVersion, advisoryIds: advisories.map((advisory) => advisory.id), evidenceDigest };
+    if (!options.advisoryAssessment) return { runtime: options.runtime, release, assessmentRequest, vault: { root: vault.root, status: "advisory-assessment-required", operation: options.operation }, instruction: "Active authorized runtime must assess the verified advisories before this operation. Local reads remain available under the contract." };
+    const assessment = record(options.advisoryAssessment);
+    if (assessment.root !== vault.root || assessment.evidenceDigest !== evidenceDigest || assessment.operation !== options.operation || assessment.installedVersion !== release.installedVersion || assessment.loadedVersion !== release.loadedVersion || !Array.isArray(assessment.advisoryIds) || JSON.stringify([...assessment.advisoryIds].sort()) !== JSON.stringify(advisories.map((advisory) => advisory.id).sort()) || typeof assessment.rationale !== "string" || !assessment.rationale.trim()) throw new Error("advisory assessment does not match this operation and release evidence");
+    if (assessment.proceed !== true) return { runtime: options.runtime, release, vault: { root: vault.root, status: "advisory-paused", operation: options.operation }, assessment };
+  }
   const observationOptions = { stateDir: path.join(options.home, ".local/state/knowledge-loom"), ...(ports.now ? { now: ports.now } : {}) };
   const observation = vault ? options.operation === "sync"
     ? await synchronizeVault(vault, { ...observationOptions, registryPath: context.registryPath, ...(options.resolution ? { resolution: options.resolution } : {}) })
@@ -125,7 +148,7 @@ async function route(options: RuntimeOptions, ports: RuntimePorts) {
   return { runtime: options.runtime, release, vault: observation, skillRoot: path.join(root(options.home), "current/skills"), semanticReconciliation: "active-authorized-runtime", loadedInstructions: options.loadedVersion ?? "unknown" };
 }
 
-export interface RuntimeOptions { home: string; source?: string; apply: boolean; migrate: boolean; runtime: string; mode: string; selector?: string; registry?: string; loadedVersion?: string; operation: string; resolution?: string; }
+export interface RuntimeOptions { home: string; source?: string; apply: boolean; migrate: boolean; runtime: "codex" | "claude"; mode: "project" | "skill"; selector?: string; registry?: string; loadedVersion?: string; operation: "access" | "sync"; resolution?: string; advisoryAssessment?: string; }
 function version(command: string, home: string): string {
   const result = spawnSync(command, ["--version"], { env: { ...process.env, HOME: home, CODEX_HOME: path.join(home, ".codex"), CLAUDE_CONFIG_DIR: path.join(home, ".claude") }, encoding: "utf8", timeout: 10_000 });
   return result.status === 0 ? result.stdout.trim() : "unavailable";
@@ -158,18 +181,18 @@ export async function runRuntime(command: string, args: string[], ports: Runtime
     if (!value) throw new Error(`missing value: ${flag}`);
     if (flag === "--home") options.home = fs.realpathSync(value);
     else if (flag === "--source") options.source = path.resolve(value);
-    else if (flag === "--runtime") options.runtime = value;
-    else if (flag === "--mode") options.mode = value;
+    else if (flag === "--runtime") { if (value !== "codex" && value !== "claude") throw new Error("runtime must be codex or claude"); options.runtime = value; }
+    else if (flag === "--mode") { if (value !== "project" && value !== "skill") throw new Error("mode must be project or skill"); options.mode = value; }
     else if (flag === "--selector") options.selector = value;
     else if (flag === "--registry") options.registry = value;
-    else if (flag === "--operation") options.operation = value;
+    else if (flag === "--operation") { if (value !== "access" && value !== "sync") throw new Error("operation must be access or sync"); options.operation = value; }
+    else if (flag === "--advisory-assessment") options.advisoryAssessment = value;
     else if (flag === "--resolution") options.resolution = value;
     else if (flag === "--loaded-version") options.loadedVersion = value;
     else throw new Error(`unknown option: ${flag}`);
   }
-  if (!["codex", "claude"].includes(options.runtime)) throw new Error("runtime must be codex or claude");
-  if (!["project", "skill"].includes(options.mode)) throw new Error("mode must be project or skill");
-  if (!["access", "sync"].includes(options.operation)) throw new Error("operation must be access or sync");
+  options.home = fs.realpathSync(options.home);
+  assertHomeDirectories(options.home);
   if (options.resolution && options.operation !== "sync") throw new Error("resolution requires --operation sync");
   if (command === "runtime-status") {
     const configured = configuration(options).every((change) => change.before === change.after) && fs.existsSync(entry(options.home));

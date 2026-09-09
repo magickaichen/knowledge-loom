@@ -160,6 +160,23 @@ async function maintainLocked(options: MaintenanceOptions, ports: MaintenancePor
     save(stateFile, state);
     recovered = true;
   }
+  if (options.command === "bootstrap" && options.targets?.length) {
+    const added: InstallationLink[] = [];
+    for (const directory of options.targets) for (const name of SKILLS) {
+      const target = path.join(fs.realpathSync(directory), name);
+      if (state.links.some((link) => link.target === target)) continue;
+      if (/[\\/](?:\.codex|\.claude)[\\/]plugins[\\/]/.test(fs.realpathSync(target))) throw new Error(`plugin installation requires its owner to update: ${target}`);
+      if (fingerprint(target) !== state.fingerprints[name]) throw new Error(`local modification collision: ${target}`);
+      added.push({ target, backup: path.join(root, "backups", String(state.links.length + added.length), name), route: installationRoute(target), ...(fs.lstatSync(target).isSymbolicLink() ? { originalLink: fs.readlinkSync(target) } : {}) });
+    }
+    if (added.length) {
+      state.links.push(...added);
+      state.adopting = true;
+      save(stateFile, state);
+      await finishAdoption(root, state, trackWriter);
+      save(stateFile, state);
+    }
+  }
   const report = (status: string): MaintenanceResult => {
     const installed = state.pending && fs.realpathSync(path.join(root, "current")) === state.pending.bundle ? state.pending : state;
     return {

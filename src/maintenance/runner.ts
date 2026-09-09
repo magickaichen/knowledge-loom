@@ -9,7 +9,7 @@ async function main(): Promise<void> {
     return;
   }
   if (command === "--help") {
-    console.log("maintenance setup --source PATH [--home PATH] [--apply] [--migrate]\nmaintenance runtime-status [--home PATH]\nmaintenance route --runtime codex|claude --mode skill|project [--selector PATH] [--registry PATH] [--home PATH] [--loaded-version VERSION] [--operation access|sync] [--resolution PATH]\nmaintenance bootstrap --source PATH --target PATH [--target PATH] [--home PATH]\nmaintenance status|use [--home PATH] [--loaded-version VERSION] [--pin VERSION|none]");
+    console.log("maintenance setup --source PATH [--home PATH] [--apply] [--migrate]\nmaintenance runtime-status [--home PATH]\nmaintenance route --runtime codex|claude --mode skill|project [--selector PATH] [--registry PATH] [--home PATH] [--loaded-version VERSION] [--operation access|sync] [--resolution PATH] [--advisory-assessment PATH]\nmaintenance bootstrap --source PATH --target PATH [--target PATH] [--home PATH]\nmaintenance status|use [--home PATH] [--loaded-version VERSION] [--pin VERSION|none]");
     return;
   }
   if (command !== "bootstrap" && command !== "status" && command !== "use") throw new Error("expected bootstrap, status, or use; see --help");

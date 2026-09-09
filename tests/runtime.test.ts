@@ -11,7 +11,7 @@ function cli(home: string, ...args: string[]) {
   return JSON.parse(result.stdout);
 }
 test("setup previews external shared-owner routing without changing a home", (t) => {
-  const home = temporaryDirectory(t);
+  const home = fs.realpathSync(temporaryDirectory(t));
   const preview = cli(home, "setup", "--source", PACKAGE_ROOT);
   assert.equal(preview.status, "preview");
   assert.equal(preview.owner, "shared-skills");
@@ -21,7 +21,7 @@ test("setup previews external shared-owner routing without changing a home", (t)
   assert.ok(preview.changes.some((change: { path: string }) => change.path.endsWith(".claude/CLAUDE.md")));
 });
 test("setup applies twice, preserves unrelated instructions/settings and verifies the external route", (t) => {
-  const home = temporaryDirectory(t);
+  const home = fs.realpathSync(temporaryDirectory(t));
   fs.mkdirSync(path.join(home, ".claude"));
   fs.writeFileSync(path.join(home, ".claude/CLAUDE.md"), "Keep my guidance.\n");
   fs.writeFileSync(path.join(home, ".claude/settings.json"), JSON.stringify({ model: "keep", hooks: { Stop: [{ hooks: [{ type: "command", command: "echo keep" }] }] } }));
@@ -38,7 +38,7 @@ test("setup applies twice, preserves unrelated instructions/settings and verifie
   assert.equal(fs.realpathSync(path.join(home, ".claude/skills/use-knowledge-vault")), fs.realpathSync(path.join(home, ".agents/skills/use-knowledge-vault")));
 });
 test("duplicate migration is explicit, preserves plugin caches and ordinary backups, and refuses local edits", (t) => {
-  const home = temporaryDirectory(t);
+  const home = fs.realpathSync(temporaryDirectory(t));
   fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(home, ".agents/skills"), { recursive: true });
   fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(home, ".claude/skills"), { recursive: true });
   fs.writeFileSync(path.join(home, ".claude/settings.json"), JSON.stringify({ enabledPlugins: { "knowledge-loom@knowledge-loom": true, "other@other": true } }));
@@ -64,7 +64,7 @@ test("duplicate migration is explicit, preserves plugin caches and ordinary back
 test("external access works with an old skill and shares release/daily checks across continuing runtime calls", async (t) => {
   const { runRuntime } = await import("../src/maintenance/runtime.ts");
   const { copyFixture } = await import("./helpers.ts");
-  const home = temporaryDirectory(t);
+  const home = fs.realpathSync(temporaryDirectory(t));
   const source = path.join(home, "old-source");
   fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(source, "skills"), { recursive: true });
   fs.writeFileSync(path.join(source, "package.json"), '{"version":"0.7.0"}');
@@ -128,7 +128,7 @@ test("external access works with an old skill and shares release/daily checks ac
 });
 test("ordinary conversation, startup and no associated vault cause no maintenance calls", async (t) => {
   const { runRuntime } = await import("../src/maintenance/runtime.ts");
-  const home = temporaryDirectory(t);
+  const home = fs.realpathSync(temporaryDirectory(t));
   let lookups = 0;
   const result = await runRuntime("route", ["--home", home], { cwd: home, releases: { async list() { lookups++; throw new Error("unexpected network"); }, async stage() { throw new Error("unexpected staging"); } } }) as any;
   assert.equal(result.release.status, "not-applicable"); assert.equal(lookups, 0);
@@ -139,4 +139,71 @@ test("ordinary conversation, startup and no associated vault cause no maintenanc
     else assert.deepEqual(JSON.parse(hook.stdout), {});
   }
   assert.deepEqual(fs.readdirSync(home), []);
+});
+test("setup refuses a runtime directory symlink escaping the selected home before any external write", (t) => {
+  const temporary = temporaryDirectory(t);
+  const home = path.join(temporary, "home"), external = path.join(temporary, "external");
+  fs.mkdirSync(home); fs.mkdirSync(external);
+  fs.writeFileSync(path.join(external, "CLAUDE.md"), "External user guidance\n");
+  fs.symlinkSync(external, path.join(home, ".claude"));
+  const result = spawnSync(process.execPath, ["dist/maintenance.cjs", "setup", "--home", home, "--source", PACKAGE_ROOT, "--apply"], { encoding: "utf8" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /outside.*home|escapes.*home/);
+  assert.deepEqual(fs.readdirSync(external), ["CLAUDE.md"]);
+  assert.equal(fs.readFileSync(path.join(external, "CLAUDE.md"), "utf8"), "External user guidance\n");
+});
+test("migration of an existing runtime-specific bootstrap keeps shared skills tracked by the updater", async (t) => {
+  const home = fs.realpathSync(temporaryDirectory(t));
+  const legacy = path.join(home, ".codex/skills");
+  fs.cpSync(path.join(PACKAGE_ROOT, "skills"), legacy, { recursive: true });
+  cli(home, "bootstrap", "--source", PACKAGE_ROOT, "--target", legacy);
+  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply", "--migrate");
+  const status = cli(home, "status");
+  const shared = path.join(home, ".agents/skills/use-knowledge-vault");
+  assert.ok(status.installations.some((installation: { target: string }) => installation.target === shared));
+  assert.ok(fs.lstatSync(shared).isSymbolicLink());
+  assert.equal(fs.realpathSync(shared), fs.realpathSync(path.join(legacy, "use-knowledge-vault")));
+  for (const installation of status.installations) assert.equal(fs.readlinkSync(installation.target), path.join(home, ".local/share/knowledge-loom/current/skills", path.basename(installation.target)));
+  const { runRuntime } = await import("../src/maintenance/runtime.ts");
+  const updated = await runRuntime("route", ["--home", home, "--mode", "skill"], { cwd: home, releases: { async list() { return [{ version: "0.9.0", published: true, prerelease: false, revision: "b".repeat(40) }]; }, async stage(_release: unknown, target: string) {
+    fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(target, "skills"), { recursive: true }); fs.writeFileSync(path.join(target, "package.json"), '{"version":"0.9.0"}');
+  } } }) as any;
+  assert.equal(updated.release.status, "updated"); assert.equal(updated.release.installedVersion, "0.9.0");
+  assert.equal(fs.realpathSync(shared), fs.realpathSync(path.join(legacy, "use-knowledge-vault")));
+});
+test("verified advisories return to the active runtime before vault operations and bind its assessment", async (t) => {
+  const { runRuntime } = await import("../src/maintenance/runtime.ts");
+  const { copyFixture } = await import("./helpers.ts");
+  const home = fs.realpathSync(temporaryDirectory(t));
+  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
+  const vault = copyFixture("single-proactive", path.join(home, "vault"));
+  const ports = { cwd: vault, releases: { async list() { return [{ version: "0.8.0", published: true, prerelease: false, revision: "a".repeat(40) }]; }, async stage(_release: unknown, target: string) {
+    fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(target, "skills"), { recursive: true });
+    fs.writeFileSync(path.join(target, "package.json"), '{"version":"0.8.0"}');
+    fs.writeFileSync(path.join(target, "data-integrity-advisories.json"), JSON.stringify([{ id: "example", affectedVersions: ["0.8.0"], message: "Synthetic advisory requiring operation assessment.", url: "https://github.com/magickaichen/knowledge-loom/issues/47" }]));
+  } } };
+  const paused = await runRuntime("route", ["--home", home], ports) as any;
+  assert.equal(paused.vault.status, "advisory-assessment-required");
+  assert.equal(paused.release.advisories[0].id, "example");
+  const decision = path.join(home, "assessment.json");
+  fs.writeFileSync(decision, JSON.stringify({ ...paused.assessmentRequest, proceed: true, rationale: "This synthetic contract has no inbound integration; the advisory is inapplicable to this operation." }));
+  const allowed = await runRuntime("route", ["--home", home, "--advisory-assessment", decision], ports) as any;
+  assert.equal(allowed.vault.status, "not-enabled");
+  await assert.rejects(runRuntime("route", ["--home", home, "--operation", "sync", "--advisory-assessment", decision], ports), /assessment/);
+});
+test("setup reports a busy maintenance owner without writing pending runtime configuration", async (t) => {
+  const { runRuntime } = await import("../src/maintenance/runtime.ts");
+  const home = fs.realpathSync(temporaryDirectory(t));
+  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
+  const instruction = path.join(home, ".claude/CLAUDE.md"); fs.unlinkSync(instruction);
+  let release!: () => void, started!: () => void;
+  const inFlight = new Promise<void>((resolve) => { started = resolve; });
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const work = runRuntime("route", ["--home", home, "--mode", "skill"], { cwd: home, releases: { async list() { started(); await held; return []; }, async stage() {} } });
+  await inFlight;
+  try {
+    const result = spawnSync(process.execPath, ["dist/maintenance.cjs", "setup", "--home", home, "--source", PACKAGE_ROOT, "--apply"], { encoding: "utf8", timeout: 20_000 });
+    assert.notEqual(result.status, 0); assert.match(result.stderr, /busy/);
+    assert.equal(fs.existsSync(instruction), false);
+  } finally { release(); await work; }
 });

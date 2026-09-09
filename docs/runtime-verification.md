@@ -13,6 +13,11 @@ The existing ordinary skills were in `.agents/skills`; Claude's four ordinary en
 Claude also had an enabled Knowledge Loom plugin. The proposed pilot owner is shared skills, with
 explicit disablement of that plugin and preservation of its cache. This was **inspection and preview**;
 no real skill installation, runtime configuration, or private vault was changed.
+The final read-only setup preview confirmed zero independent ordinary duplicates, an enabled Claude
+plugin owner, and symlinked user instruction files in both runtimes. Those instruction symlinks are
+an explicit owner-migration prerequisite; the installer will not replace them or edit their targets.
+The preview is not an apply-ready promise for the real home. A matching historical source bundle
+must also be supplied for actual adoption.
 
 [Codex hook documentation](https://learn.chatgpt.com/docs/hooks) describes user hooks and tool-path
 exceptions. [Claude hook documentation](https://code.claude.com/docs/en/hooks) describes SessionStart
@@ -31,6 +36,9 @@ synthetic content. The dispatcher uses the same implementation as the installed 
 | Setup preview | No home mutation; proposed user instruction/configuration text returned |
 | Setup twice | Same JSON settings and one route; unrelated model, hooks and guidance preserved |
 | Duplicate ordinary/plugin owners | Apply requires migration; local customization blocks adoption; original ordinary copy backed up; only Knowledge Loom plugin disabled |
+| Existing bootstrap | Shared targets become tracked links without breaking the old maintained targets |
+| Busy installation owner / escaped home | Setup refuses to configure while maintenance is busy or directory symlinks escape the selected home |
+| Integrity advisory | Route pauses before vault operations; active-runtime assessment is bound to operation and exact evidence |
 | Old skill | Adopted 0.7.0 synthetic skill has no maintenance instructions; external access still checks releases and vault |
 | Both runtimes / continuing access | One shared release lookup; cached daily observation; later due call integrates a real remote commit; elapsed weekly boundary checks again |
 | Associated project | Registry association reaches the same canonical checkout |
