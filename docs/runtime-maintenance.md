@@ -41,7 +41,8 @@ before adopting this route. Do not enable an additional owner afterward.
 
 Setup preserves original configuration text in `~/.local/share/knowledge-loom/runtime-backups/`.
 It appends a bounded managed block to user `AGENTS.md` / `CLAUDE.md` and a SessionStart command to
-Codex `hooks.json` / Claude `settings.json`. Unrelated instruction text is preserved byte for byte;
+Codex `hooks.json` / Claude `settings.json`. Claude also receives a `Read|Skill` PreToolUse hook.
+Unrelated instruction text is preserved byte for byte;
 JSON retains unrelated values. Configuration symlinks require explicit owner migration. Repeating
 setup is idempotent. Previously bootstrapped runtime-specific targets remain tracked by the same
 maintenance owner when shared targets are added. A busy coordinator stops configuration; retry
@@ -57,7 +58,16 @@ can prevent activation. Setup does not override them or force an active session 
 ## Actual access and publication
 
 User instructions and startup context direct both runtimes to call the external command before
-retrieval. The two explicit access branches are:
+retrieval. Claude's native `Read` tool also runs maintenance through PreToolUse when its canonical
+file belongs to the vault selected by the hook's project cwd. Unrelated reads and symlinks outside
+that vault do nothing. The native `Skill` tool checks the four exact Knowledge Loom skill names,
+including standalone invocation without a selected vault. This Skill hook checks releases only;
+the explicit route handles vault selection and access after the skill resolves its arguments.
+The hook returns separate release/vault
+state and leaves normal runtime permission checks intact. It denies a failed maintenance operation
+or busy vault writer. Verified advisories remain in the returned context; the explicit route handles
+operation assessment before vault mutation. Contract-authorized local reads remain available. Shell reads and namespaced plugin skills still require the explicit cooperative route.
+The two explicit access branches are:
 
 ```sh
 node "$HOME/.local/share/knowledge-loom/maintenance.cjs" route --runtime codex --mode skill
@@ -115,10 +125,16 @@ preserved original text/skill directories. Never overwrite local edits with a bl
 This is a cooperative **external command boundary**, not universal read interception. Arbitrary shell
 reads, direct legacy CLI calls, disabled hooks, hosted tools, and opt-out tool paths can bypass it.
 Read-only `probe`, `resolve`, and `audit` remain read-only. User instructions are the persistent route;
-SessionStart is a redundant reminder, not a timer or an access detector. No automatic hot-reload or
+SessionStart is a redundant reminder; Claude PreToolUse covers only the native access paths above. No automatic hot-reload or
 loaded-skill-version introspection is claimed. See the [runtime verification record](runtime-verification.md)
 for exercised versions, capabilities, and untested paths.
 
 All installer and runtime experiments support `--home PATH`. In tests, also set `HOME`, `CODEX_HOME`,
 and `CLAUDE_CONFIG_DIR` to that temporary home so runtime configuration, discovery, and observations
 remain isolated. Use synthetic vaults and a temporary remote; do not test migration against a private vault.
+
+The runtime **tool environment** must include Git on `PATH`; a logged-in runtime control process
+can have a different environment from its shell tools. `Git executable unavailable on the runtime
+tool PATH` means to restore that dependency, not remove a vault lock. For isolated Codex tests with
+`shell_environment_policy.inherit="none"`, explicitly set a tool PATH containing Git. Keep normal
+sandbox permissions; add only the test-owned vault and its Git metadata when write access is needed.

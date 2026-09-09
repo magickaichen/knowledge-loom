@@ -11,6 +11,7 @@ import { accessVault, validateAuthority } from "../knowledge-loom/access.js";
 import { isUnknownRecord } from "../knowledge-loom/contract.js";
 import { withVaultLock } from "../knowledge-loom/vault-lock.js";
 import { atomicWriteText } from "../knowledge-loom/registry.js";
+import { isWithin } from "../knowledge-loom/pathing.js";
 
 const START = "<!-- knowledge-loom routing -->";
 const END = "<!-- /knowledge-loom routing -->";
@@ -70,6 +71,11 @@ function configuration(options: RuntimeOptions): { path: string; before: string;
     const previous = hooks.SessionStart ?? [];
     if (!Array.isArray(previous)) throw new Error(`invalid SessionStart hooks: ${configPath}`);
     if (!previous.some((group: unknown) => isUnknownRecord(group) && Array.isArray(group.hooks) && group.hooks.some((hook: unknown) => isUnknownRecord(hook) && hook.command === command))) hooks.SessionStart = [...previous, { hooks: [{ type: "command", command, timeout: 10 }] }];
+    if (runtime === "claude") {
+      const reads = hooks.PreToolUse ?? [];
+      if (!Array.isArray(reads)) throw new Error(`invalid PreToolUse hooks: ${configPath}`);
+      if (!reads.some((group: unknown) => isUnknownRecord(group) && group.matcher === "Read|Skill" && Array.isArray(group.hooks) && group.hooks.some((hook: unknown) => isUnknownRecord(hook) && hook.command === command))) hooks.PreToolUse = [...reads, { matcher: "Read|Skill", hooks: [{ type: "command", command, timeout: 120 }] }];
+    }
     if (runtime === "claude" && options.migrate && isUnknownRecord(config.enabledPlugins)) for (const key of Object.keys(config.enabledPlugins)) if (key.split("@")[0] === "knowledge-loom") config.enabledPlugins[key] = false;
     return [{ path: instructionPath, before, after }, { path: configPath, before: readText(configPath), after: JSON.stringify(config, null, 2) + "\n" }];
   });
@@ -126,9 +132,9 @@ async function setup(options: RuntimeOptions) {
   if (verified.status !== 0 || !JSON.parse(verified.stdout).hookSpecificOutput?.additionalContext?.includes("route")) throw new Error("external routing self-check failed");
   return { ...preview, status: "configured", verification: "external-command-only; runtime smoke required" };
 }
-async function route(options: RuntimeOptions, ports: RuntimePorts) {
+async function route(options: RuntimeOptions, ports: RuntimePorts, releaseOnly = false) {
   const context = { cwd: ports.cwd ?? process.cwd(), registryPath: options.registry ?? path.join(options.home, ".config/knowledge-vault/registry.yaml") };
-  const vault = options.selector ? resolveVault(options.selector, context) : resolveApplicableVault(context);
+  const vault = releaseOnly ? undefined : options.selector ? resolveVault(options.selector, context) : resolveApplicableVault(context);
   if (!vault && options.mode === "project") return { release: { status: "not-applicable" }, vault: { status: "not-applicable" } };
   if (vault) validateAuthority(vault);
   const release = await maintain({ command: "use", home: options.home, ...(options.loadedVersion ? { loadedVersion: options.loadedVersion } : {}) }, ports);
@@ -170,7 +176,31 @@ export function previewSetup(options: RuntimeOptions) {
     changes: configuration(options).map(({ path: file, before, after }) => ({ path: file, changed: before !== after, proposed: after })),
   };
 }
-export interface RuntimePorts extends MaintenancePorts { cwd?: string; }
+export interface RuntimePorts extends MaintenancePorts { cwd?: string; hookInput?: unknown; }
+async function toolHook(input: Record<string, unknown>, options: RuntimeOptions, ports: RuntimePorts) {
+  if (options.runtime !== "claude" || !isUnknownRecord(input.tool_input)) return {};
+  const tool = input.tool_name;
+  const toolInput = input.tool_input;
+  if (tool !== "Read" && tool !== "Skill") return {};
+  const cwd = typeof input.cwd === "string" ? input.cwd : ports.cwd ?? process.cwd();
+  try {
+    if (tool === "Skill") {
+      if (!SKILLS.some((name) => name === toolInput.skill)) return {};
+    } else {
+      if (typeof toolInput.file_path !== "string") return {};
+      const vault = resolveApplicableVault({ cwd, registryPath: options.registry ?? path.join(options.home, ".config/knowledge-vault/registry.yaml") });
+      if (!vault) return {};
+      const file = path.resolve(cwd, toolInput.file_path);
+      if (!fs.existsSync(file) || !isWithin(vault.root, fs.realpathSync(file))) return {};
+    }
+    const result = await route({ ...options, mode: tool === "Skill" ? "skill" : "project" }, { ...ports, cwd }, tool === "Skill");
+    const status = result.vault.status;
+    const blocked = status === "busy";
+    return { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: JSON.stringify(result), ...(blocked ? { permissionDecision: "deny", permissionDecisionReason: "Knowledge Loom access is paused; inspect the maintenance result before retrying." } : {}) } };
+  } catch (error) {
+    return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `Knowledge Loom pre-access maintenance failed: ${error instanceof Error ? error.message : String(error)}` } };
+  }
+}
 export async function runRuntime(command: string, args: string[], ports: RuntimePorts = {}): Promise<unknown> {
   const options: RuntimeOptions = { home: os.homedir(), apply: false, migrate: false, runtime: "codex", mode: "project", operation: "access" };
   for (let index = 0; index < args.length; index++) {
@@ -209,7 +239,8 @@ export async function runRuntime(command: string, args: string[], ports: Runtime
   }
   if (command === "route") return route(options, ports);
   if (command === "hook") {
-    const input: unknown = JSON.parse(fs.readFileSync(0, "utf8") || "{}");
+    const input: unknown = ports.hookInput ?? JSON.parse(fs.readFileSync(0, "utf8") || "{}");
+    if (isUnknownRecord(input) && input.hook_event_name === "PreToolUse") return toolHook(input, options, ports);
     if (!input || typeof input !== "object" || !("hook_event_name" in input) || input.hook_event_name !== "SessionStart") return {};
     return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: instructions(options.home, options.runtime) } };
   }

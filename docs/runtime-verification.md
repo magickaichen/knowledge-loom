@@ -21,7 +21,8 @@ must also be supplied for actual adoption.
 
 [Codex hook documentation](https://learn.chatgpt.com/docs/hooks) describes user hooks and tool-path
 exceptions. [Claude hook documentation](https://code.claude.com/docs/en/hooks) describes SessionStart
-context delivery. The adapter uses only that startup event and user instruction files. It does not
+context delivery. The adapter uses startup context and user instruction files in both runtimes, plus native
+`Read|Skill` PreToolUse in Claude. It does not
 infer that a particular running session accepted hooks, supports hot reload, or exposes loaded skill
 versions from those documents. Both the configuration preview and status keep activation unverified.
 
@@ -64,12 +65,41 @@ DNS lookup; a repeat with network access reached the model endpoint and received
 Claude returned `Not logged in` before model execution. These are authentication limits of the
 isolated homes, not a successful end-to-end hosted-model test.
 
-**Untested:** authenticated model-driven standalone invocation, associated-project retrieval, later
-access in the same live model session, runtime acceptance of the startup hook independently of user
-instructions, automatic hot reload, and semantic judgment by a hosted runtime. CLI dispatcher calls
-with runtime labels do not establish any of these. No automatic maintenance activation is claimed
-for the user's existing sessions. The reproducible smoke runner allows those paths to be checked
-in an explicitly authenticated disposable environment without touching real installation ownership.
+An explicitly authorized authenticated follow-up used disposable homes, synthetic notes, a local bare
+remote, and exact command/read allowlists. Codex initially failed with `cannot create vault mutation
+lock`; instrumentation isolated `spawnSync git ENOENT`. The test's `inherit="none"` policy had omitted
+Git from the tool PATH. Giving the tool environment an explicit system PATH made the original route
+succeed without disabling the workspace sandbox. The lock error now identifies missing Git directly.
+
+Claude initially rejected the textual maintenance prerequisite and read the note directly. The added
+native PreToolUse hook closes that observed `Read` path independently of model cooperation. After the
+fix, both processes remained alive through ordinary conversation and subsequent access:
+
+| Authenticated scenario | Observed result |
+| --- | --- |
+| Ordinary conversation in both runtimes | No maintenance route; no release `lastCheck` |
+| Codex associated project | Successful route and retrieval of synthetic `CEDAR-ONE` |
+| Claude native Read in associated project | Read tool invoked; shared observation timestamp unchanged |
+| Later Codex access in the same process | Route integrated a remote commit and retrieved `CEDAR-TWO` |
+| Later Claude native Read in the same process | Native Read integrated the next remote commit and retrieved `CEDAR-THREE` |
+
+Daily due state was advanced by aging only the synthetic observation timestamp; this was not a
+24-hour wall-clock wait. Codex prompts named the permitted route explicitly. Claude prompts requested
+native Read and relied on the configured hook. The bare remote, checkout content, tool events, and
+observation timestamps were inspected; correct response text alone was not the pass criterion.
+Temporary authentication copies were removed after terminating the runtime processes. Existing real
+installation/configuration ownership was unchanged. Managed Claude startup hooks also ran in the
+disposable home, so this was not a pristine unmanaged runtime test.
+
+Local evidence from this run is retained under `/private/tmp/kl-safe-live-je1hxmh3/` (`results.json`,
+`codex-out.jsonl`, `claude-out.jsonl`, and `guard-log.jsonl`); these machine-local files are not distributed.
+The repeatable deterministic coverage is in `tests/runtime.test.ts`, including native reads,
+standalone Skill dispatch, unrelated/escaped paths, malformed authority, and missing tool PATH.
+
+**Untested:** authenticated model-driven standalone skill invocation, Codex startup-hook acceptance
+independently of user instructions, automatic hot reload, and semantic judgment by a hosted runtime.
+No automatic maintenance activation is claimed for the user's existing sessions. Deterministic
+standalone dispatch coverage does not establish model-driven invocation.
 
 Arbitrary shell reads, opt-out tools, custom/enterprise/project installation scopes, Windows,
 Claude Desktop, and native plugin update ownership are outside this adapter's tested boundary.

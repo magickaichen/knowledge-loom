@@ -207,3 +207,41 @@ test("setup reports a busy maintenance owner without writing pending runtime con
     assert.equal(fs.existsSync(instruction), false);
   } finally { release(); await work; }
 });
+test("Claude native reads reach maintenance before retrieval even when the model skips the route", async (t) => {
+  const { runRuntime } = await import("../src/maintenance/runtime.ts");
+  const { copyFixture } = await import("./helpers.ts");
+  const home = fs.realpathSync(temporaryDirectory(t));
+  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
+  const vault = copyFixture("single-proactive", path.join(home, "vault"));
+  let lookups = 0;
+  const ports = { cwd: vault, releases: { async list() { lookups++; return []; }, async stage() {} } };
+  const invoke = (tool_name: string, tool_input: unknown) => runRuntime("hook", ["--home", home, "--runtime", "claude"], { ...ports, hookInput: { hook_event_name: "PreToolUse", cwd: vault, tool_name, tool_input } }) as Promise<any>;
+  assert.deepEqual(await invoke("Read", { file_path: path.join(home, "unrelated.md") }), {});
+  assert.equal(lookups, 0);
+  const external = path.join(home, "outside.md"); fs.writeFileSync(external, "Synthetic outside note");
+  const link = path.join(vault, "outside.md"); fs.symlinkSync(external, link);
+  assert.deepEqual(await invoke("Read", { file_path: link }), {});
+  assert.equal(lookups, 0);
+  const result = await invoke("Read", { file_path: path.join(vault, "INDEX.md") });
+  assert.equal(lookups, 1);
+  assert.equal(result.hookSpecificOutput.hookEventName, "PreToolUse");
+  assert.match(result.hookSpecificOutput.additionalContext, /"vault"/);
+  assert.equal(result.hookSpecificOutput.permissionDecision, undefined); // Keep normal runtime permissions.
+  await invoke("Read", { file_path: path.join(vault, "INDEX.md") });
+  assert.equal(lookups, 1);
+  assert.deepEqual(await invoke("Bash", { command: "cat INDEX.md" }), {});
+  const settings = JSON.parse(fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8"));
+  assert.ok(settings.hooks.PreToolUse.some((group: { matcher: string }) => group.matcher === "Read|Skill"));
+  const standalone = await runRuntime("hook", ["--home", home, "--runtime", "claude"], { ...ports, hookInput: { hook_event_name: "PreToolUse", cwd: home, tool_name: "Skill", tool_input: { skill: "audit-knowledge-vault" } } }) as any;
+  assert.equal(JSON.parse(standalone.hookSpecificOutput.additionalContext).vault.status, "not-applicable");
+  assert.equal(JSON.parse((await invoke("Skill", { skill: "audit-knowledge-vault", args: "/explicit-other-vault" })).hookSpecificOutput.additionalContext).vault.status, "not-applicable");
+  assert.deepEqual(await invoke("Skill", { skill: "unrelated-skill" }), {});
+  fs.writeFileSync(path.join(vault, "KNOWLEDGE_VAULT.md"), "invalid contract");
+  assert.equal((await invoke("Read", { file_path: path.join(vault, "INDEX.md") })).hookSpecificOutput.permissionDecision, "deny");
+});
+test("missing Git on the runtime tool PATH reports the dependency rather than a lock conflict", (t) => {
+  const vault = fs.realpathSync(temporaryDirectory(t));
+  const result = spawnSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", `import { withVaultLock } from './src/knowledge-loom/vault-lock.ts'; await withVaultLock(process.argv[1], async () => {});`, vault], { cwd: PACKAGE_ROOT, env: { ...process.env, PATH: "" }, encoding: "utf8" });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Git executable unavailable.*PATH/);
+});

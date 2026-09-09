@@ -7967,6 +7967,7 @@ function deadOwner(root, revision) {
 async function withVaultLock(root, work, waitMs = 2e3) {
   const owner = { schema_version: 1, host: os3.hostname(), pid: process.pid, token: randomUUID() };
   const hashed = command(root, ["hash-object", "-w", "--stdin"], JSON.stringify(owner));
+  if (hashed.error && "code" in hashed.error && hashed.error.code === "ENOENT") throw new Error("Git executable unavailable on the runtime tool PATH; configure Git for tool commands and retry", { cause: hashed.error });
   if (hashed.status !== 0) throw new Error("cannot create vault mutation lock");
   let revision = hashed.stdout.trim();
   const deadline = performance.now() + waitMs;
