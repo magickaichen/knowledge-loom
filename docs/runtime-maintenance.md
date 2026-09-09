@@ -59,13 +59,15 @@ can prevent activation. Setup does not override them or force an active session 
 
 User instructions and startup context direct both runtimes to call the external command before
 retrieval. Claude's native `Read` tool also runs maintenance through PreToolUse when its canonical
-file belongs to the vault selected by the hook's project cwd. Unrelated reads and symlinks outside
+file belongs to the vault selected by the hook's project cwd and the default home registry.
+Unrelated reads and symlinks outside
 that vault do nothing. The native `Skill` tool checks the four exact Knowledge Loom skill names,
 including standalone invocation without a selected vault. This Skill hook checks releases only;
 the explicit route handles vault selection and access after the skill resolves its arguments.
 The hook returns separate release/vault
-state and leaves normal runtime permission checks intact. It denies a failed maintenance operation
-or busy vault writer. Verified advisories remain in the returned context; the explicit route handles
+state and leaves normal runtime permission checks intact. A busy writer or unavailable remote
+returns context while preserving authorized local reads. Invalid authority or a thrown maintenance
+error denies the read with its diagnostic. Verified advisories remain in the returned context; the explicit route handles
 operation assessment before vault mutation. Contract-authorized local reads remain available. Shell reads and namespaced plugin skills still require the explicit cooperative route.
 The two explicit access branches are:
 

@@ -86,6 +86,14 @@ test("external access works with an old skill and shares release/daily checks ac
   const access = (runtime: string, extra: string[] = []) => runRuntime("route", ["--home", home, "--runtime", runtime, ...extra], ports) as Promise<any>;
   const first = await access("codex", ["--loaded-version", "0.6.0"]);
   assert.equal(first.release.installedVersion, "0.7.0"); assert.equal(first.release.loadedVersion, "0.6.0"); assert.equal(first.vault.status, "current");
+  const { withVaultLock } = await import("../src/knowledge-loom/vault-lock.ts");
+  const held = await withVaultLock(vault, () => runRuntime("hook", ["--home", home, "--runtime", "claude"], { ...ports, hookInput: { hook_event_name: "PreToolUse", cwd: vault, tool_name: "Read", tool_input: { file_path: path.join(vault, "INDEX.md") } } }));
+  assert.equal(held.acquired, true);
+  if (held.acquired) {
+    const hook = held.value as { hookSpecificOutput: { additionalContext: string; permissionDecision?: string } };
+    assert.equal(JSON.parse(hook.hookSpecificOutput.additionalContext).vault.status, "busy");
+    assert.equal(hook.hookSpecificOutput.permissionDecision, undefined);
+  }
   const cached = await access("claude"); assert.equal(cached.vault.check, "cached"); assert.equal(cached.release.status, "not-due"); assert.equal(lookups, 1);
   fs.writeFileSync(path.join(other, "remote.md"), "# Remote addition\n"); git(other, "add", "."); git(other, "commit", "-m", "Remote addition"); git(other, "push");
   now += 86_400_000;

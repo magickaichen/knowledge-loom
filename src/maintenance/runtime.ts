@@ -194,9 +194,7 @@ async function toolHook(input: Record<string, unknown>, options: RuntimeOptions,
       if (!fs.existsSync(file) || !isWithin(vault.root, fs.realpathSync(file))) return {};
     }
     const result = await route({ ...options, mode: tool === "Skill" ? "skill" : "project" }, { ...ports, cwd }, tool === "Skill");
-    const status = result.vault.status;
-    const blocked = status === "busy";
-    return { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: JSON.stringify(result), ...(blocked ? { permissionDecision: "deny", permissionDecisionReason: "Knowledge Loom access is paused; inspect the maintenance result before retrying." } : {}) } };
+    return { hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: JSON.stringify(result) } };
   } catch (error) {
     return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: `Knowledge Loom pre-access maintenance failed: ${error instanceof Error ? error.message : String(error)}` } };
   }

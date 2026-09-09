@@ -94,7 +94,8 @@ disposable home, so this was not a pristine unmanaged runtime test.
 Local evidence from this run is retained under `/private/tmp/kl-safe-live-je1hxmh3/` (`results.json`,
 `codex-out.jsonl`, `claude-out.jsonl`, and `guard-log.jsonl`); these machine-local files are not distributed.
 The repeatable deterministic coverage is in `tests/runtime.test.ts`, including native reads,
-standalone Skill dispatch, unrelated/escaped paths, malformed authority, and missing tool PATH.
+standalone Skill dispatch, unrelated/escaped paths, malformed authority, busy-writer local reads,
+and missing tool PATH.
 
 **Untested:** authenticated model-driven standalone skill invocation, Codex startup-hook acceptance
 independently of user instructions, automatic hot reload, and semantic judgment by a hosted runtime.
