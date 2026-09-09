@@ -52,7 +52,9 @@ policy, lifecycle, and failure behavior.
    in the local registry; do not invoke that checker separately. Pass the same non-default registry
    path used during resolution. The write branch is complete only after the combined audit result
    and every required Git, sync, and backup state are known. Preserve a valid partial result when a
-   later lifecycle step fails.
+   later lifecycle step fails. For pending synchronization or divergent history, follow the
+   protocol's **Pending synchronization** reference; finish agent evidence review before escalating
+   an unresolved factual question.
 
 ## Report
 

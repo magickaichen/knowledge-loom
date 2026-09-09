@@ -421,3 +421,33 @@ test("a branch switch during fetch defers integration into the newly selected br
   assert.equal(asRecord(JSON.parse(result.stdout)).status, "unavailable");
   assert.equal(fs.existsSync(path.join(b, "new.md")), false);
 });
+
+test("a registered writer can finish stdout and stderr after its lock owner exits", async (t) => {
+  const { root, b, state } = await enabledDevices(t);
+  const ready = path.join(root, "writer-ready");
+  const release = path.join(root, "release-output");
+  const finished = path.join(root, "writer-finished");
+  const script = `const fs=require('node:fs'); fs.writeFileSync(${JSON.stringify(ready)}, 'ready'); const timer=setInterval(()=>{ if(!fs.existsSync(${JSON.stringify(release)})) return; clearInterval(timer); process.stdout.write('out'.repeat(32768), error=>{ if(error) process.exit(1); process.stderr.write('err'.repeat(32768), error=>{ if(error) process.exit(1); fs.writeFileSync(${JSON.stringify(finished)}, 'finished'); }); }); }, 10);`;
+  const owner = spawn(process.execPath, ["--import", "tsx", "src/knowledge-loom/runner.ts", "with-vault-lock", b, "--", process.execPath, "-e", script], { cwd: PACKAGE_ROOT, stdio: "ignore" });
+  const exited = new Promise<void>((resolve) => owner.once("exit", () => resolve()));
+  try {
+    const deadline = Date.now() + 5000;
+    while (!fs.existsSync(ready) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(fs.existsSync(ready), true);
+    owner.kill("SIGKILL"); await exited;
+    fs.writeFileSync(release, "release");
+    const completionDeadline = Date.now() + 3000;
+    while (!fs.existsSync(finished) && Date.now() < completionDeadline) await new Promise((resolve) => setTimeout(resolve, 10));
+    assert.equal(fs.existsSync(finished), true, "closed owner pipes must not abort a registered writer");
+    const result = await invoke(["access", "--state-dir", state, "--json"], b);
+    assert.equal(asRecord(JSON.parse(result.stdout)).status, "current");
+  } finally { fs.writeFileSync(release, "release"); owner.kill("SIGKILL"); }
+});
+
+test("a connected lock owner receives complete output and the writer's failing exit status", async (t) => {
+  const { b } = await enabledDevices(t);
+  const result = await invoke(["with-vault-lock", b, "--", process.execPath, "-e", "process.stdout.write('out'.repeat(32768)); process.stderr.write('err'.repeat(32768)); process.exitCode=7;"], b);
+  assert.equal(result.code, 7);
+  assert.equal(result.stdout, "out".repeat(32768));
+  assert.equal(result.stderr, "err".repeat(32768));
+});

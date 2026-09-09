@@ -1,4 +1,5 @@
 import path from "node:path";
+import { synchronizeVault } from "./sync.js";
 
 import { accessVault, configureInbound } from "./access.js";
 import { runLockedProcess, withVaultLock } from "./vault-lock.js";
@@ -12,9 +13,10 @@ import { errorMessage } from "./errors.js";
 import { isCurrentStatePolicy, isHistoryType, isWritePolicy } from "./types.js";
 import type { CliIo, Finding } from "./types.js";
 
-const HELP = `usage: knowledge-loom {access,with-vault-lock,audit,probe,resolve,register,associate,init} ...
+const HELP = `usage: knowledge-loom {sync,access,with-vault-lock,audit,probe,resolve,register,associate,init} ...
 
 commands:
+  sync        publish committed knowledge or prepare isolated reconciliation
   access      prepare a vault for retrieval with an authorized daily refresh
   with-vault-lock  run a cooperative writer under the shared mutation lock
   audit       run a read-only vault audit
@@ -26,6 +28,7 @@ commands:
 `;
 
 const COMMAND_HELP = {
+  sync: "usage: knowledge-loom sync [selector] [--registry PATH] [--state-dir PATH] [--json] [--status] [--resolution PATH]\n",
   "with-vault-lock": "usage: knowledge-loom with-vault-lock [selector] [--registry PATH] -- executable [arguments ...]\n",
   access: "usage: knowledge-loom access [selector] [--registry PATH] [--state-dir PATH] [--json] [--status] [--enable-inbound --remote NAME --branch NAME [--apply]]\n",
   audit: "usage: knowledge-loom audit [selector] [--registry PATH] [--json]\n",
@@ -49,6 +52,7 @@ interface ParsedOptions {
   apply?: boolean;
   replace?: boolean;
   state_dir?: string;
+  resolution?: string;
   enable_inbound?: boolean;
   remote?: string;
   branch?: string;
@@ -87,7 +91,7 @@ function parseArguments(arguments_: string[]): ParsedOptions {
   }
 
   const options: ParsedOptions = { help: false, command, positional: [], subject: [] };
-  const flags = new Set(command === "access"
+  const flags = new Set(command === "sync" ? ["--json", "--status"] : command === "access"
     ? ["--json", "--enable-inbound", "--apply", "--status"]
     : command === "audit"
     ? ["--json"]
@@ -99,6 +103,7 @@ function parseArguments(arguments_: string[]): ParsedOptions {
           ? ["--replace", "--apply"]
           : []);
   const valueOptions = new Set(["--registry"]);
+  if (command === "sync") for (const name of ["--state-dir", "--resolution"]) valueOptions.add(name);
   if (command === "access") for (const name of ["--state-dir", "--remote", "--branch"]) valueOptions.add(name);
   if (command === "init") {
     for (const name of ["--vault-id", "--title", "--subject", "--write-policy", "--current-state-policy", "--history"]) valueOptions.add(name);
@@ -122,6 +127,7 @@ function parseArguments(arguments_: string[]): ParsedOptions {
       if (value === undefined || value.startsWith("--")) throw new Error(`${name} requires a value`);
       const key = name.slice(2).replaceAll("-", "_");
       if (key === "subject") options.subject.push(value);
+      else if (key === "resolution") options.resolution = value;
       else if (key === "state_dir") options.state_dir = value;
       else if (key === "remote") options.remote = value;
       else if (key === "branch") options.branch = value;
@@ -167,6 +173,14 @@ export async function runCli(
       const locked = await withVaultLock(vault.root, (trackWriter) => runLockedProcess(vault.root, executable!, args, trackWriter, { stdout, stderr }));
       if (!locked.acquired) { stderr.write("BUSY another task owns the vault mutation lock\n"); return 1; }
       return locked.value;
+    }
+
+    if (options.command === "sync") {
+      if (options.positional.length > 1 || (options.status && options.resolution)) throw new Error(COMMAND_HELP.sync.trim());
+      const vault = resolveVault(options.positional[0] ?? null, { cwd, registryPath: options.registry });
+      const result = await synchronizeVault(vault, { stateDir: options.state_dir, registryPath: options.registry, statusOnly: options.status === true, resolution: options.resolution, now });
+      stdout.write(options.json ? `${JSON.stringify(result)}\n` : `${result.status} ${vault.root}\n`);
+      return 0;
     }
 
     if (options.command === "access") {

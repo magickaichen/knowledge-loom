@@ -247,7 +247,9 @@ hunks. After a write:
 2. Review the diff.
 3. Stage only task-owned paths or hunks.
 4. Commit only when the contract requires it.
-5. Run declared sync and backup lifecycle adapters in order.
+5. Run declared sync and backup lifecycle adapters in order. For failed pushes, pending sync, or
+   divergence, follow [Pending synchronization](synchronization.md) through resolution or a
+   durable pending state before reporting completion.
 6. Verify each adapter's result.
 
 Report partial completion precisely. A successful commit with a failed backup is committed but not
