@@ -39,16 +39,10 @@ than editing its versioned cache or records. Bootstrap does not edit runtime con
 
 ## Run on due use
 
-Add this instruction to the runtime's user-level instructions, outside installed skill directories:
-
-> Before using Knowledge Loom, run `node "$HOME/.local/share/knowledge-loom/maintenance.cjs" use`.
-> Read its result, then resolve the installed skill to its canonical directory for this invocation.
-> If maintenance reports failure, backoff, or busy, retain the usable installed bundle and report
-> the recovery state when relevant to the task.
-
-Verify the wiring by invoking it from each runtime and checking that they report the same
-`entryPoint`, installed version, and `lastCheck`. This explicit caller setup is required even for
-old skills; no ordinary-chat polling, background service, or scheduler is installed.
+Use [runtime setup and migration](runtime-maintenance.md) to install the external route for Codex
+and Claude Code. That route combines release use with authorized vault access and runs again on
+actual access later in a session. Verify the route in each runtime; merely bootstrapping the bundle
+or installing a startup hook does not establish automatic access maintenance.
 
 The first `use` checks immediately. Successful observations are shared across tasks and runtimes
 using the same home. The next check becomes due after exactly seven elapsed days. A failed lookup

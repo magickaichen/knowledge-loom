@@ -113,3 +113,5 @@ providers retain their own access and privacy rules.
 ## License
 
 [MIT](LICENSE).
+
+For shared Codex/Claude maintenance, see [runtime setup, migration, and recovery](docs/runtime-maintenance.md).
