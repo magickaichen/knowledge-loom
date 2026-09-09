@@ -24,14 +24,15 @@
     "knowledge-loom": "skills/use-knowledge-vault/scripts/knowledge-loom.mjs"
   },
   "scripts": {
-    "build": "node --import tsx scripts/build-skill-packages.ts && node --import tsx scripts/build-claude-desktop-skill.ts",
+    "build": "node --import tsx scripts/build-skill-packages.ts && node --import tsx scripts/build-claude-desktop-skill.ts && node --import tsx scripts/build-maintenance.ts",
     "build:check": "node --import tsx scripts/build-skill-packages.ts --check",
     "cli": "node --import tsx src/knowledge-loom/runner.ts",
     "install:skills": "node --import tsx scripts/install.ts",
-    "test": "node --import tsx scripts/run-tests.ts",
+    "test": "node --import tsx scripts/build-maintenance.ts && node --import tsx scripts/run-tests.ts",
     "typecheck": "tsc --noEmit",
     "validate": "node --import tsx scripts/validate.ts",
-    "validate:npx": "node --import tsx scripts/validate.ts --npx"
+    "validate:npx": "node --import tsx scripts/validate.ts --npx",
+    "build:maintenance": "node --import tsx scripts/build-maintenance.ts"
   },
   "dependencies": {
     "yaml": "2.9.0"
