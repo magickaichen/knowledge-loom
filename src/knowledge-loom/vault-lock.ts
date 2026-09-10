@@ -38,6 +38,7 @@ type TrackWriter = (pid: number, group?: boolean) => void;
 export async function withVaultLock<T>(root: string, work: (trackWriter: TrackWriter) => Promise<T>, waitMs = 2_000): Promise<{ acquired: true; value: T } | { acquired: false }> {
   const owner = { schema_version: 1, host: os.hostname(), pid: process.pid, token: randomUUID() };
   const hashed = command(root, ["hash-object", "-w", "--stdin"], JSON.stringify(owner));
+  if (hashed.error && "code" in hashed.error && hashed.error.code === "ENOENT") throw new Error("Git executable unavailable on the runtime tool PATH; configure Git for tool commands and retry", { cause: hashed.error });
   if (hashed.status !== 0) throw new Error("cannot create vault mutation lock");
   let revision = hashed.stdout.trim();
   const deadline = performance.now() + waitMs;
