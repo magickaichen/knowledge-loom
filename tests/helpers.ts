@@ -21,6 +21,13 @@ export function copyFixture(name: string, destination: string): string {
   return destination;
 }
 
+/** Synthetic release metadata keeps upgrade scenarios independent of the shipping version. */
+export function copyReleaseFixture(destination: string, version: string): string {
+  fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(destination, "skills"), { recursive: true });
+  fs.writeFileSync(path.join(destination, "package.json"), JSON.stringify({ version }));
+  return destination;
+}
+
 export function readJson<T>(relative: string): T {
   return JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, relative), "utf8")) as T;
 }

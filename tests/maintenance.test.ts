@@ -6,27 +6,29 @@ import path from "node:path";
 import test, { type TestContext } from "node:test";
 
 import { maintain } from "../src/maintenance/maintenance.ts";
-import { PACKAGE_ROOT, temporaryDirectory } from "./helpers.ts";
+import { PACKAGE_ROOT, temporaryDirectory, copyReleaseFixture } from "./helpers.ts";
 
-function installationFiles(t: TestContext): { home: string; target: string } {
+const bootstrapRunner = path.join(PACKAGE_ROOT, "dist", "maintenance.cjs");
+
+function installationFiles(t: TestContext): { home: string; target: string; source: string } {
   const home = temporaryDirectory(t);
   const target = path.join(home, ".agents", "skills");
   fs.cpSync(path.join(PACKAGE_ROOT, "skills"), target, { recursive: true });
-  return { home, target };
+  const source = copyReleaseFixture(path.join(home, "source"), "0.8.0");
+  return { home, target, source };
 }
 async function bootstrapInstallation(t: TestContext): Promise<{ home: string; target: string }> {
   const installation = installationFiles(t);
-  await maintain({ command: "bootstrap", ...installation, source: PACKAGE_ROOT, targets: [installation.target] });
+  await maintain({ command: "bootstrap", bootstrapRunner, ...installation, targets: [installation.target] });
   return installation;
 }
 async function stageRelease(release: { version: string }, destination: string): Promise<void> {
-  fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(destination, "skills"), { recursive: true });
-  fs.writeFileSync(path.join(destination, "package.json"), JSON.stringify({ version: release.version }));
+  copyReleaseFixture(destination, release.version);
 }
 
 test("explicit bootstrap keeps old skills usable through an external entry point", async (t) => {
-  const { home, target } = installationFiles(t);
-  const result = await maintain({ command: "bootstrap", home, source: PACKAGE_ROOT, targets: [target] });
+  const { home, target, source } = installationFiles(t);
+  const result = await maintain({ command: "bootstrap", bootstrapRunner, home, source, targets: [target] });
   assert.equal(result.status, "bootstrapped");
   assert.equal(result.installedVersion, "0.8.0");
   assert.equal(result.loadedVersion, "unknown");
@@ -94,12 +96,12 @@ test("failed lookups retain last observation and back off durably", async (t) =>
 });
 
 test("local edits block the whole update while manager bookkeeping and other skills survive", async (t) => {
-  const { home, target } = installationFiles(t);
+  const { home, target, source } = installationFiles(t);
   const bookkeeping = path.join(home, ".agents", ".skill-lock.json");
   fs.writeFileSync(bookkeeping, '{"version":3,"skills":{"unrelated":{"hash":"keep"}}}');
   fs.mkdirSync(path.join(target, "unrelated"));
   fs.writeFileSync(path.join(target, "unrelated", "SKILL.md"), "keep");
-  await maintain({ command: "bootstrap", home, source: PACKAGE_ROOT, targets: [target] });
+  await maintain({ command: "bootstrap", bootstrapRunner, home, source, targets: [target] });
   const edited = path.join(target, "use-knowledge-vault", "SKILL.md");
   fs.appendFileSync(edited, "\nLocal instruction\n");
   const ports = { releases: {
@@ -136,13 +138,13 @@ test("interruption after the atomic switch recovers the complete new bundle", as
 });
 
 test("bootstrap resumes an interrupted adoption without losing originals", async (t) => {
-  const { home, target } = installationFiles(t);
+  const { home, target, source } = installationFiles(t);
   const symlink = fs.symlinkSync;
   const fault = t.mock.method(fs, "symlinkSync", (...args: Parameters<typeof fs.symlinkSync>) => {
     if (String(args[1]).endsWith("/use-knowledge-vault")) throw new Error("interrupted adoption");
     return symlink(...args);
   });
-  await assert.rejects(maintain({ command: "bootstrap", home, source: PACKAGE_ROOT, targets: [target] }), /interrupted adoption/);
+  await assert.rejects(maintain({ command: "bootstrap", bootstrapRunner, home, source, targets: [target] }), /interrupted adoption/);
   for (const name of ["use-knowledge-vault", "init-knowledge-vault", "audit-knowledge-vault", "manage-current-focus"]) {
     assert.equal(fs.readFileSync(path.join(target, name, "SKILL.md"), "utf8"), fs.readFileSync(path.join(PACKAGE_ROOT, "skills", name, "SKILL.md"), "utf8"));
   }
@@ -174,7 +176,7 @@ test("old skill releases need no embedded update logic to bootstrap", async (t) 
   fs.writeFileSync(path.join(old, "package.json"), '{"version":"0.1.0"}');
   const target = path.join(home, ".claude", "skills");
   fs.cpSync(path.join(old, "skills"), target, { recursive: true });
-  const result = await maintain({ command: "bootstrap", home, source: old, targets: [target], bootstrapRunner: path.join(PACKAGE_ROOT, "dist", "maintenance.cjs") });
+  const result = await maintain({ command: "bootstrap", bootstrapRunner, home, source: old, targets: [target] });
   assert.equal(result.installedVersion, "0.1.0");
   assert.equal(result.status, "bootstrapped");
 });
@@ -201,20 +203,20 @@ test("bootstrap detects linked installations and refuses plugin-owned caches", a
   const target = path.join(home, ".agents", "skills");
   fs.mkdirSync(target, { recursive: true });
   for (const name of ["use-knowledge-vault", "init-knowledge-vault", "audit-knowledge-vault", "manage-current-focus"]) fs.symlinkSync(path.join(PACKAGE_ROOT, "skills", name), path.join(target, name));
-  const result = await maintain({ command: "bootstrap", home, source: PACKAGE_ROOT, targets: [target] });
+  const result = await maintain({ command: "bootstrap", bootstrapRunner, home, source: PACKAGE_ROOT, targets: [target] });
   assert.ok(result.installations?.every((installation) => installation.route === "symlink"));
   const pluginHome = temporaryDirectory(t);
   const plugin = path.join(pluginHome, ".codex", "plugins", "cache", "knowledge-loom", "skills");
   fs.cpSync(path.join(PACKAGE_ROOT, "skills"), plugin, { recursive: true });
-  await assert.rejects(maintain({ command: "bootstrap", home: pluginHome, source: PACKAGE_ROOT, targets: [plugin] }), /plugin.*owner/);
+  await assert.rejects(maintain({ command: "bootstrap", bootstrapRunner, home: pluginHome, source: PACKAGE_ROOT, targets: [plugin] }), /plugin.*owner/);
 });
 
 test("skills CLI ownership is detected and bookkeeping remains byte-identical after update", async (t) => {
-  const { home, target } = installationFiles(t);
+  const { home, target, source } = installationFiles(t);
   const lockFile = path.join(home, "skills-lock.json");
   const contents = '{"version":1,"skills":{"use-knowledge-vault":{"source":"magickaichen/knowledge-loom","sourceType":"github","computedHash":"old"},"other":{"computedHash":"keep"}}}';
   fs.writeFileSync(lockFile, contents);
-  const bootstrap = await maintain({ command: "bootstrap", home, source: PACKAGE_ROOT, targets: [target] });
+  const bootstrap = await maintain({ command: "bootstrap", bootstrapRunner, home, source, targets: [target] });
   assert.equal(bootstrap.installations?.find((item) => item.target.endsWith("use-knowledge-vault"))?.route, "skills-cli");
   const updated = await maintain({ command: "use", home }, { releases: {
     async list() { return [{ version: "0.9.0", revision: "a".repeat(40), published: true, prerelease: false }]; },
@@ -245,8 +247,8 @@ test("a killed staging process leaves the previous bundle and a recoverable shar
 });
 
 test("the bootstrapped CLI runs independently of the source checkout", async (t) => {
-  const { home, target } = installationFiles(t);
-  const bootstrap = spawnSync(process.execPath, [path.join(PACKAGE_ROOT, "dist", "maintenance.cjs"), "bootstrap", "--home", home, "--source", PACKAGE_ROOT, "--target", target], { encoding: "utf8", cwd: home });
+  const { home, target, source } = installationFiles(t);
+  const bootstrap = spawnSync(process.execPath, [path.join(PACKAGE_ROOT, "dist", "maintenance.cjs"), "bootstrap", "--home", home, "--source", source, "--target", target], { encoding: "utf8", cwd: home });
   assert.equal(bootstrap.status, 0, bootstrap.stderr);
   const entry = path.join(home, ".local", "share", "knowledge-loom", "maintenance.cjs");
   const status = spawnSync(process.execPath, [entry, "status", "--home", home, "--loaded-version", "0.7.0"], { encoding: "utf8", cwd: home, env: { ...process.env, HOME: home, NODE_PATH: "" } });
@@ -319,13 +321,13 @@ test("a pinned current release still supplies verified advisories on due use", a
 });
 
 test("interruption after one adoption exchange retains all four original skills", async (t) => {
-  const { home, target } = installationFiles(t);
+  const { home, target, source } = installationFiles(t);
   const symlink = fs.symlinkSync;
   const fault = t.mock.method(fs, "symlinkSync", (...args: Parameters<typeof fs.symlinkSync>) => {
     if (String(args[1]).endsWith("/init-knowledge-vault")) throw new Error("interrupted after first exchange");
     return symlink(...args);
   });
-  await assert.rejects(maintain({ command: "bootstrap", home, source: PACKAGE_ROOT, targets: [target] }), /interrupted after/);
+  await assert.rejects(maintain({ command: "bootstrap", bootstrapRunner, home, source, targets: [target] }), /interrupted after/);
   assert.ok(fs.lstatSync(path.join(target, "use-knowledge-vault")).isSymbolicLink());
   for (const name of ["use-knowledge-vault", "init-knowledge-vault", "audit-knowledge-vault", "manage-current-focus"]) {
     assert.equal(fs.readFileSync(path.join(target, name, "SKILL.md"), "utf8"), fs.readFileSync(path.join(PACKAGE_ROOT, "skills", name, "SKILL.md"), "utf8"));
