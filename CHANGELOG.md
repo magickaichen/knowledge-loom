@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.9.0
+
+Knowledge Loom now provides a shared maintenance entry point for stable skill releases and vault
+freshness in Codex and Claude Code. Existing installations need a one-time
+[setup and ownership migration](https://github.com/magickaichen/knowledge-loom/blob/v0.9.0/docs/runtime-maintenance.md); publishing this release alone does
+not activate maintenance in existing sessions.
+
+### Added
+
+- Check published stable skill releases on use, with a shared seven-day interval, explicit version
+  pins, atomic bundle replacement, and recovery that preserves a usable installation.
+- Check authorized vault remotes on access at a shared 24-hour interval. Safely fast-forward clean
+  checkouts and report observed, integrated, deferred, and unavailable states separately.
+- Preserve local reads, edits, and commits during remote failures. Retain pending synchronization
+  and use bounded evidence-based reconciliation after rejected pushes, even inside the daily cache.
+- Add previewable, idempotent Codex and Claude Code setup with shared skills, explicit duplicate
+  ownership migration, external access routing, and startup context without maintenance networking.
+- Run maintenance before Claude native reads within the applicable vault. Native Skill invocation
+  checks releases; explicit routing retains vault selection and publication.
+
+### Safety and compatibility
+
+- Preserve unfinished edits, live writers, existing configuration, and installation backups.
+  Maintenance contention does not block otherwise authorized local reads.
+- Assess verified integrity advisories before affected vault mutations; keep installed versions
+  separate from instructions already loaded in a session.
+- Preserve contract schema version 1 and read-only resolver/audit behavior. Inbound synchronization
+  requires explicit contract configuration; provider-specific backup adapters remain external.
+- Keep arbitrary shell reads and opt-out tools outside automatic interception. Hosted standalone
+  invocation, independent Codex startup-hook acceptance, hot reload, and hosted semantic
+  reconciliation remain unverified; see the [runtime verification record](https://github.com/magickaichen/knowledge-loom/blob/v0.9.0/docs/runtime-verification.md).
+- Report missing Git in the runtime tool PATH as a dependency error, rather than a vault-lock conflict.
+
 ## v0.8.0
 
 `init-knowledge-vault` can now turn existing authorized work into a populated vault without first

@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
-import { PACKAGE_ROOT, temporaryDirectory } from "./helpers.ts";
+import { PACKAGE_ROOT, temporaryDirectory, copyReleaseFixture } from "./helpers.ts";
 
 function cli(home: string, ...args: string[]) {
   const result = spawnSync(process.execPath, ["dist/maintenance.cjs", ...args, "--home", home], { cwd: PACKAGE_ROOT, encoding: "utf8" });
@@ -162,10 +162,11 @@ test("setup refuses a runtime directory symlink escaping the selected home befor
 });
 test("migration of an existing runtime-specific bootstrap keeps shared skills tracked by the updater", async (t) => {
   const home = fs.realpathSync(temporaryDirectory(t));
+  const source = copyReleaseFixture(path.join(home, "source"), "0.8.0");
   const legacy = path.join(home, ".codex/skills");
   fs.cpSync(path.join(PACKAGE_ROOT, "skills"), legacy, { recursive: true });
-  cli(home, "bootstrap", "--source", PACKAGE_ROOT, "--target", legacy);
-  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply", "--migrate");
+  cli(home, "bootstrap", "--source", source, "--target", legacy);
+  cli(home, "setup", "--source", source, "--apply", "--migrate");
   const status = cli(home, "status");
   const shared = path.join(home, ".agents/skills/use-knowledge-vault");
   assert.ok(status.installations.some((installation: { target: string }) => installation.target === shared));
@@ -183,7 +184,8 @@ test("verified advisories return to the active runtime before vault operations a
   const { runRuntime } = await import("../src/maintenance/runtime.ts");
   const { copyFixture } = await import("./helpers.ts");
   const home = fs.realpathSync(temporaryDirectory(t));
-  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
+  const source = copyReleaseFixture(path.join(home, "source"), "0.8.0");
+  cli(home, "setup", "--source", source, "--apply");
   const vault = copyFixture("single-proactive", path.join(home, "vault"));
   const ports = { cwd: vault, releases: { async list() { return [{ version: "0.8.0", published: true, prerelease: false, revision: "a".repeat(40) }]; }, async stage(_release: unknown, target: string) {
     fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(target, "skills"), { recursive: true });
