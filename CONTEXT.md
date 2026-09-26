@@ -22,15 +22,16 @@ local work. A deferred integration leaves the local knowledge behind the observe
 _Avoid_: Fetch, observation
 
 **Applicability notice**:
-A runtime-delivered reminder that automatic applicability selects a vault for the current directory.
-It prompts vault use but does not select the vault; the applicability probe remains authoritative.
+A runtime-delivered reminder that a vault applies to the current directory through its nearest
+ancestor contract or project association. It prompts vault use; the vault selection rules still
+choose the vault.
 _Avoid_: Vault selection, auto-load
 
 **Vault activation**:
-Loading the selected vault's contract, instruction roots, and navigation into one agent session so
-later retrieval in that session follows them. Activation happens once per session and again only
-after that context is lost or the governing files change.
-_Avoid_: Inbound access, retrieval, skill call
+The session state in which the selected vault's contract, instruction roots, and navigation are
+loaded, so later retrieval in that session follows them. It lasts until that context is lost or the
+governing files change.
+_Avoid_: Skill call, vault loading
 
 **Governance initialization**:
 Establishing a vault contract and minimal navigation for a new, empty Markdown vault.
