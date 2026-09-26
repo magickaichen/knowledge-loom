@@ -29,7 +29,7 @@ _Avoid_: Vault selection, auto-load
 **Vault activation**:
 Loading the selected vault's contract, instruction roots, and navigation into one agent session so
 later retrieval in that session follows them. Activation happens once per session and again only
-after that context is lost.
+after that context is lost or the governing files change.
 _Avoid_: Inbound access, retrieval, skill call
 
 **Governance initialization**:
