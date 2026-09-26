@@ -21,6 +21,18 @@ Incorporating an observed remote revision into the local knowledge while preserv
 local work. A deferred integration leaves the local knowledge behind the observed revision.
 _Avoid_: Fetch, observation
 
+**Applicability notice**:
+A runtime-delivered reminder that a vault applies to the current directory through its nearest
+ancestor contract or project association. It prompts vault use; the vault selection rules still
+choose the vault.
+_Avoid_: Vault selection, auto-load
+
+**Vault activation**:
+The session state in which the selected vault's contract, instruction roots, and navigation are
+loaded, so later retrieval in that session follows them. It lasts until that context is lost or the
+governing files change.
+_Avoid_: Skill call, vault loading
+
 **Governance initialization**:
 Establishing a vault contract and minimal navigation for a new, empty Markdown vault.
 _Avoid_: Bootstrap, import
