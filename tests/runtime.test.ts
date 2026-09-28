@@ -24,11 +24,10 @@ test("setup previews external shared-owner routing without changing a home", (t)
     assert.deepEqual(hooks.UserPromptSubmit, hooks.SessionStart, file);
   }
 });
-test("setup applies twice, rewrites a stale managed block from the startup generator, preserves unrelated instructions/settings and verifies the external route", (t) => {
+test("setup applies twice, preserves unrelated instructions/settings and verifies the external route", (t) => {
   const home = fs.realpathSync(temporaryDirectory(t));
   fs.mkdirSync(path.join(home, ".claude"));
-  const staleBlock = "<!-- knowledge-loom routing -->\nReread the resulting contract and instruction roots before retrieval.\n<!-- /knowledge-loom routing -->";
-  fs.writeFileSync(path.join(home, ".claude/CLAUDE.md"), `Keep my guidance.\n${staleBlock}\nKeep my closing guidance.\n`);
+  fs.writeFileSync(path.join(home, ".claude/CLAUDE.md"), "Keep my guidance.\n");
   fs.writeFileSync(path.join(home, ".claude/settings.json"), JSON.stringify({ model: "keep", hooks: { Stop: [{ hooks: [{ type: "command", command: "echo keep" }] }] } }));
   fs.mkdirSync(path.join(home, ".codex"));
   fs.writeFileSync(path.join(home, ".codex/hooks.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ type: "command", command: "echo keep" }] }] } }));
@@ -36,7 +35,6 @@ test("setup applies twice, rewrites a stale managed block from the startup gener
   assert.equal(first.status, "configured");
   assert.equal(first.automaticMaintenance, false); // Runtime execution must be observed separately.
   const before = fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8");
-  const instructionsBefore = ["claude/CLAUDE.md", "codex/AGENTS.md"].map((file) => fs.readFileSync(path.join(home, `.${file}`), "utf8"));
   const codexBefore = fs.readFileSync(path.join(home, ".codex/hooks.json"), "utf8");
   type HookGroups = { hooks: [{ command: string }] }[];
   const commands = (groups: HookGroups) => groups.map((group) => group.hooks[0].command);
@@ -48,23 +46,32 @@ test("setup applies twice, rewrites a stale managed block from the startup gener
   assert.equal(second.status, "configured");
   assert.equal(fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8"), before);
   assert.equal(fs.readFileSync(path.join(home, ".codex/hooks.json"), "utf8"), codexBefore);
-  assert.deepEqual(["claude/CLAUDE.md", "codex/AGENTS.md"].map((file) => fs.readFileSync(path.join(home, `.${file}`), "utf8")), instructionsBefore);
-  const instruction = instructionsBefore[0]!;
-  const [, block] = /^Keep my guidance\.\n(<!-- knowledge-loom routing -->\n[\s\S]*<!-- \/knowledge-loom routing -->)\nKeep my closing guidance\.\n$/.exec(instruction) ?? [];
-  assert.ok(block, instruction);
-  assert.match(block, /Run the matching route on every actual access/);
-  assert.match(block, /Reread the contract and instruction roots before retrieval when the route reports vault status\nintegrated or release status updated;/);
-  assert.doesNotMatch(block, /Reread the resulting/);
-  for (const runtime of ["claude", "codex"]) {
-    const startup = spawnSync(process.execPath, ["dist/maintenance.cjs", "hook", "--home", home, "--runtime", runtime], { cwd: PACKAGE_ROOT, input: JSON.stringify({ hook_event_name: "SessionStart", cwd: home }), encoding: "utf8" });
-    assert.equal(startup.status, 0, startup.stderr);
-    const managed: string = runtime === "claude" ? block : fs.readFileSync(path.join(home, ".codex/AGENTS.md"), "utf8").trimEnd();
-    assert.equal(JSON.parse(startup.stdout).hookSpecificOutput.additionalContext, managed, runtime);
-  }
-  assert.equal(cli(home, "runtime-status").status, "configured");
+  assert.match(fs.readFileSync(path.join(home, ".claude/CLAUDE.md"), "utf8"), /^Keep my guidance\.\n/);
   assert.equal(JSON.parse(before).model, "keep");
   assert.equal(cli(home, "route", "--mode", "project").vault.status, "not-applicable");
   assert.equal(fs.realpathSync(path.join(home, ".claude/skills/use-knowledge-vault")), fs.realpathSync(path.join(home, ".agents/skills/use-knowledge-vault")));
+});
+test("setup rewrites a stale managed block between user instructions to the startup routing text", (t) => {
+  const home = fs.realpathSync(temporaryDirectory(t));
+  const files = [".claude/CLAUDE.md", ".codex/AGENTS.md"].map((file) => path.join(home, file));
+  const readInstructions = () => files.map((file) => fs.readFileSync(file, "utf8"));
+  const stale = "<!-- knowledge-loom routing -->\nReread the resulting contract and instruction roots before retrieval.\n<!-- /knowledge-loom routing -->";
+  for (const file of files) { fs.mkdirSync(path.dirname(file)); fs.writeFileSync(file, `Keep my guidance.\n${stale}\nKeep my closing guidance.\n`); }
+  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
+  const configured = readInstructions();
+  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
+  assert.deepEqual(readInstructions(), configured);
+  for (const [index, runtime] of ["claude", "codex"].entries()) {
+    const [, block] = /^Keep my guidance\.\n(<!-- knowledge-loom routing -->\n[\s\S]*<!-- \/knowledge-loom routing -->)\nKeep my closing guidance\.\n$/.exec(configured[index]!) ?? [];
+    if (!block) assert.fail(configured[index]);
+    assert.match(block, /Run the matching route on every actual access/);
+    assert.match(block, /Reread the contract and instruction roots before retrieval when the route reports vault status\s+integrated or release status\s+updated;/);
+    assert.doesNotMatch(block, /Reread the resulting/);
+    const startup = spawnSync(process.execPath, ["dist/maintenance.cjs", "hook", "--home", home, "--runtime", runtime], { cwd: PACKAGE_ROOT, input: JSON.stringify({ hook_event_name: "SessionStart", cwd: home }), encoding: "utf8" });
+    assert.equal(startup.status, 0, startup.stderr);
+    assert.equal(JSON.parse(startup.stdout).hookSpecificOutput.additionalContext, block, runtime);
+  }
+  assert.equal(cli(home, "runtime-status").status, "configured");
 });
 test("duplicate migration is explicit, preserves plugin caches and ordinary backups, and refuses local edits", (t) => {
   const home = fs.realpathSync(temporaryDirectory(t));

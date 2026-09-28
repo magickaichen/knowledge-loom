@@ -103,8 +103,8 @@ supplied registry. Selection and governing authority validation precede maintena
 reports release and vault states separately. Resolve the installed skill's canonical path again after
 each call. Reread the contract and instruction roots before retrieval when the route reports vault
 status `integrated` or release status `updated`, because those states mean the governing files
-may have changed; otherwise retrieval follows the files loaded at vault activation, which happens
-once per session.
+may have changed; otherwise retrieval follows the files that the `use-knowledge-vault` skill
+loaded at vault activation, which lasts until that context is lost.
 
 Run the route at every actual access, including later accesses in a continuing session. The shared
 coordinator performs at most one due release observation per elapsed seven days and a vault check
