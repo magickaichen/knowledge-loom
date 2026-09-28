@@ -1,6 +1,6 @@
 ---
 name: use-knowledge-vault
-description: Apply one governed Markdown vault automatically around substantive local project work when an ancestor contract or project association may exist; also handle explicit requests to consult, remember, update, or sync vault knowledge.
+description: Invoke before substantive work in a vault-linked directory, where an ancestor contract or project association may apply; this skill call starts vault activation for one governed Markdown vault. Also invoke for explicit requests to consult, remember, update, or sync vault knowledge.
 ---
 
 # Use Knowledge Vault
