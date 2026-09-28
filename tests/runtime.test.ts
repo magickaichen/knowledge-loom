@@ -51,6 +51,28 @@ test("setup applies twice, preserves unrelated instructions/settings and verifie
   assert.equal(cli(home, "route", "--mode", "project").vault.status, "not-applicable");
   assert.equal(fs.realpathSync(path.join(home, ".claude/skills/use-knowledge-vault")), fs.realpathSync(path.join(home, ".agents/skills/use-knowledge-vault")));
 });
+test("setup rewrites a stale managed block between user instructions to the startup routing text", (t) => {
+  const home = fs.realpathSync(temporaryDirectory(t));
+  const files = [".claude/CLAUDE.md", ".codex/AGENTS.md"].map((file) => path.join(home, file));
+  const readInstructions = () => files.map((file) => fs.readFileSync(file, "utf8"));
+  const stale = "<!-- knowledge-loom routing -->\nReread the resulting contract and instruction roots before retrieval.\n<!-- /knowledge-loom routing -->";
+  for (const file of files) { fs.mkdirSync(path.dirname(file)); fs.writeFileSync(file, `Keep my guidance.\n${stale}\nKeep my closing guidance.\n`); }
+  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
+  const configured = readInstructions();
+  cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
+  assert.deepEqual(readInstructions(), configured);
+  for (const [index, runtime] of ["claude", "codex"].entries()) {
+    const [, block] = /^Keep my guidance\.\n(<!-- knowledge-loom routing -->\n[\s\S]*<!-- \/knowledge-loom routing -->)\nKeep my closing guidance\.\n$/.exec(configured[index]!) ?? [];
+    if (!block) assert.fail(configured[index]);
+    assert.match(block, /Run the matching route on every actual access/);
+    assert.match(block, /Reread the contract and instruction roots before retrieval when the route reports vault status\s+integrated or release status\s+updated;/);
+    assert.doesNotMatch(block, /Reread the resulting/);
+    const startup = spawnSync(process.execPath, ["dist/maintenance.cjs", "hook", "--home", home, "--runtime", runtime], { cwd: PACKAGE_ROOT, input: JSON.stringify({ hook_event_name: "SessionStart", cwd: home }), encoding: "utf8" });
+    assert.equal(startup.status, 0, startup.stderr);
+    assert.equal(JSON.parse(startup.stdout).hookSpecificOutput.additionalContext, block, runtime);
+  }
+  assert.equal(cli(home, "runtime-status").status, "configured");
+});
 test("duplicate migration is explicit, preserves plugin caches and ordinary backups, and refuses local edits", (t) => {
   const home = fs.realpathSync(temporaryDirectory(t));
   fs.cpSync(path.join(PACKAGE_ROOT, "skills"), path.join(home, ".agents/skills"), { recursive: true });
@@ -157,7 +179,7 @@ test("ordinary conversation, startup and no associated vault cause no maintenanc
   for (const runtime of ["codex", "claude"]) for (const event of ["SessionStart", "UserPromptSubmit", "PreToolUse"]) {
     const hook = spawnSync(process.execPath, ["dist/maintenance.cjs", "hook", "--home", home, "--runtime", runtime], { input: JSON.stringify({ hook_event_name: event, prompt: "hello" }), encoding: "utf8" });
     assert.equal(hook.status, 0, hook.stderr);
-    if (event === "SessionStart") assert.match(JSON.parse(hook.stdout).hookSpecificOutput.additionalContext, /Repeat on actual access later/);
+    if (event === "SessionStart") assert.match(JSON.parse(hook.stdout).hookSpecificOutput.additionalContext, /Run the matching route on every actual access/);
     else assert.deepEqual(JSON.parse(hook.stdout), {});
   }
   assert.deepEqual(fs.readdirSync(home), []);
@@ -196,7 +218,7 @@ test("prompt and startup hooks deliver the applicability notice for the event's 
     const prompt = await hook(runtime, "UserPromptSubmit", cwd);
     assert.equal(startup.hookSpecificOutput.hookEventName, "SessionStart");
     const [routing, appended] = startup.hookSpecificOutput.additionalContext.split("<!-- /knowledge-loom routing -->\n");
-    assert.match(routing, /^<!-- knowledge-loom routing -->\n[\s\S]*Repeat on actual access later/);
+    assert.match(routing, /^<!-- knowledge-loom routing -->\n[\s\S]*Run the matching route on every actual access/);
     if (!notice) {
       assert.equal(appended, undefined, `${runtime} ${cwd}`);
       assert.deepEqual(prompt, {}, `${runtime} ${cwd}`);
