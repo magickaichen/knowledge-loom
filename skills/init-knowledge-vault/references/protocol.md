@@ -71,7 +71,7 @@ context does not enter the loop.
 
 Vault activation starts with the `use-knowledge-vault` skill call, which loads the selected vault's
 contract, instruction roots, and navigation. A session without vault activation makes that call
-before its first vault access.
+before its next vault access.
 
 An applicability notice is an optional runtime delivery of the automatic applicability result for
 the current directory. It prompts vault use without selecting the vault: the applicability probe
