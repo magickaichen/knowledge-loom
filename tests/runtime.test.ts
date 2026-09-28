@@ -24,10 +24,11 @@ test("setup previews external shared-owner routing without changing a home", (t)
     assert.deepEqual(hooks.UserPromptSubmit, hooks.SessionStart, file);
   }
 });
-test("setup applies twice, preserves unrelated instructions/settings and verifies the external route", (t) => {
+test("setup applies twice, rewrites a stale managed block from the startup generator, preserves unrelated instructions/settings and verifies the external route", (t) => {
   const home = fs.realpathSync(temporaryDirectory(t));
   fs.mkdirSync(path.join(home, ".claude"));
-  fs.writeFileSync(path.join(home, ".claude/CLAUDE.md"), "Keep my guidance.\n");
+  const staleBlock = "<!-- knowledge-loom routing -->\nReread the resulting contract and instruction roots before retrieval.\n<!-- /knowledge-loom routing -->";
+  fs.writeFileSync(path.join(home, ".claude/CLAUDE.md"), `Keep my guidance.\n${staleBlock}\nKeep my closing guidance.\n`);
   fs.writeFileSync(path.join(home, ".claude/settings.json"), JSON.stringify({ model: "keep", hooks: { Stop: [{ hooks: [{ type: "command", command: "echo keep" }] }] } }));
   fs.mkdirSync(path.join(home, ".codex"));
   fs.writeFileSync(path.join(home, ".codex/hooks.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ type: "command", command: "echo keep" }] }] } }));
@@ -35,6 +36,7 @@ test("setup applies twice, preserves unrelated instructions/settings and verifie
   assert.equal(first.status, "configured");
   assert.equal(first.automaticMaintenance, false); // Runtime execution must be observed separately.
   const before = fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8");
+  const instructionsBefore = ["claude/CLAUDE.md", "codex/AGENTS.md"].map((file) => fs.readFileSync(path.join(home, `.${file}`), "utf8"));
   const codexBefore = fs.readFileSync(path.join(home, ".codex/hooks.json"), "utf8");
   type HookGroups = { hooks: [{ command: string }] }[];
   const commands = (groups: HookGroups) => groups.map((group) => group.hooks[0].command);
@@ -46,7 +48,20 @@ test("setup applies twice, preserves unrelated instructions/settings and verifie
   assert.equal(second.status, "configured");
   assert.equal(fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8"), before);
   assert.equal(fs.readFileSync(path.join(home, ".codex/hooks.json"), "utf8"), codexBefore);
-  assert.match(fs.readFileSync(path.join(home, ".claude/CLAUDE.md"), "utf8"), /^Keep my guidance\.\n/);
+  assert.deepEqual(["claude/CLAUDE.md", "codex/AGENTS.md"].map((file) => fs.readFileSync(path.join(home, `.${file}`), "utf8")), instructionsBefore);
+  const instruction = instructionsBefore[0]!;
+  const [, block] = /^Keep my guidance\.\n(<!-- knowledge-loom routing -->\n[\s\S]*<!-- \/knowledge-loom routing -->)\nKeep my closing guidance\.\n$/.exec(instruction) ?? [];
+  assert.ok(block, instruction);
+  assert.match(block, /Run the matching route on every actual access/);
+  assert.match(block, /Reread the contract and instruction roots before retrieval when the route reports vault status\nintegrated or release status updated;/);
+  assert.doesNotMatch(block, /Reread the resulting/);
+  for (const runtime of ["claude", "codex"]) {
+    const startup = spawnSync(process.execPath, ["dist/maintenance.cjs", "hook", "--home", home, "--runtime", runtime], { cwd: PACKAGE_ROOT, input: JSON.stringify({ hook_event_name: "SessionStart", cwd: home }), encoding: "utf8" });
+    assert.equal(startup.status, 0, startup.stderr);
+    const managed: string = runtime === "claude" ? block : fs.readFileSync(path.join(home, ".codex/AGENTS.md"), "utf8").trimEnd();
+    assert.equal(JSON.parse(startup.stdout).hookSpecificOutput.additionalContext, managed, runtime);
+  }
+  assert.equal(cli(home, "runtime-status").status, "configured");
   assert.equal(JSON.parse(before).model, "keep");
   assert.equal(cli(home, "route", "--mode", "project").vault.status, "not-applicable");
   assert.equal(fs.realpathSync(path.join(home, ".claude/skills/use-knowledge-vault")), fs.realpathSync(path.join(home, ".agents/skills/use-knowledge-vault")));
@@ -157,7 +172,7 @@ test("ordinary conversation, startup and no associated vault cause no maintenanc
   for (const runtime of ["codex", "claude"]) for (const event of ["SessionStart", "UserPromptSubmit", "PreToolUse"]) {
     const hook = spawnSync(process.execPath, ["dist/maintenance.cjs", "hook", "--home", home, "--runtime", runtime], { input: JSON.stringify({ hook_event_name: event, prompt: "hello" }), encoding: "utf8" });
     assert.equal(hook.status, 0, hook.stderr);
-    if (event === "SessionStart") assert.match(JSON.parse(hook.stdout).hookSpecificOutput.additionalContext, /Repeat on actual access later/);
+    if (event === "SessionStart") assert.match(JSON.parse(hook.stdout).hookSpecificOutput.additionalContext, /Run the matching route on every actual access/);
     else assert.deepEqual(JSON.parse(hook.stdout), {});
   }
   assert.deepEqual(fs.readdirSync(home), []);
@@ -196,7 +211,7 @@ test("prompt and startup hooks deliver the applicability notice for the event's 
     const prompt = await hook(runtime, "UserPromptSubmit", cwd);
     assert.equal(startup.hookSpecificOutput.hookEventName, "SessionStart");
     const [routing, appended] = startup.hookSpecificOutput.additionalContext.split("<!-- /knowledge-loom routing -->\n");
-    assert.match(routing, /^<!-- knowledge-loom routing -->\n[\s\S]*Repeat on actual access later/);
+    assert.match(routing, /^<!-- knowledge-loom routing -->\n[\s\S]*Run the matching route on every actual access/);
     if (!notice) {
       assert.equal(appended, undefined, `${runtime} ${cwd}`);
       assert.deepEqual(prompt, {}, `${runtime} ${cwd}`);

@@ -40,8 +40,10 @@ are outside automatic user-home discovery: remove/disable their Knowledge Loom o
 before adopting this route. Do not enable an additional owner afterward.
 
 Setup preserves original configuration text in `~/.local/share/knowledge-loom/runtime-backups/`.
-It appends a bounded managed block to user `AGENTS.md` / `CLAUDE.md` and SessionStart and
-UserPromptSubmit commands to Codex `hooks.json` / Claude `settings.json`. Claude also receives a
+It appends a bounded managed block to user `AGENTS.md` / `CLAUDE.md`, or rewrites an existing block
+in place to the current routing text, and adds SessionStart and UserPromptSubmit commands to Codex
+`hooks.json` / Claude `settings.json`. One generator produces both the managed block and the
+SessionStart routing text, so the two stay identical. Claude also receives a
 `Read|Skill` PreToolUse hook.
 Unrelated instruction text is preserved byte for byte;
 JSON retains unrelated values. Configuration symlinks require explicit owner migration. Repeating
@@ -98,10 +100,13 @@ node "$HOME/.local/share/knowledge-loom/maintenance.cjs" route --runtime claude 
 uses only an ancestor contract or registered project association; no applicable vault means no
 maintenance request. Pass `--selector` only for an explicitly selected vault and `--registry` for a
 supplied registry. Selection and governing authority validation precede maintenance work. The result
-reports release and vault states separately. Reread the resulting contract and instruction roots
-before retrieval, and resolve the installed skill's canonical path again.
+reports release and vault states separately. Resolve the installed skill's canonical path again after
+each call. Reread the contract and instruction roots before retrieval when the route reports vault
+status `integrated` or release status `updated`, because those states mean the governing files
+may have changed; otherwise retrieval follows the files loaded at vault activation, which happens
+once per session.
 
-Repeat the route at each actual access, including later accesses in a continuing session. The shared
+Run the route at every actual access, including later accesses in a continuing session. The shared
 coordinator performs at most one due release observation per elapsed seven days and a vault check
 per elapsed 24 hours. Failed observations retain their own bounded backoff. Ordinary conversation,
 SessionStart, UserPromptSubmit, and unrelated hook events make no Knowledge Loom maintenance network
