@@ -166,22 +166,33 @@ function projectAssociation(start: string, registry: Registry): ProjectMatch | n
   return nearest[0] ?? null;
 }
 
-function applicableVaultContext(cwd: string, registryPath: string | undefined): { vault: LoadedVault | null; registry: Registry | null } {
+export type SelectionSource = "ancestor-contract" | "registry-association";
+
+export interface ApplicableSelection {
+  vault: LoadedVault;
+  source: SelectionSource;
+}
+
+function applicableVaultContext(cwd: string, registryPath: string | undefined): { selection: ApplicableSelection | null; registry: Registry | null } {
   const ancestor = findAncestorVault(cwd);
-  if (ancestor) return { vault: loadVault(ancestor), registry: null };
+  if (ancestor) return { selection: { vault: loadVault(ancestor), source: "ancestor-contract" }, registry: null };
   const registry = loadRegistry(registryPath);
   const association = projectAssociation(cwd, registry)
     ?? (() => {
       const mainCheckout = mainCheckoutEquivalent(cwd);
       return mainCheckout ? projectAssociation(mainCheckout, registry) : null;
     })();
-  const vault = association ? registeredVault(projectRecord(association.configuredRoot, association.record).vault_id, registry) : null;
-  return { vault, registry };
+  const selection = association
+    ? { vault: registeredVault(projectRecord(association.configuredRoot, association.record).vault_id, registry), source: "registry-association" as const }
+    : null;
+  return { selection, registry };
 }
+
+interface ApplicabilityOptions { cwd?: string | undefined; registryPath?: string | undefined }
 
 export function resolveVault(
   selector: string | null = null,
-  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: { cwd?: string | undefined; registryPath?: string | undefined } = {},
+  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: ApplicabilityOptions = {},
 ): LoadedVault {
   if (selector !== null && selector !== undefined) {
     const selectorPath = path.resolve(expandHome(String(selector)));
@@ -195,8 +206,8 @@ export function resolveVault(
     throw new ResolutionError(`unknown vault selector: ${selector}`);
   }
 
-  const { vault, registry } = applicableVaultContext(cwd, registryPath);
-  if (vault) return vault;
+  const { selection, registry } = applicableVaultContext(cwd, registryPath);
+  if (selection) return selection.vault;
   if (!registry) throw new ResolutionError("internal error: registry unavailable after vault resolution");
   const candidates = registeredCandidates(registry);
   if (candidates.length === 1) return loadVault(candidates[0]![1]);
@@ -204,10 +215,14 @@ export function resolveVault(
   throw new ResolutionError(`vault selection is ambiguous; choose one of: ${candidates.map(([vaultId]) => vaultId).join(", ")}`);
 }
 
-export function resolveApplicableVault(
-  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: { cwd?: string | undefined; registryPath?: string | undefined } = {},
-): LoadedVault | null {
-  return applicableVaultContext(cwd, registryPath).vault;
+export function resolveApplicableVault(options: ApplicabilityOptions = {}): LoadedVault | null {
+  return resolveApplicableSelection(options)?.vault ?? null;
+}
+
+export function resolveApplicableSelection(
+  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: ApplicabilityOptions = {},
+): ApplicableSelection | null {
+  return applicableVaultContext(cwd, registryPath).selection;
 }
 
 export function registerVault(

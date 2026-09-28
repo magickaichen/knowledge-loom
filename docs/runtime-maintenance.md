@@ -40,8 +40,9 @@ are outside automatic user-home discovery: remove/disable their Knowledge Loom o
 before adopting this route. Do not enable an additional owner afterward.
 
 Setup preserves original configuration text in `~/.local/share/knowledge-loom/runtime-backups/`.
-It appends a bounded managed block to user `AGENTS.md` / `CLAUDE.md` and a SessionStart command to
-Codex `hooks.json` / Claude `settings.json`. Claude also receives a `Read|Skill` PreToolUse hook.
+It appends a bounded managed block to user `AGENTS.md` / `CLAUDE.md` and SessionStart and
+UserPromptSubmit commands to Codex `hooks.json` / Claude `settings.json`. Claude also receives a
+`Read|Skill` PreToolUse hook.
 Unrelated instruction text is preserved byte for byte;
 JSON retains unrelated values. Configuration symlinks require explicit owner migration. Repeating
 setup is idempotent. Previously bootstrapped runtime-specific targets remain tracked by the same
@@ -54,6 +55,23 @@ mean an active runtime has loaded the new configuration. Start or resume a runti
 that runtime, approve hook trust if required, and verify an actual route call before treating the
 cooperative route as active. Managed policy, disabled hooks, or an already loaded instruction snapshot
 can prevent activation. Setup does not override them or force an active session to restart.
+
+## Applicability notice
+
+When automatic applicability selects a vault for the hook event's `cwd`, both runtimes receive an
+**applicability notice**: appended after the routing block at SessionStart, and alone on every
+UserPromptSubmit. The notice names the vault ID, canonical root, and selection source (ancestor
+contract or registry association, including the main-checkout equivalent of a linked worktree),
+and asks for vault activation through the `use-knowledge-vault` skill call when a request is
+substantive and the session has not activated yet. Each prompt recomputes the notice from its own
+`cwd` and the current registry, so a directory change or registry edit takes effect on the next
+prompt. The hook keeps no session state.
+
+Computing the notice reads only the registry and the selected contract; it makes no network call,
+vault access, or note read. Without an applicable vault, UserPromptSubmit returns `{}` and
+SessionStart returns the routing block alone. An unreadable registry, invalid contract, or any other
+resolution error yields the same output, so the notice never blocks a prompt. The notice is a
+reminder; the probe and route remain authoritative for vault selection.
 
 ## Actual access and publication
 
@@ -86,8 +104,8 @@ before retrieval, and resolve the installed skill's canonical path again.
 Repeat the route at each actual access, including later accesses in a continuing session. The shared
 coordinator performs at most one due release observation per elapsed seven days and a vault check
 per elapsed 24 hours. Failed observations retain their own bounded backoff. Ordinary conversation,
-SessionStart, and unrelated hook events make no Knowledge Loom maintenance network calls. Runtime
-telemetry, model requests, and plugin-manager traffic are separate from maintenance.
+SessionStart, UserPromptSubmit, and unrelated hook events make no Knowledge Loom maintenance network
+calls. Runtime telemetry, model requests, and plugin-manager traffic are separate from maintenance.
 
 For `sync.mode: git-remote-push`, after an authorized audited focused commit, call the route with
 `--operation sync`. A rejected push reaches immediate reconciliation despite today's access cache.
@@ -127,7 +145,8 @@ preserved original text/skill directories. Never overwrite local edits with a bl
 This is a cooperative **external command boundary**, not universal read interception. Arbitrary shell
 reads, direct legacy CLI calls, disabled hooks, hosted tools, and opt-out tool paths can bypass it.
 Read-only `probe`, `resolve`, and `audit` remain read-only. User instructions are the persistent route;
-SessionStart is a redundant reminder; Claude PreToolUse covers only the native access paths above. No automatic hot-reload or
+SessionStart is a redundant reminder; the applicability notice accelerates the applicability
+decision without becoming a dependency; Claude PreToolUse covers only the native access paths above. No automatic hot-reload or
 loaded-skill-version introspection is claimed. See the [runtime verification record](runtime-verification.md)
 for exercised versions, capabilities, and untested paths.
 
