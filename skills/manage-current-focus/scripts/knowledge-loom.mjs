@@ -7869,8 +7869,8 @@ function resolveVault(selector = null, { cwd = process.cwd(), registryPath = def
   if (!candidates.length) throw new ResolutionError("no vault selected, no ancestor contract found, and registry has no valid vaults");
   throw new ResolutionError(`vault selection is ambiguous; choose one of: ${candidates.map(([vaultId]) => vaultId).join(", ")}`);
 }
-function resolveApplicableVault({ cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
-  return resolveApplicableSelection({ cwd, registryPath })?.vault ?? null;
+function resolveApplicableVault(options = {}) {
+  return resolveApplicableSelection(options)?.vault ?? null;
 }
 function resolveApplicableSelection({ cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
   return applicableVaultContext(cwd, registryPath).selection;

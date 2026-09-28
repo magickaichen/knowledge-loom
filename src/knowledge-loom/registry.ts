@@ -213,14 +213,14 @@ export function resolveVault(
   throw new ResolutionError(`vault selection is ambiguous; choose one of: ${candidates.map(([vaultId]) => vaultId).join(", ")}`);
 }
 
-export function resolveApplicableVault(
-  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: { cwd?: string | undefined; registryPath?: string | undefined } = {},
-): LoadedVault | null {
-  return resolveApplicableSelection({ cwd, registryPath })?.vault ?? null;
+interface ApplicabilityOptions { cwd?: string | undefined; registryPath?: string | undefined }
+
+export function resolveApplicableVault(options: ApplicabilityOptions = {}): LoadedVault | null {
+  return resolveApplicableSelection(options)?.vault ?? null;
 }
 
 export function resolveApplicableSelection(
-  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: { cwd?: string | undefined; registryPath?: string | undefined } = {},
+  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: ApplicabilityOptions = {},
 ): ApplicableSelection | null {
   return applicableVaultContext(cwd, registryPath).selection;
 }

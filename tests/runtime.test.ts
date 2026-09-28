@@ -29,15 +29,17 @@ test("setup applies twice, preserves unrelated instructions/settings and verifie
   fs.mkdirSync(path.join(home, ".claude"));
   fs.writeFileSync(path.join(home, ".claude/CLAUDE.md"), "Keep my guidance.\n");
   fs.writeFileSync(path.join(home, ".claude/settings.json"), JSON.stringify({ model: "keep", hooks: { Stop: [{ hooks: [{ type: "command", command: "echo keep" }] }] } }));
+  fs.mkdirSync(path.join(home, ".codex"));
+  fs.writeFileSync(path.join(home, ".codex/hooks.json"), JSON.stringify({ hooks: { UserPromptSubmit: [{ hooks: [{ type: "command", command: "echo keep" }] }] } }));
   const first = cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
   assert.equal(first.status, "configured");
   assert.equal(first.automaticMaintenance, false); // Runtime execution must be observed separately.
   const before = fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8");
   const codexBefore = fs.readFileSync(path.join(home, ".codex/hooks.json"), "utf8");
-  for (const config of [JSON.parse(before), JSON.parse(codexBefore)]) {
-    assert.equal(config.hooks.UserPromptSubmit.length, 1);
-    assert.equal(config.hooks.UserPromptSubmit[0].hooks[0].command, config.hooks.SessionStart[0].hooks[0].command);
-  }
+  const route = (config: any) => config.hooks.SessionStart[0].hooks[0].command;
+  const claude = JSON.parse(before), codex = JSON.parse(codexBefore);
+  assert.deepEqual(claude.hooks.UserPromptSubmit.map((group: any) => group.hooks[0].command), [route(claude)]);
+  assert.deepEqual(codex.hooks.UserPromptSubmit.map((group: any) => group.hooks[0].command), ["echo keep", route(codex)]);
   assert.deepEqual(JSON.parse(before).hooks.Stop, [{ hooks: [{ type: "command", command: "echo keep" }] }]);
   const second = cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
   assert.equal(second.status, "configured");
@@ -180,7 +182,7 @@ test("prompt and startup hooks deliver the applicability notice for the event's 
   assert.equal(await runCli(["associate", "acme-work", project, "--registry", registry, "--apply"], { stdout: quiet }), 0);
   const ports = { releases: { async list(): Promise<never> { throw new Error("unexpected network"); }, async stage() { throw new Error("unexpected staging"); } } };
   const hook = (runtime: string, event: string, cwd: string) => runRuntime("hook", ["--home", home, "--runtime", runtime], { ...ports, hookInput: { hook_event_name: event, cwd, prompt: "What changed on the project?" } }) as Promise<any>;
-  let routingOnly = "";
+  const routingOnly: Record<string, string> = {};
   const scenarios = [
     { cwd: path.join(vault, "Projects"), source: "its ancestor contract" },
     { cwd: project, source: "a registry association" },
@@ -197,7 +199,7 @@ test("prompt and startup hooks deliver the applicability notice for the event's 
     if (!notice) {
       assert.equal(appended, undefined, `${runtime} ${cwd}`);
       assert.deepEqual(prompt, {}, `${runtime} ${cwd}`);
-      if (runtime === "claude") routingOnly = startup.hookSpecificOutput.additionalContext;
+      routingOnly[runtime] = startup.hookSpecificOutput.additionalContext;
       continue;
     }
     assert.ok(appended?.startsWith(notice), `${runtime} ${cwd}: ${appended}`);
@@ -205,11 +207,14 @@ test("prompt and startup hooks deliver the applicability notice for the event's 
     assert.deepEqual(prompt, { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: appended } });
   }
   assert.equal(fs.existsSync(path.join(home, ".local/state")), false); // No vault access.
-  fs.writeFileSync(registry, "schema_version: [unreadable\n");
-  for (const runtime of ["codex", "claude"]) {
-    assert.deepEqual(await hook(runtime, "UserPromptSubmit", project), {});
+  const registryText = fs.readFileSync(registry, "utf8");
+  for (const unreadable of [() => fs.writeFileSync(registry, "schema_version: [unreadable\n"), () => { fs.writeFileSync(registry, registryText); fs.chmodSync(registry, 0); }]) {
+    unreadable();
+    for (const runtime of ["codex", "claude"]) {
+      assert.deepEqual(await hook(runtime, "UserPromptSubmit", project), {});
+      assert.equal((await hook(runtime, "SessionStart", project)).hookSpecificOutput.additionalContext, routingOnly[runtime]);
+    }
   }
-  assert.equal((await hook("claude", "SessionStart", project)).hookSpecificOutput.additionalContext, routingOnly);
 });
 test("setup refuses a runtime directory symlink escaping the selected home before any external write", (t) => {
   const temporary = temporaryDirectory(t);

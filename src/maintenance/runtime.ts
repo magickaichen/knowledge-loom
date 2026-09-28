@@ -26,6 +26,7 @@ function assertHomeDirectories(home: string): void {
 }
 function root(home: string): string { return path.join(home, ".local/share/knowledge-loom"); }
 function entry(home: string): string { return path.join(root(home), "maintenance.cjs"); }
+function registryPath(options: RuntimeOptions): string { return options.registry ?? path.join(options.home, ".config/knowledge-vault/registry.yaml"); }
 function instructions(home: string, runtime: string): string {
   const command = `${quote(process.execPath)} ${quote(entry(home))} route --home ${quote(home)} --runtime ${runtime}`;
   return `${START}
@@ -49,14 +50,15 @@ Continue authorized local work during remote failure; preserve pending sync, aud
 Arbitrary shell reads and opt-out tool paths bypass this cooperative route.
 ${END}`;
 }
-const SOURCES = { "ancestor-contract": "its ancestor contract", "registry-association": "a registry association" } as const;
+const SELECTION_SOURCE_PHRASES = { "ancestor-contract": "its ancestor contract", "registry-association": "a registry association" } as const;
+const NOTICE_EVENTS = ["SessionStart", "UserPromptSubmit"];
 /** Fails open: no applicable vault or any resolution error yields no notice. */
 function applicabilityNotice(cwd: string, registryPath: string): string | null {
   try {
     const selection = resolveApplicableSelection({ cwd, registryPath });
     if (!selection) return null;
     const vaultId = String(selection.vault.contract.vault_id);
-    return `Knowledge Loom: this directory is associated with vault \`${vaultId}\` (\`${selection.vault.root}\`) by ${SOURCES[selection.source]}. Vault activation starts with the \`use-knowledge-vault\` skill call; the maintenance route is a per-access check. When this request is substantive and this session has no vault activation yet, invoke \`use-knowledge-vault\` before the primary task. When the vault is already active, retrieve only knowledge not yet retrieved.`;
+    return `Knowledge Loom: this directory is associated with vault \`${vaultId}\` (\`${selection.vault.root}\`) by ${SELECTION_SOURCE_PHRASES[selection.source]}. Vault activation starts with the \`use-knowledge-vault\` skill call; the maintenance route is a per-access check. When this request is substantive and this session has no vault activation yet, invoke \`use-knowledge-vault\` before the primary task. When the vault is already active, retrieve only knowledge not yet retrieved.`;
   } catch {
     return null;
   }
@@ -80,7 +82,7 @@ function configuration(options: RuntimeOptions): { path: string; before: string;
     const command = `${quote(process.execPath)} ${quote(entry(options.home))} hook --home ${quote(options.home)} --runtime ${runtime}`;
     const hooks = config.hooks ??= {};
     if (!isUnknownRecord(hooks)) throw new Error(`invalid hooks: ${configPath}`);
-    for (const event of ["SessionStart", "UserPromptSubmit"]) {
+    for (const event of NOTICE_EVENTS) {
       const previous = hooks[event] ?? [];
       if (!Array.isArray(previous)) throw new Error(`invalid ${event} hooks: ${configPath}`);
       if (!previous.some((group: unknown) => isUnknownRecord(group) && Array.isArray(group.hooks) && group.hooks.some((hook: unknown) => isUnknownRecord(hook) && hook.command === command))) hooks[event] = [...previous, { hooks: [{ type: "command", command, timeout: 10 }] }];
@@ -147,7 +149,7 @@ async function setup(options: RuntimeOptions) {
   return { ...preview, status: "configured", verification: "external-command-only; runtime smoke required" };
 }
 async function route(options: RuntimeOptions, ports: RuntimePorts, releaseOnly = false) {
-  const context = { cwd: ports.cwd ?? process.cwd(), registryPath: options.registry ?? path.join(options.home, ".config/knowledge-vault/registry.yaml") };
+  const context = { cwd: ports.cwd ?? process.cwd(), registryPath: registryPath(options) };
   const vault = releaseOnly ? undefined : options.selector ? resolveVault(options.selector, context) : resolveApplicableVault(context);
   if (!vault && options.mode === "project") return { release: { status: "not-applicable" }, vault: { status: "not-applicable" } };
   if (vault) validateAuthority(vault);
@@ -202,7 +204,7 @@ async function toolHook(input: Record<string, unknown>, options: RuntimeOptions,
       if (!SKILLS.some((name) => name === toolInput.skill)) return {};
     } else {
       if (typeof toolInput.file_path !== "string") return {};
-      const vault = resolveApplicableVault({ cwd, registryPath: options.registry ?? path.join(options.home, ".config/knowledge-vault/registry.yaml") });
+      const vault = resolveApplicableVault({ cwd, registryPath: registryPath(options) });
       if (!vault) return {};
       const file = path.resolve(cwd, toolInput.file_path);
       if (!fs.existsSync(file) || !isWithin(vault.root, fs.realpathSync(file))) return {};
@@ -253,9 +255,9 @@ export async function runRuntime(command: string, args: string[], ports: Runtime
   if (command === "hook") {
     const input: unknown = ports.hookInput ?? JSON.parse(fs.readFileSync(0, "utf8") || "{}");
     if (isUnknownRecord(input) && input.hook_event_name === "PreToolUse") return toolHook(input, options, ports);
-    if (!isUnknownRecord(input) || (input.hook_event_name !== "SessionStart" && input.hook_event_name !== "UserPromptSubmit")) return {};
+    if (!isUnknownRecord(input) || !NOTICE_EVENTS.some((event) => event === input.hook_event_name)) return {};
     const cwd = typeof input.cwd === "string" ? input.cwd : ports.cwd ?? process.cwd();
-    const notice = applicabilityNotice(cwd, options.registry ?? path.join(options.home, ".config/knowledge-vault/registry.yaml"));
+    const notice = applicabilityNotice(cwd, registryPath(options));
     if (input.hook_event_name === "UserPromptSubmit") return notice ? { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: notice } } : {};
     const routing = instructions(options.home, options.runtime);
     return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: notice ? `${routing}\n${notice}` : routing } };

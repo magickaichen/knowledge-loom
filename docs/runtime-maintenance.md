@@ -104,8 +104,8 @@ before retrieval, and resolve the installed skill's canonical path again.
 Repeat the route at each actual access, including later accesses in a continuing session. The shared
 coordinator performs at most one due release observation per elapsed seven days and a vault check
 per elapsed 24 hours. Failed observations retain their own bounded backoff. Ordinary conversation,
-SessionStart, UserPromptSubmit, and unrelated hook events make no Knowledge Loom maintenance network calls. Runtime
-telemetry, model requests, and plugin-manager traffic are separate from maintenance.
+SessionStart, UserPromptSubmit, and unrelated hook events make no Knowledge Loom maintenance network
+calls. Runtime telemetry, model requests, and plugin-manager traffic are separate from maintenance.
 
 For `sync.mode: git-remote-push`, after an authorized audited focused commit, call the route with
 `--operation sync`. A rejected push reaches immediate reconciliation despite today's access cache.

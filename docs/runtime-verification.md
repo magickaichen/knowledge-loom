@@ -21,9 +21,8 @@ must also be supplied for actual adoption.
 
 [Codex hook documentation](https://learn.chatgpt.com/docs/hooks) describes user hooks and tool-path
 exceptions. [Claude hook documentation](https://code.claude.com/docs/en/hooks) describes SessionStart
-and UserPromptSubmit context delivery. The adapter uses startup and prompt context and user instruction
-files in both runtimes, plus native
-`Read|Skill` PreToolUse in Claude. It does not
+and UserPromptSubmit context delivery. The adapter uses startup and prompt context and user
+instruction files in both runtimes, plus native `Read|Skill` PreToolUse in Claude. It does not
 infer that a particular running session accepted hooks, supports hot reload, or exposes loaded skill
 versions from those documents. Both the configuration preview and status keep activation unverified.
 
