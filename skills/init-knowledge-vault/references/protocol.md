@@ -69,6 +69,16 @@ it. Treat implementation, planning, prioritization, review, research synthesis, 
 durable communication as substantive. Transient conversation that cannot reuse or produce durable
 context does not enter the loop.
 
+Vault activation starts with the `use-knowledge-vault` skill call, which loads the selected vault's
+contract, instruction roots, and navigation. Later retrieval in the same session follows them until
+that context is lost or the governing files change. A per-access maintenance check runs on every
+vault access and stays separate from activation.
+
+A runtime may deliver an applicability notice: an optional delivery of the automatic applicability
+result for the current directory. It prompts vault use without selecting the vault. The applicability
+probe remains authoritative and runs whether or not a notice arrived, so its current result, including
+a registry change made after the notice, decides the vault.
+
 An explicit request to consult, remember, update, sync, set up, initialize, or audit vault knowledge
 uses the full selection rules below instead of the automatic applicability probe. Zero-input setup
 is the exception: it follows **Bootstrap a useful vault**, including that section's selection

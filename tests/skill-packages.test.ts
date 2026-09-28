@@ -61,3 +61,16 @@ test("skill frontmatter and plugin manifests match the distribution", () => {
   assert.ok(Array.isArray(claude.skills) && claude.skills.every((entry) => typeof entry === "string"));
   assert.deepEqual(new Set((claude.skills as string[]).map((entry) => path.basename(entry))), skillNames);
 });
+
+test("vault activation starts with the use-knowledge-vault skill call", () => {
+  const [metadata] = splitFrontmatter(fs.readFileSync(path.join(PACKAGE_ROOT, "skills", "use-knowledge-vault", "SKILL.md"), "utf8"), { source: "use-knowledge-vault" });
+  const description = metadata.description as string;
+  assert.match(description, /^Invoke before substantive work in a vault-linked directory/);
+  assert.match(description, /skill call starts vault activation/);
+  assert.match(description, /consult, remember, update, or sync/);
+  const protocol = fs.readFileSync(path.join(PACKAGE_ROOT, "references", "protocol.md"), "utf8").replace(/\s+/g, " ");
+  assert.match(protocol, /Vault activation starts with the `use-knowledge-vault` skill call/);
+  assert.match(protocol, /applicability notice: an optional delivery of the automatic applicability result/);
+  assert.match(protocol, /prompts vault use without selecting the vault/);
+  assert.match(protocol, /applicability probe remains authoritative/);
+});
