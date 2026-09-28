@@ -21,7 +21,8 @@ must also be supplied for actual adoption.
 
 [Codex hook documentation](https://learn.chatgpt.com/docs/hooks) describes user hooks and tool-path
 exceptions. [Claude hook documentation](https://code.claude.com/docs/en/hooks) describes SessionStart
-context delivery. The adapter uses startup context and user instruction files in both runtimes, plus native
+and UserPromptSubmit context delivery. The adapter uses startup and prompt context and user instruction
+files in both runtimes, plus native
 `Read|Skill` PreToolUse in Claude. It does not
 infer that a particular running session accepted hooks, supports hot reload, or exposes loaded skill
 versions from those documents. Both the configuration preview and status keep activation unverified.
@@ -35,7 +36,7 @@ synthetic content. The dispatcher uses the same implementation as the installed 
 | Scenario | Observable evidence |
 | --- | --- |
 | Setup preview | No home mutation; proposed user instruction/configuration text returned |
-| Setup twice | Same JSON settings and one route; unrelated model, hooks and guidance preserved |
+| Setup twice | Same JSON settings and one route; SessionStart and UserPromptSubmit entries in both runtimes; unrelated model, hooks and guidance preserved |
 | Duplicate ordinary/plugin owners | Apply requires migration; local customization blocks adoption; original ordinary copy backed up; only Knowledge Loom plugin disabled |
 | Existing bootstrap | Shared targets become tracked links without breaking the old maintained targets |
 | Busy installation owner / escaped home | Setup refuses to configure while maintenance is busy or directory symlinks escape the selected home |
@@ -47,6 +48,7 @@ synthetic content. The dispatcher uses the same implementation as the installed 
 | Offline / local work / recovery | Failed access remains unavailable; local commit remains usable; pending publication survives and later synchronizes |
 | Push race | Fresh cache does not hide rejected push; isolated evidence returns; explicit synthetic evidence resolution preserves both contributions |
 | Ordinary conversation / startup | Unrelated events do nothing; SessionStart only returns instructions; no maintenance state or network calls |
+| Applicability notice | Both runtimes × SessionStart/UserPromptSubmit × ancestor contract, registry association, linked worktree, no vault; notice follows each event's `cwd`; unreadable registry fails open; no network, vault access, or note read |
 
 Existing `maintenance`, `access`, and `sync` suites retain concurrent observation, atomic replacement,
 interruption, bounded retries, authority revalidation, and adversarial reconciliation coverage. These

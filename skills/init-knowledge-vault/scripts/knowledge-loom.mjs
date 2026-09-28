@@ -7840,14 +7840,14 @@ function projectAssociation(start, registry) {
 }
 function applicableVaultContext(cwd, registryPath) {
   const ancestor3 = findAncestorVault(cwd);
-  if (ancestor3) return { vault: loadVault(ancestor3), registry: null };
+  if (ancestor3) return { selection: { vault: loadVault(ancestor3), source: "ancestor-contract" }, registry: null };
   const registry = loadRegistry(registryPath);
   const association = projectAssociation(cwd, registry) ?? (() => {
     const mainCheckout = mainCheckoutEquivalent(cwd);
     return mainCheckout ? projectAssociation(mainCheckout, registry) : null;
   })();
-  const vault = association ? registeredVault(projectRecord(association.configuredRoot, association.record).vault_id, registry) : null;
-  return { vault, registry };
+  const selection = association ? { vault: registeredVault(projectRecord(association.configuredRoot, association.record).vault_id, registry), source: "registry-association" } : null;
+  return { selection, registry };
 }
 function resolveVault(selector = null, { cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
   if (selector !== null && selector !== void 0) {
@@ -7861,8 +7861,8 @@ function resolveVault(selector = null, { cwd = process.cwd(), registryPath = def
     if (isUnknownRecord(record) && typeof record.path === "string") return loadVault(record.path);
     throw new ResolutionError(`unknown vault selector: ${selector}`);
   }
-  const { vault, registry } = applicableVaultContext(cwd, registryPath);
-  if (vault) return vault;
+  const { selection, registry } = applicableVaultContext(cwd, registryPath);
+  if (selection) return selection.vault;
   if (!registry) throw new ResolutionError("internal error: registry unavailable after vault resolution");
   const candidates = registeredCandidates(registry);
   if (candidates.length === 1) return loadVault(candidates[0][1]);
@@ -7870,7 +7870,10 @@ function resolveVault(selector = null, { cwd = process.cwd(), registryPath = def
   throw new ResolutionError(`vault selection is ambiguous; choose one of: ${candidates.map(([vaultId]) => vaultId).join(", ")}`);
 }
 function resolveApplicableVault({ cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
-  return applicableVaultContext(cwd, registryPath).vault;
+  return resolveApplicableSelection({ cwd, registryPath })?.vault ?? null;
+}
+function resolveApplicableSelection({ cwd = process.cwd(), registryPath = defaultRegistryPath() } = {}) {
+  return applicableVaultContext(cwd, registryPath).selection;
 }
 function registerVault(vaultId, root, { registryPath = defaultRegistryPath(), apply = false, rename = fs3.renameSync } = {}) {
   const vault = loadVault(root);

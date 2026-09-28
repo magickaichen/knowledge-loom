@@ -5,7 +5,7 @@ import os from "node:os";
 import { spawnSync } from "node:child_process";
 import { SKILLS, fingerprint, validateBundle } from "./bundle.js";
 import { maintain, type MaintenancePorts } from "./maintenance.js";
-import { resolveApplicableVault, resolveVault } from "../knowledge-loom/registry.js";
+import { resolveApplicableSelection, resolveApplicableVault, resolveVault } from "../knowledge-loom/registry.js";
 import { synchronizeVault } from "../knowledge-loom/sync.js";
 import { accessVault, validateAuthority } from "../knowledge-loom/access.js";
 import { isUnknownRecord } from "../knowledge-loom/contract.js";
@@ -49,6 +49,18 @@ Continue authorized local work during remote failure; preserve pending sync, aud
 Arbitrary shell reads and opt-out tool paths bypass this cooperative route.
 ${END}`;
 }
+const SOURCES = { "ancestor-contract": "its ancestor contract", "registry-association": "a registry association" } as const;
+/** Fails open: no applicable vault or any resolution error yields no notice. */
+function applicabilityNotice(cwd: string, registryPath: string): string | null {
+  try {
+    const selection = resolveApplicableSelection({ cwd, registryPath });
+    if (!selection) return null;
+    const vaultId = String(selection.vault.contract.vault_id);
+    return `Knowledge Loom: this directory is associated with vault \`${vaultId}\` (\`${selection.vault.root}\`) by ${SOURCES[selection.source]}. Vault activation starts with the \`use-knowledge-vault\` skill call; the maintenance route is a per-access check. When this request is substantive and this session has no vault activation yet, invoke \`use-knowledge-vault\` before the primary task. When the vault is already active, retrieve only knowledge not yet retrieved.`;
+  } catch {
+    return null;
+  }
+}
 function readText(file: string): string { return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : ""; }
 function record(file: string): Record<string, unknown> {
   const value: unknown = JSON.parse(readText(file) || "{}");
@@ -68,9 +80,11 @@ function configuration(options: RuntimeOptions): { path: string; before: string;
     const command = `${quote(process.execPath)} ${quote(entry(options.home))} hook --home ${quote(options.home)} --runtime ${runtime}`;
     const hooks = config.hooks ??= {};
     if (!isUnknownRecord(hooks)) throw new Error(`invalid hooks: ${configPath}`);
-    const previous = hooks.SessionStart ?? [];
-    if (!Array.isArray(previous)) throw new Error(`invalid SessionStart hooks: ${configPath}`);
-    if (!previous.some((group: unknown) => isUnknownRecord(group) && Array.isArray(group.hooks) && group.hooks.some((hook: unknown) => isUnknownRecord(hook) && hook.command === command))) hooks.SessionStart = [...previous, { hooks: [{ type: "command", command, timeout: 10 }] }];
+    for (const event of ["SessionStart", "UserPromptSubmit"]) {
+      const previous = hooks[event] ?? [];
+      if (!Array.isArray(previous)) throw new Error(`invalid ${event} hooks: ${configPath}`);
+      if (!previous.some((group: unknown) => isUnknownRecord(group) && Array.isArray(group.hooks) && group.hooks.some((hook: unknown) => isUnknownRecord(hook) && hook.command === command))) hooks[event] = [...previous, { hooks: [{ type: "command", command, timeout: 10 }] }];
+    }
     if (runtime === "claude") {
       const reads = hooks.PreToolUse ?? [];
       if (!Array.isArray(reads)) throw new Error(`invalid PreToolUse hooks: ${configPath}`);
@@ -239,8 +253,12 @@ export async function runRuntime(command: string, args: string[], ports: Runtime
   if (command === "hook") {
     const input: unknown = ports.hookInput ?? JSON.parse(fs.readFileSync(0, "utf8") || "{}");
     if (isUnknownRecord(input) && input.hook_event_name === "PreToolUse") return toolHook(input, options, ports);
-    if (!input || typeof input !== "object" || !("hook_event_name" in input) || input.hook_event_name !== "SessionStart") return {};
-    return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: instructions(options.home, options.runtime) } };
+    if (!isUnknownRecord(input) || (input.hook_event_name !== "SessionStart" && input.hook_event_name !== "UserPromptSubmit")) return {};
+    const cwd = typeof input.cwd === "string" ? input.cwd : ports.cwd ?? process.cwd();
+    const notice = applicabilityNotice(cwd, options.registry ?? path.join(options.home, ".config/knowledge-vault/registry.yaml"));
+    if (input.hook_event_name === "UserPromptSubmit") return notice ? { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: notice } } : {};
+    const routing = instructions(options.home, options.runtime);
+    return { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: notice ? `${routing}\n${notice}` : routing } };
   }
   throw new Error("unknown runtime command");
 }

@@ -19,6 +19,10 @@ test("setup previews external shared-owner routing without changing a home", (t)
   assert.deepEqual(fs.readdirSync(home), []);
   assert.ok(preview.changes.some((change: { path: string }) => change.path.endsWith(".codex/AGENTS.md")));
   assert.ok(preview.changes.some((change: { path: string }) => change.path.endsWith(".claude/CLAUDE.md")));
+  for (const file of [".codex/hooks.json", ".claude/settings.json"]) {
+    const { hooks } = JSON.parse(preview.changes.find((change: { path: string }) => change.path.endsWith(file)).proposed);
+    assert.deepEqual(hooks.UserPromptSubmit, hooks.SessionStart, file);
+  }
 });
 test("setup applies twice, preserves unrelated instructions/settings and verifies the external route", (t) => {
   const home = fs.realpathSync(temporaryDirectory(t));
@@ -29,9 +33,16 @@ test("setup applies twice, preserves unrelated instructions/settings and verifie
   assert.equal(first.status, "configured");
   assert.equal(first.automaticMaintenance, false); // Runtime execution must be observed separately.
   const before = fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8");
+  const codexBefore = fs.readFileSync(path.join(home, ".codex/hooks.json"), "utf8");
+  for (const config of [JSON.parse(before), JSON.parse(codexBefore)]) {
+    assert.equal(config.hooks.UserPromptSubmit.length, 1);
+    assert.equal(config.hooks.UserPromptSubmit[0].hooks[0].command, config.hooks.SessionStart[0].hooks[0].command);
+  }
+  assert.deepEqual(JSON.parse(before).hooks.Stop, [{ hooks: [{ type: "command", command: "echo keep" }] }]);
   const second = cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
   assert.equal(second.status, "configured");
   assert.equal(fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8"), before);
+  assert.equal(fs.readFileSync(path.join(home, ".codex/hooks.json"), "utf8"), codexBefore);
   assert.match(fs.readFileSync(path.join(home, ".claude/CLAUDE.md"), "utf8"), /^Keep my guidance\.\n/);
   assert.equal(JSON.parse(before).model, "keep");
   assert.equal(cli(home, "route", "--mode", "project").vault.status, "not-applicable");
@@ -147,6 +158,58 @@ test("ordinary conversation, startup and no associated vault cause no maintenanc
     else assert.deepEqual(JSON.parse(hook.stdout), {});
   }
   assert.deepEqual(fs.readdirSync(home), []);
+});
+test("prompt and startup hooks deliver the applicability notice for the event's cwd", async (t) => {
+  const { runRuntime } = await import("../src/maintenance/runtime.ts");
+  const { copyFixture } = await import("./helpers.ts");
+  const { runCli } = await import("../src/knowledge-loom/cli.ts");
+  const home = fs.realpathSync(temporaryDirectory(t));
+  const git = (cwd: string, ...args: string[]) => {
+    const result = spawnSync("git", ["-C", cwd, "-c", "user.name=Example", "-c", "user.email=example@example.com", ...args], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+  };
+  const vault = copyFixture("single-proactive", path.join(home, "vault"));
+  fs.chmodSync(path.join(vault, "INDEX.md"), 0); // Computing the notice reads no note.
+  const project = path.join(home, "project"); fs.mkdirSync(project);
+  git(project, "init", "--initial-branch=main"); git(project, "commit", "--allow-empty", "-m", "Initial");
+  const worktree = path.join(home, "worktree"); git(project, "worktree", "add", worktree);
+  const unrelated = path.join(home, "unrelated"); fs.mkdirSync(unrelated);
+  const registry = path.join(home, ".config/knowledge-vault/registry.yaml");
+  const quiet = { write(_value: string) {} };
+  assert.equal(await runCli(["register", "acme-work", vault, "--registry", registry, "--apply"], { stdout: quiet }), 0);
+  assert.equal(await runCli(["associate", "acme-work", project, "--registry", registry, "--apply"], { stdout: quiet }), 0);
+  const ports = { releases: { async list(): Promise<never> { throw new Error("unexpected network"); }, async stage() { throw new Error("unexpected staging"); } } };
+  const hook = (runtime: string, event: string, cwd: string) => runRuntime("hook", ["--home", home, "--runtime", runtime], { ...ports, hookInput: { hook_event_name: event, cwd, prompt: "What changed on the project?" } }) as Promise<any>;
+  let routingOnly = "";
+  const scenarios = [
+    { cwd: path.join(vault, "Projects"), source: "its ancestor contract" },
+    { cwd: project, source: "a registry association" },
+    { cwd: worktree, source: "a registry association" },
+    { cwd: unrelated, source: undefined },
+  ];
+  for (const runtime of ["codex", "claude"]) for (const { cwd, source } of scenarios) {
+    const notice = source && `Knowledge Loom: this directory is associated with vault \`acme-work\` (\`${fs.realpathSync(vault)}\`) by ${source}.`;
+    const startup = await hook(runtime, "SessionStart", cwd);
+    const prompt = await hook(runtime, "UserPromptSubmit", cwd);
+    assert.equal(startup.hookSpecificOutput.hookEventName, "SessionStart");
+    const [routing, appended] = startup.hookSpecificOutput.additionalContext.split("<!-- /knowledge-loom routing -->\n");
+    assert.match(routing, /^<!-- knowledge-loom routing -->\n[\s\S]*Repeat on actual access later/);
+    if (!notice) {
+      assert.equal(appended, undefined, `${runtime} ${cwd}`);
+      assert.deepEqual(prompt, {}, `${runtime} ${cwd}`);
+      if (runtime === "claude") routingOnly = startup.hookSpecificOutput.additionalContext;
+      continue;
+    }
+    assert.ok(appended?.startsWith(notice), `${runtime} ${cwd}: ${appended}`);
+    assert.match(appended, /invoke `use-knowledge-vault` before the primary task/);
+    assert.deepEqual(prompt, { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext: appended } });
+  }
+  assert.equal(fs.existsSync(path.join(home, ".local/state")), false); // No vault access.
+  fs.writeFileSync(registry, "schema_version: [unreadable\n");
+  for (const runtime of ["codex", "claude"]) {
+    assert.deepEqual(await hook(runtime, "UserPromptSubmit", project), {});
+  }
+  assert.equal((await hook("claude", "SessionStart", project)).hookSpecificOutput.additionalContext, routingOnly);
 });
 test("setup refuses a runtime directory symlink escaping the selected home before any external write", (t) => {
   const temporary = temporaryDirectory(t);
