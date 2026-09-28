@@ -51,7 +51,7 @@ Arbitrary shell reads and opt-out tool paths bypass this cooperative route.
 ${END}`;
 }
 const SELECTION_SOURCE_PHRASES = { "ancestor-contract": "its ancestor contract", "registry-association": "a registry association" } as const;
-const NOTICE_EVENTS = ["SessionStart", "UserPromptSubmit"];
+const NOTICE_EVENTS = ["SessionStart", "UserPromptSubmit"] as const;
 /** Fails open: no applicable vault or any resolution error yields no notice. */
 function applicabilityNotice(cwd: string, registryPath: string): string | null {
   try {

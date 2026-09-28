@@ -36,10 +36,11 @@ test("setup applies twice, preserves unrelated instructions/settings and verifie
   assert.equal(first.automaticMaintenance, false); // Runtime execution must be observed separately.
   const before = fs.readFileSync(path.join(home, ".claude/settings.json"), "utf8");
   const codexBefore = fs.readFileSync(path.join(home, ".codex/hooks.json"), "utf8");
-  const route = (config: any) => config.hooks.SessionStart[0].hooks[0].command;
-  const claude = JSON.parse(before), codex = JSON.parse(codexBefore);
-  assert.deepEqual(claude.hooks.UserPromptSubmit.map((group: any) => group.hooks[0].command), [route(claude)]);
-  assert.deepEqual(codex.hooks.UserPromptSubmit.map((group: any) => group.hooks[0].command), ["echo keep", route(codex)]);
+  type HookGroups = { hooks: [{ command: string }] }[];
+  const commands = (groups: HookGroups) => groups.map((group) => group.hooks[0].command);
+  const claude = JSON.parse(before) as { hooks: Record<string, HookGroups> }, codex = JSON.parse(codexBefore) as { hooks: Record<string, HookGroups> };
+  assert.deepEqual(commands(claude.hooks.UserPromptSubmit!), commands(claude.hooks.SessionStart!));
+  assert.deepEqual(commands(codex.hooks.UserPromptSubmit!), ["echo keep", ...commands(codex.hooks.SessionStart!)]);
   assert.deepEqual(JSON.parse(before).hooks.Stop, [{ hooks: [{ type: "command", command: "echo keep" }] }]);
   const second = cli(home, "setup", "--source", PACKAGE_ROOT, "--apply");
   assert.equal(second.status, "configured");

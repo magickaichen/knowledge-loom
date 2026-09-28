@@ -188,9 +188,11 @@ function applicableVaultContext(cwd: string, registryPath: string | undefined): 
   return { selection, registry };
 }
 
+interface ApplicabilityOptions { cwd?: string | undefined; registryPath?: string | undefined }
+
 export function resolveVault(
   selector: string | null = null,
-  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: { cwd?: string | undefined; registryPath?: string | undefined } = {},
+  { cwd = process.cwd(), registryPath = defaultRegistryPath() }: ApplicabilityOptions = {},
 ): LoadedVault {
   if (selector !== null && selector !== undefined) {
     const selectorPath = path.resolve(expandHome(String(selector)));
@@ -212,8 +214,6 @@ export function resolveVault(
   if (!candidates.length) throw new ResolutionError("no vault selected, no ancestor contract found, and registry has no valid vaults");
   throw new ResolutionError(`vault selection is ambiguous; choose one of: ${candidates.map(([vaultId]) => vaultId).join(", ")}`);
 }
-
-interface ApplicabilityOptions { cwd?: string | undefined; registryPath?: string | undefined }
 
 export function resolveApplicableVault(options: ApplicabilityOptions = {}): LoadedVault | null {
   return resolveApplicableSelection(options)?.vault ?? null;
