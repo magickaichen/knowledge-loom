@@ -106,6 +106,13 @@ association remains the nearest match.
 Before ordinary retrieval, complete **Prepare inbound access** for the selected vault. Explicit
 read-only audits and resolution probes retain their read-only behavior.
 
+Vault activation reads the contract and instruction roots in steps 1 and 2. Later retrieval during
+that activation follows and cites the loaded contract and instruction roots, and rereads them when
+inbound access reports `integrated` or a maintenance check reports release status `updated`,
+because either status means they may have changed. Every request still follows its matching
+context pointers, the boundary checks, and the remaining steps. Vault activation ends when that
+context is lost.
+
 1. Read `KNOWLEDGE_VAULT.md` completely.
 2. Resolve declared paths inside the vault boundary, then read its instruction roots and
    navigation entrypoints. Follow every instruction-root context pointer whose stated trigger
@@ -151,7 +158,8 @@ read-only audits and resolution probes retain their read-only behavior.
 ## Prepare inbound access
 
 1. Resolve one vault using the applicable selection mode. Read its contract and instruction roots
-   before invoking inbound access; their policy governs whether the operation is authorized.
+   before the first inbound access of a vault activation; their policy governs whether the
+   operation is authorized.
 2. Invoke `access` on the selected canonical root before reading knowledge. Without a selector it
    uses automatic applicability only; explicit operations resolve first and pass the root. Missing
    `sync.inbound` returns `not-enabled` without fetching. Offer a previewed migration when enabling

@@ -11,6 +11,10 @@ import { asRecord, FIXTURES, PACKAGE_ROOT, temporaryDirectory } from "./helpers.
 
 const SKILL_NAMES = Object.keys(SKILL_REFERENCES) as SkillName[];
 
+function normalizedProtocol(): string {
+  return fs.readFileSync(path.join(PACKAGE_ROOT, "references", "protocol.md"), "utf8").replace(/\s+/g, " ");
+}
+
 test("generated skill packages are current", async () => {
   for (const skillName of SKILL_NAMES) assert.deepEqual(await checkSkill(PACKAGE_ROOT, skillName), []);
 });
@@ -68,8 +72,14 @@ test("vault activation starts with the use-knowledge-vault skill call", () => {
   assert.match(description, /^Invoke before substantive work in a vault-linked directory/);
   assert.match(description, /skill call starts vault activation/);
   assert.match(description, /consult, remember, update, or sync/);
-  const protocol = fs.readFileSync(path.join(PACKAGE_ROOT, "references", "protocol.md"), "utf8").replace(/\s+/g, " ");
+  const protocol = normalizedProtocol();
   assert.match(protocol, /Vault activation starts with the `use-knowledge-vault` skill call/);
   assert.match(protocol, /applicability notice [^.]*\. It prompts vault use without selecting the vault/);
   assert.match(protocol, /applicability probe remains authoritative/);
+});
+
+test("vault activation rereads the contract and instruction roots only after integration or an updated release", () => {
+  const protocol = normalizedProtocol();
+  assert.match(protocol, /rereads them when inbound access reports `integrated` or a maintenance check reports release status `updated`/);
+  assert.match(protocol, /before the first inbound access of a vault activation/);
 });
