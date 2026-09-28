@@ -1,6 +1,6 @@
 ---
 name: use-knowledge-vault
-description: Invoke before substantive work in a vault-linked directory, or wherever an ancestor contract or project association may link one; this skill call starts vault activation for one governed Markdown vault. Also invoke for explicit requests to consult, remember, update, or sync vault knowledge.
+description: Invoke before substantive work in a vault-linked directory, where an ancestor contract or project association may apply; this skill call starts vault activation for one governed Markdown vault. Also invoke for explicit requests to consult, remember, update, or sync vault knowledge.
 ---
 
 # Use Knowledge Vault

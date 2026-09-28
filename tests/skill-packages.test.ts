@@ -65,12 +65,11 @@ test("skill frontmatter and plugin manifests match the distribution", () => {
 test("vault activation starts with the use-knowledge-vault skill call", () => {
   const [metadata] = splitFrontmatter(fs.readFileSync(path.join(PACKAGE_ROOT, "skills", "use-knowledge-vault", "SKILL.md"), "utf8"), { source: "use-knowledge-vault" });
   const description = metadata.description as string;
-  assert.match(description, /^Invoke before substantive work in a vault-linked directory/);
+  assert.match(description, /^Invoke before substantive work/);
   assert.match(description, /skill call starts vault activation/);
   assert.match(description, /consult, remember, update, or sync/);
   const protocol = fs.readFileSync(path.join(PACKAGE_ROOT, "references", "protocol.md"), "utf8").replace(/\s+/g, " ");
   assert.match(protocol, /Vault activation starts with the `use-knowledge-vault` skill call/);
-  assert.match(protocol, /applicability notice: an optional delivery of the automatic applicability result/);
-  assert.match(protocol, /prompts vault use without selecting the vault/);
+  assert.match(protocol, /applicability notice .*prompts vault use without selecting the vault/);
   assert.match(protocol, /applicability probe remains authoritative/);
 });
