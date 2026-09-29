@@ -33,6 +33,26 @@ so directional) supported the mechanism:
   following the routing instruction to reread before retrieval. That instruction conflicted with
   once-per-session activation and led to the conditional reread above.
 
+An acceptance run on the built changes (Claude Code 2.1.284, Codex CLI 0.158.0; the prototype
+prompt set, two sessions per runtime, two repetitions) confirmed the mechanism in both runtimes.
+It ran in an isolated home installed from `main` with `setup --apply`, against the same vault
+read-only:
+
+| Criterion | Claude | Codex | Prototype with notice |
+|---|---|---|---|
+| First substantive request starts activation with the skill call before the answer | 4/4 | 4/4 | Claude 3/4, Codex 4/4 |
+| Ordinary prompt starts no activation | 4/4 | 4/4 | Claude 4/4, Codex 4/4 |
+| Later substantive request repeats no skill call | 4/4 | 4/4 | Claude 4/4, Codex 4/4 |
+| Later substantive request rereads no contract or instruction root | 4/4 | 4/4 | Claude 4/4, Codex 0/4 |
+
+- Every `route` call reported release status `not-due` or `current` and vault status
+  `not-enabled`, so no turn called for a reread; the `integrated` and `updated` paths were not
+  exercised.
+- Hooks came from the isolated home's setup-installed configuration instead of per-invocation
+  flags, and Codex ran with `--dangerously-bypass-hook-trust`. The notice reached every Claude
+  turn and every Codex rollout.
+- The vault's Git status and `HEAD` matched before and after the runs.
+
 ## Considered options
 
 - **Hook-tracked activation state**, injecting only until activation is observed. Rejected: the
