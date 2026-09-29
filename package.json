@@ -35,7 +35,7 @@
     "build:maintenance": "node --import tsx scripts/build-maintenance.ts"
   },
   "dependencies": {
-    "yaml": "2.9.0"
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@types/node": "26.4.0",
