@@ -55,7 +55,10 @@ configuration change observed during setup stops replacement so the new text is 
 `configured` means the installed external command passed its local hook self-check. It does **not**
 mean an active runtime has loaded the new configuration. Start or resume a runtime as supported by
 that runtime, approve hook trust if required, and verify an actual route call before treating the
-cooperative route as active. Managed policy, disabled hooks, or an already loaded instruction snapshot
+cooperative route as active. Codex records hook trust per `hooks.json` entry in `config.toml`
+`hooks.state`, so its first interactive start after setup asks the user to trust the new
+SessionStart and UserPromptSubmit commands. Approve both so the startup routing text and the
+applicability notice reach the session. Managed policy, disabled hooks, or an already loaded instruction snapshot
 can prevent activation. Setup does not override them or force an active session to restart.
 
 ## Applicability notice

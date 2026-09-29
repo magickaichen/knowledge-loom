@@ -52,6 +52,8 @@ read-only:
   flags, and Codex ran with `--dangerously-bypass-hook-trust`. The notice reached every Claude
   turn and every Codex rollout.
 - The vault's Git status and `HEAD` matched before and after the runs.
+- Codex's first interactive start after setup asked the user to trust the new hooks, and approval
+  recorded trusted hashes for the `session_start` and `user_prompt_submit` entries in `hooks.state`.
 
 ## Considered options
 
