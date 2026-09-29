@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.10.0
+
+Codex and Claude Code now start vault activation on the first substantive request in a
+vault-linked directory and keep it for the session. Existing installations receive the new skills
+through release maintenance, but must re-run
+[setup](https://github.com/magickaichen/knowledge-loom/blob/v0.10.0/docs/runtime-maintenance.md)
+to add the UserPromptSubmit hook and the new routing text. Codex then asks the user to trust the
+new hooks on its first interactive start.
+
+### Added
+
+- Deliver an applicability notice through runtime hooks: after the routing text at SessionStart,
+  and alone on every UserPromptSubmit. It names the vault, its root, and the selection source, and
+  asks for the `use-knowledge-vault` skill call when a substantive request arrives before vault
+  activation. See [ADR 0001](https://github.com/magickaichen/knowledge-loom/blob/v0.10.0/docs/adr/0001-stateless-applicability-notice.md).
+- Add the UserPromptSubmit hook to Codex and Claude Code in setup preview and apply. Setup rewrites
+  an existing managed instruction block in place and preserves the surrounding text.
+
+### Changed
+
+- Run the maintenance route on every vault access, but reread the contract and instruction roots
+  only when it reports vault status `integrated` or release status `updated`. The routing text and
+  the protocol now agree.
+- Lead the `use-knowledge-vault` description with an imperative trigger for substantive work in a
+  vault-linked directory, and name the skill call as the start of vault activation.
+
+### Safety and compatibility
+
+- The notice is stateless and computed only from the event's `cwd`, the registry, and the selected
+  contract, with no network call, vault access, or note read. With no applicable vault or any
+  resolution error, it adds nothing and never blocks a prompt.
+- The applicability probe remains authoritative for vault selection; a registry change takes effect
+  at the next prompt. Runtimes without hooks keep the instruction-file route.
+- Preserve contract schema version 1, existing CLI commands, and read-only resolver and audit
+  behavior.
+
 ## v0.9.0
 
 Knowledge Loom now provides a shared maintenance entry point for stable skill releases and vault
